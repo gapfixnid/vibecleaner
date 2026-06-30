@@ -350,6 +350,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           key={pageIdx}
                           className={`page-item ${isSelected ? "selected" : ""}`}
                           style={{ top: `${itemIndex * PAGE_ROW_HEIGHT}px` }}
+                          data-tooltip={page.filename}
+                          data-tooltip-pos="page-item"
                           role="button"
                           tabIndex={0}
                           aria-current={isSelected}
@@ -381,7 +383,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               return label ? (
                                 <span
                                   className={`page-status-dot status-${status.kind}${status.blink ? " status-blink" : ""}`}
-                                  title={label}
                                   aria-label={label}
                                 />
                               ) : null;
@@ -411,10 +412,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 <span className="page-rename-ext">{splitName(page.filename).ext}</span>
                               </div>
                             ) : (
-                              <div className="page-filename" title={page.filename}>{page.filename}</div>
+                              <div className="page-filename">{page.filename}</div>
                             )}
                             <div className="page-stats">
-                              {page.width}x{page.height} • {page.bubble_count} bubbles
+                              {page.width}x{page.height}
                             </div>
                           </div>
                         </div>
@@ -837,6 +838,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         .page-item:hover {
           background: var(--fill-3);
+        }
+
+        .page-item[data-tooltip][data-tooltip-pos="page-item"]::after {
+          left: 8px;
+          right: auto;
+          top: calc(100% + 5px);
+          max-width: calc(var(--sidebar-width) - 28px);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          transform: translateX(0) translateY(-2px);
+          z-index: 20;
+        }
+
+        .page-item[data-tooltip][data-tooltip-pos="page-item"]:hover::after,
+        .page-item[data-tooltip][data-tooltip-pos="page-item"]:focus-visible::after {
+          transform: translateX(0) translateY(0);
         }
 
         .page-item.selected {
