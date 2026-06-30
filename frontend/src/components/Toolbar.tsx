@@ -19,7 +19,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onSaveProject,
   onPreferences,
   onAbout,
-  isDirty,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -46,7 +45,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     setMenuOpen(false);
     fn();
   };
-  const menuItemTabIndex = menuOpen ? 0 : -1;
 
   return (
     <header className="toolbar-container">
@@ -71,53 +69,45 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       <div className="drag-spacer" data-tauri-drag-region />
 
       <div className="toolbar-right">
-        <div className={`menu-wrapper ${menuOpen ? "open" : ""}`} ref={menuRef}>
-          <div
-            id="toolbar-action-flyout"
-            className="toolbar-flyout"
-            role="menu"
-            aria-label="Project actions"
-            aria-hidden={!menuOpen}
-          >
-            <button type="button" className="flyout-action" role="menuitem" tabIndex={menuItemTabIndex} onClick={runItem(onNewProject)}>
-              <FilePlus2 size={14} />
-              <span>New</span>
-            </button>
-            <button type="button" className="flyout-action" role="menuitem" tabIndex={menuItemTabIndex} onClick={runItem(onOpenProject)}>
-              <FolderOpen size={14} />
-              <span>Open</span>
-            </button>
-            <button
-              type="button"
-              className={`flyout-action ${isDirty ? "primary" : ""}`}
-              role="menuitem"
-              tabIndex={menuItemTabIndex}
-              onClick={runItem(onSaveProject)}
-            >
-              <Save size={14} />
-              <span>Save</span>
-            </button>
-            <button type="button" className="flyout-action" role="menuitem" tabIndex={menuItemTabIndex} onClick={runItem(onPreferences)}>
-              <Settings size={14} />
-              <span>Preferences</span>
-            </button>
-            <button type="button" className="flyout-action" role="menuitem" tabIndex={menuItemTabIndex} onClick={runItem(onAbout)}>
-              <Info size={14} />
-              <span>About</span>
-            </button>
-          </div>
+        <div className="menu-wrapper" ref={menuRef}>
           <button
             type="button"
             className={`toolbar-action menu-toggle ${menuOpen ? "active" : ""}`}
-            data-tooltip={menuOpen ? "Close" : "Menu"}
-            aria-label={menuOpen ? "Close Menu" : "Open Menu"}
+            data-tooltip="Menu"
+            aria-label="Menu"
             aria-haspopup="menu"
-            aria-controls="toolbar-action-flyout"
+            aria-controls="toolbar-dropdown-menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
           >
             <Menu size={18} />
           </button>
+
+          {menuOpen && (
+            <div id="toolbar-dropdown-menu" className="toolbar-menu" role="menu">
+              <button type="button" role="menuitem" onClick={runItem(onNewProject)}>
+                <FilePlus2 size={14} />
+                <span>New Project</span>
+              </button>
+              <button type="button" role="menuitem" onClick={runItem(onOpenProject)}>
+                <FolderOpen size={14} />
+                <span>Open Project</span>
+              </button>
+              <button type="button" role="menuitem" onClick={runItem(onSaveProject)}>
+                <Save size={14} />
+                <span>Save Project</span>
+              </button>
+              <div className="toolbar-menu-separator" />
+              <button type="button" role="menuitem" onClick={runItem(onPreferences)}>
+                <Settings size={14} />
+                <span>Preferences</span>
+              </button>
+              <button type="button" role="menuitem" onClick={runItem(onAbout)}>
+                <Info size={14} />
+                <span>About</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -259,49 +249,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         }
 
         .menu-wrapper {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
+          position: relative;
           pointer-events: auto;
-        }
-
-        .toolbar-flyout {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          height: 32px;
-          max-width: 0;
-          overflow: hidden;
-          padding: 0;
-          border: 1px solid transparent;
-          border-radius: 10px;
-          background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
-            var(--fill-4);
-          box-shadow: none;
-          opacity: 0;
-          pointer-events: none;
-          transform: translateX(18px) scaleX(0.94);
-          transform-origin: right center;
-          white-space: nowrap;
-          will-change: max-width, opacity, transform;
-          transition:
-            max-width 0.34s cubic-bezier(0.16, 1, 0.3, 1),
-            opacity 0.18s ease,
-            transform 0.34s cubic-bezier(0.16, 1, 0.3, 1),
-            padding 0.34s cubic-bezier(0.16, 1, 0.3, 1),
-            border-color 0.18s ease,
-            box-shadow 0.18s ease;
-        }
-
-        .menu-wrapper.open .toolbar-flyout {
-          max-width: 440px;
-          padding: 3px;
-          border-color: var(--border-color);
-          box-shadow: var(--inset-track-shadow);
-          opacity: 1;
-          pointer-events: auto;
-          transform: translateX(0) scaleX(1);
         }
 
         .toolbar-action {
@@ -360,76 +309,77 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           box-shadow: var(--control-active-shadow);
         }
 
-        .flyout-action {
-          height: 26px;
-          border: 1px solid transparent;
-          border-radius: 7px;
-          background: transparent;
-          color: var(--text-secondary);
-          cursor: pointer;
+        .toolbar-menu {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          min-width: 184px;
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+            var(--bg-panel);
+          border: 1px solid var(--border-color);
+          border-radius: 11px;
+          box-shadow: var(--shadow-lg);
+          padding: 6px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          z-index: 100;
+          transform-origin: top right;
+          will-change: opacity, transform;
+          animation: toolbarMenuEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes toolbarMenuEnter {
+          0% {
+            opacity: 0;
+            transform: translateX(14px) translateY(-4px) scale(0.96);
+          }
+          62% {
+            opacity: 1;
+            transform: translateX(-2px) translateY(0) scale(1.01);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(0) translateY(0) scale(1);
+          }
+        }
+
+        .toolbar-menu button {
           display: flex;
           align-items: center;
-          justify-content: center;
-          gap: 6px;
-          padding: 0 9px;
-          font-family: var(--font-family);
-          font-size: 12px;
-          font-weight: 600;
-          white-space: nowrap;
-          opacity: 0;
-          transform: translateX(8px);
-          will-change: opacity, transform;
-          transition:
-            background-color 0.14s ease,
-            border-color 0.14s ease,
-            color 0.14s ease,
-            opacity 0.22s ease,
-            transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        .menu-wrapper.open .flyout-action {
-          opacity: 1;
-          transform: translateX(0);
-          transition-delay: 0.05s;
-        }
-
-        .flyout-action:hover {
-          background: var(--fill-hover, var(--bg-input));
-          border-color: var(--border-color);
+          gap: 10px;
+          width: 100%;
+          padding: 7px 10px;
+          border: none;
+          background: transparent;
           color: var(--text-primary);
+          font-size: 13px;
+          font-weight: 500;
+          font-family: var(--font-family);
+          text-align: left;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background-color 0.14s ease, color 0.14s ease;
         }
 
-        .flyout-action svg {
+        .toolbar-menu button:hover {
+          background: var(--fill-hover, var(--bg-input));
+        }
+
+        .toolbar-menu button svg {
           color: var(--text-secondary);
           flex-shrink: 0;
         }
 
-        .flyout-action.primary {
-          background: var(--system-blue);
-          border-color: transparent;
-          color: white;
-          box-shadow: 0 5px 14px rgba(0, 122, 255, 0.22);
-        }
-
-        .flyout-action.primary svg {
-          color: white;
+        .toolbar-menu-separator {
+          height: 1px;
+          background: var(--border-color);
+          margin: 4px 6px;
         }
 
         @media (max-width: 760px) {
           .toolbar-subtitle {
-            display: none;
-          }
-
-          .menu-wrapper.open .toolbar-flyout {
-            max-width: 230px;
-          }
-
-          .flyout-action {
-            width: 28px;
-            padding: 0;
-          }
-
-          .flyout-action span {
             display: none;
           }
         }
