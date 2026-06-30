@@ -22,8 +22,9 @@ flowchart LR
 - `desktop/src-tauri/`: Tauri shell, backend process launcher, command forwarding to the local API.
 - `backend/`: FastAPI routes, project state, image processing services, OCR/detection/inpainting/rendering pipeline.
 - `backend/modules/`: model wrappers and lower-level image/OCR/rendering utilities.
-- `download_models.py`: downloads the core local model set used by detection and OCR.
+- `download_models.py`: downloads the core local model set into the user's app data directory.
 - `scripts/verify-packaging.py`: checks packaging prerequisites without downloading large model assets.
+- `scripts/build-runtime-sidecar.ps1`: builds the packaged backend sidecar from runtime-only dependencies.
 
 ## Translation Pipeline
 
@@ -74,7 +75,7 @@ python -m venv venv
 .\venv\Scripts\python.exe -m pip install -e .
 ```
 
-> **Note:** `requirements.txt` includes all core and optional Python dependencies. If you do not need PyTorch-based models (inpainting, Manga OCR torch path, font detection), you can remove the `torch`, `torchvision`, `torchmetrics`, and `pytorch-lightning` lines from `requirements.txt` before installing.
+> **Note:** `requirements.txt` is the full development environment. Release sidecar builds use `requirements-runtime.txt`, which excludes Torch packages and keeps model files outside the installer.
 
 Download the standard local models:
 
@@ -94,6 +95,7 @@ npm run dev
 | --- | --- |
 | `npm run dev` | Start Tauri development mode. Requires Rust/Cargo and the Python backend environment. |
 | `npm run build` | Build the Tauri desktop app. Requires a packaged backend sidecar. |
+| `npm run build:sidecar:runtime` | Build the Python backend sidecar from `requirements-runtime.txt`. |
 | `npm run sync-version` | Sync the root app version into app metadata files. |
 | `npm run verify:packaging` | Check sidecar, bundled font, and model registry metadata. |
 | `npm run verify:packaging:models` | Also require local model files to exist and pass checksum checks. |
@@ -107,8 +109,23 @@ npm run dev
 - Local browser and local process access are not the same security boundary. Treat the local API as a loopback service for the desktop app, not as a network service.
 - Translation provider credentials are configured in app settings. Do not commit local settings or API keys.
 - Model files are downloaded into the user data directory and are not committed to the repository.
+- Runtime sidecar builds use `.venv-runtime/`, `requirements-runtime.txt`, and PyInstaller excludes so optional Torch packages and model weights are not bundled into the installer.
 - Release builds need a backend sidecar at `desktop/src-tauri/binaries/server-x86_64-pc-windows-msvc.exe`.
 - Pretendard is bundled for Korean text rendering under `backend/app/assets/fonts/`.
+
+## Release Packaging
+
+Build the backend sidecar from a clean runtime-only environment:
+
+```powershell
+npm run build:sidecar:runtime
+npm run verify:packaging
+npm run build
+```
+
+Do not build the sidecar from `venv/` if that environment contains optional packages such as Torch, torchvision, spaCy, or notebook tooling. PyInstaller can detect imports even when they are only used by optional code paths, which inflates the sidecar. The runtime sidecar script creates `.venv-runtime/`, installs `requirements-runtime.txt`, excludes optional Torch modules, and copies the generated server to `desktop/src-tauri/binaries/server-x86_64-pc-windows-msvc.exe`.
+
+Model files are external runtime assets. They are resolved through `ModelDownloader` and saved under the platform-specific user data directory, for example `%LOCALAPPDATA%\vibecleaner\models` on Windows. Use `download_models.py` only to pre-warm a local machine; do not add downloaded model folders to Tauri resources.
 
 ## License
 

@@ -18,6 +18,14 @@ SIDECAR_RESOURCE = "binaries/server-x86_64-pc-windows-msvc.exe"
 SIDECAR_PATH = TAURI_ROOT / SIDECAR_RESOURCE
 BUNDLED_FONT = BACKEND_ROOT / "app" / "assets" / "fonts" / "PretendardVariable.ttf"
 BUNDLED_FONT_LICENSE = BACKEND_ROOT / "app" / "assets" / "fonts" / "LICENSE-Pretendard.txt"
+RUNTIME_REQUIREMENTS = REPO_ROOT / "requirements-runtime.txt"
+FORBIDDEN_RUNTIME_REQUIREMENTS = {
+    "torch",
+    "torchvision",
+    "torchmetrics",
+    "pytorch-lightning",
+    "pytorch_lightning",
+}
 
 
 def _add_backend_to_path() -> None:
@@ -51,6 +59,23 @@ def _check_tauri_resources(config: dict, errors: list[str]) -> None:
 def _check_fonts(errors: list[str]) -> None:
     _check_file(BUNDLED_FONT, "bundled Pretendard font", errors, min_size=100_000)
     _check_file(BUNDLED_FONT_LICENSE, "Pretendard font license", errors)
+
+
+def _check_runtime_requirements(errors: list[str]) -> None:
+    _check_file(RUNTIME_REQUIREMENTS, "runtime requirements", errors)
+    if not RUNTIME_REQUIREMENTS.exists():
+        return
+
+    for raw_line in RUNTIME_REQUIREMENTS.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        package_name = line.split(";", 1)[0].split("[", 1)[0]
+        for marker in ("==", ">=", "<=", "~=", "!=", ">", "<"):
+            package_name = package_name.split(marker, 1)[0]
+        package_name = package_name.strip().lower().replace("_", "-")
+        if package_name in FORBIDDEN_RUNTIME_REQUIREMENTS:
+            errors.append(f"runtime requirements must not include optional Torch package: {raw_line}")
 
 
 def _model_ids(profile: str):
@@ -118,6 +143,7 @@ def main() -> int:
     config = _load_tauri_config()
     _check_tauri_resources(config, errors)
     _check_fonts(errors)
+    _check_runtime_requirements(errors)
     _check_model_registry(args.profile, errors)
     if args.require_model_files:
         _check_model_files(args.profile, errors)

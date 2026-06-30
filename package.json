@@ -6,6 +6,7 @@
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
+    "build:sidecar:runtime": "powershell -ExecutionPolicy Bypass -File scripts/build-runtime-sidecar.ps1",
     "verify:packaging": ".\\venv\\Scripts\\python.exe scripts/verify-packaging.py",
     "verify:packaging:models": ".\\venv\\Scripts\\python.exe scripts/verify-packaging.py --require-model-files",
     "sync-version": "node scripts/sync-version.mjs"

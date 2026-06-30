@@ -2,6 +2,7 @@
 import logging
 
 import cv2
+import numpy as np
 from .factory import DetectionEngineFactory
 from modules.utils.textblock import TextBlock
 

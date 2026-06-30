@@ -1,8 +1,9 @@
 # ============================================================
 # vibecleaner - Python backend dependencies
 # ============================================================
-# Core dependencies required for the application to run.
-# Optional dependencies are listed in the [optional] section.
+# Full development environment dependencies.
+# For release sidecar packaging, install requirements-runtime.txt instead.
+# Optional Torch dependencies are also mirrored in requirements-torch.txt.
 # ============================================================
 
 # --- Web framework ---
