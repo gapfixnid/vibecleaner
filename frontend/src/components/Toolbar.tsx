@@ -57,7 +57,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
 
         <div className="app-logo" data-tauri-drag-region>
-          <span className="app-mark" aria-hidden="true">V</span>
+          <span className="app-mark" aria-hidden="true">
+            <img className="app-icon" src="/favicon.svg" alt="" draggable={false} />
+          </span>
           <div className="app-title-stack" data-tauri-drag-region>
             <span className="logo-text" data-tauri-drag-region>{APP_NAME}</span>
             <span className="toolbar-subtitle" data-tauri-drag-region>Image cleanup workspace</span>
@@ -243,11 +245,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             var(--fill-2);
           border: 1px solid var(--overlay-border);
           box-shadow: var(--control-active-shadow);
-          color: var(--text-primary);
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: 0;
-          line-height: 1;
+          overflow: hidden;
+        }
+
+        .app-icon {
+          width: 18px;
+          height: 18px;
+          display: block;
+          object-fit: contain;
+          user-select: none;
+          -webkit-user-drag: none;
         }
 
         .app-title-stack {
@@ -397,7 +404,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           flex-direction: column;
           gap: 2px;
           z-index: 100;
-          animation: dialogFadeIn 0.1s ease-out;
+          transform-origin: top right;
+          will-change: opacity, transform;
+          animation: toolbarMenuEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes toolbarMenuEnter {
+          0% {
+            opacity: 0;
+            transform: translateX(14px) translateY(-4px) scale(0.96);
+          }
+          62% {
+            opacity: 1;
+            transform: translateX(-2px) translateY(0) scale(1.01);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(0) translateY(0) scale(1);
+          }
         }
 
         .toolbar-menu button {
