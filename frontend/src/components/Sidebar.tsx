@@ -278,239 +278,242 @@ export const Sidebar: React.FC<SidebarProps> = ({
     Math.ceil(visibleBottom / PAGE_ROW_HEIGHT) + PAGE_OVERSCAN
   );
   const visiblePages = filteredPages.slice(startIndex, endIndex);
+  const hasPages = pages.length > 0;
 
   return (
-    <aside className="sidebar-container">
-      <div className="sidebar-header">
-        <div className="sidebar-title">
-          <Layers size={14} className="title-icon" />
-          <div className="sidebar-title-copy">
-            <span className="sidebar-title-main">Pages</span>
-            <span className="sidebar-title-sub">{pages.length} imported</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="sidebar-search-container">
-        <div className="search-input-wrapper">
-          <Search size={13} className="search-icon" />
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Filter pages..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="sidebar-scroll-area" ref={scrollAreaRef} onScroll={updateScrollMetrics}>
-        {/* PAGES GROUP */}
-        <div className="sidebar-group">
-          <div className="sidebar-group-header pages-group-header">
-            <div
-              className="pages-group-toggle"
-              role="button"
-              tabIndex={0}
-              aria-expanded={isImagesExpanded}
-              onClick={() => setIsImagesExpanded(!isImagesExpanded)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setIsImagesExpanded(!isImagesExpanded);
-                }
-              }}
-            >
-              <span className="sidebar-group-chevron">
-                {isImagesExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-              </span>
-              <span className="sidebar-group-title">Pages ({pages.length})</span>
-            </div>
-            <div className="pages-header-actions">
-              <button
-                type="button"
-                className="pages-add-btn"
-                data-tooltip="Add Images"
-                aria-label="Add Images"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onImportImages();
-                }}
-              >
-                <Plus size={14} />
-              </button>
-
-              <button
-                type="button"
-                className="pages-add-btn"
-                data-tooltip="Save Selected Images"
-                aria-label="Save Selected Images"
-                disabled={selectedPageIds.length === 0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onExportSelectedImages();
-                }}
-              >
-                <Save size={14} />
-              </button>
+    <aside className={`sidebar-container ${hasPages ? "" : "empty-only"}`}>
+      {hasPages ? (
+        <>
+          <div className="sidebar-header">
+            <div className="sidebar-title">
+              <Layers size={14} className="title-icon" />
+              <div className="sidebar-title-copy">
+                <span className="sidebar-title-main">Pages</span>
+                <span className="sidebar-title-sub">{pages.length} imported</span>
+              </div>
             </div>
           </div>
 
-          {isImagesExpanded && (
-            <div className="pages-list" ref={pagesListRef}>
-              {filteredPages.length === 0 ? (
-                <div className="empty-pages" role="status">
-                  <div className="empty-pages-icon" aria-hidden="true">
-                    <Layers size={18} />
-                  </div>
-                  <p className="empty-pages-title">
-                    {searchQuery ? "No matching pages" : "No images loaded"}
-                  </p>
-                  <p className="empty-pages-copy">
-                    {searchQuery ? "Try a different filename filter." : "Import manga or comic pages to begin cleanup."}
-                  </p>
-                  {!searchQuery && (
-                    <button type="button" className="empty-pages-action" onClick={onImportImages}>
-                      <Plus size={13} />
-                      <span>Add Images</span>
-                    </button>
+          <div className="sidebar-search-container">
+            <div className="search-input-wrapper">
+              <Search size={13} className="search-icon" />
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Filter pages..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="sidebar-scroll-area" ref={scrollAreaRef} onScroll={updateScrollMetrics}>
+            {/* PAGES GROUP */}
+            <div className="sidebar-group">
+              <div className="sidebar-group-header pages-group-header">
+                <div
+                  className="pages-group-toggle"
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isImagesExpanded}
+                  onClick={() => setIsImagesExpanded(!isImagesExpanded)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setIsImagesExpanded(!isImagesExpanded);
+                    }
+                  }}
+                >
+                  <span className="sidebar-group-chevron">
+                    {isImagesExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  </span>
+                  <span className="sidebar-group-title">Pages ({pages.length})</span>
+                </div>
+                <div className="pages-header-actions">
+                  <button
+                    type="button"
+                    className="pages-add-btn"
+                    data-tooltip="Add Images"
+                    aria-label="Add Images"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onImportImages();
+                    }}
+                  >
+                    <Plus size={14} />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="pages-add-btn"
+                    data-tooltip="Save Selected Images"
+                    aria-label="Save Selected Images"
+                    disabled={selectedPageIds.length === 0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onExportSelectedImages();
+                    }}
+                  >
+                    <Save size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {isImagesExpanded && (
+                <div className="pages-list" ref={pagesListRef}>
+                  {filteredPages.length === 0 ? (
+                    <div className="empty-pages" role="status">
+                      <div className="empty-pages-icon" aria-hidden="true">
+                        <Layers size={18} />
+                      </div>
+                      <p className="empty-pages-title">No matching pages</p>
+                      <p className="empty-pages-copy">Try a different filename filter.</p>
+                    </div>
+                  ) : (
+                    <div className="pages-virtual-spacer" style={{ height: `${filteredPages.length * PAGE_ROW_HEIGHT}px` }}>
+                    {visiblePages.map((page, visibleIdx) => {
+                      const itemIndex = startIndex + visibleIdx;
+                      const pageIdx = page.index;
+                      const isSelected = selectedPageIds.includes(pageIdx);
+                      const thumbUrl = `${backendUrl}/api/pages/${pageIdx}/image?type=original&thumbnail=true`;
+                      return (
+                        <div
+                          key={pageIdx}
+                          className={`page-item ${isSelected ? "selected" : ""}`}
+                          style={{ top: `${itemIndex * PAGE_ROW_HEIGHT}px` }}
+                          role="button"
+                          tabIndex={0}
+                          aria-current={isSelected}
+                          draggable={renamingIndex !== pageIdx}
+                          onDragStart={(e) => handleDragStart(e, pageIdx)}
+                          onDragOver={(e) => handleDragOver(e, pageIdx)}
+                          onDrop={(e) => handleDrop(e, pageIdx)}
+                          onClick={(e) => onPageClick(e, pageIdx)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onSelectPage(pageIdx);
+                            }
+                          }}
+                          onContextMenu={(e) => handleContextMenu(e, pageIdx)}
+                        >
+                          <div className="page-thumbnail-wrapper">
+                            <QueuedThumbnail
+                              src={thumbUrl}
+                              alt={`Page ${pageIdx + 1}`}
+                            />
+                            <span className="page-number-badge">{pageIdx + 1}</span>
+                            {(() => {
+                              const status = derivePageStatus(
+                                page, pageVersions[pageIdx] ?? 0,
+                                processingPages[pageIdx],
+                              );
+                              const label = pageStatusLabel(status.kind);
+                              return label ? (
+                                <span
+                                  className={`page-status-dot status-${status.kind}${status.blink ? " status-blink" : ""}`}
+                                  title={label}
+                                  aria-label={label}
+                                />
+                              ) : null;
+                            })()}
+                          </div>
+                          <div className="page-meta-info">
+                            {renamingIndex === pageIdx ? (
+                              <div className="page-rename" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  ref={renameInputRef}
+                                  className="page-rename-input"
+                                  value={renameDraft}
+                                  onChange={(e) => setRenameDraft(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    e.stopPropagation();
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      commitRename(pageIdx);
+                                    } else if (e.key === "Escape") {
+                                      e.preventDefault();
+                                      cancelRename();
+                                    }
+                                  }}
+                                  onBlur={cancelRename}
+                                  spellCheck={false}
+                                />
+                                <span className="page-rename-ext">{splitName(page.filename).ext}</span>
+                              </div>
+                            ) : (
+                              <div className="page-filename" title={page.filename}>{page.filename}</div>
+                            )}
+                            <div className="page-stats">
+                              {page.width}x{page.height} • {page.bubble_count} bubbles
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                    }
+                    </div>
                   )}
                 </div>
-              ) : (
-                <div className="pages-virtual-spacer" style={{ height: `${filteredPages.length * PAGE_ROW_HEIGHT}px` }}>
-                {visiblePages.map((page, visibleIdx) => {
-                  const itemIndex = startIndex + visibleIdx;
-                  const pageIdx = page.index;
-                  const isSelected = selectedPageIds.includes(pageIdx);
-                  const thumbUrl = `${backendUrl}/api/pages/${pageIdx}/image?type=original&thumbnail=true`;
-                  return (
-                    <div
-                      key={pageIdx}
-                      className={`page-item ${isSelected ? "selected" : ""}`}
-                      style={{ top: `${itemIndex * PAGE_ROW_HEIGHT}px` }}
-                      role="button"
-                      tabIndex={0}
-                      aria-current={isSelected}
-                      draggable={renamingIndex !== pageIdx}
-                      onDragStart={(e) => handleDragStart(e, pageIdx)}
-                      onDragOver={(e) => handleDragOver(e, pageIdx)}
-                      onDrop={(e) => handleDrop(e, pageIdx)}
-                      onClick={(e) => onPageClick(e, pageIdx)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onSelectPage(pageIdx);
-                        }
-                      }}
-                      onContextMenu={(e) => handleContextMenu(e, pageIdx)}
-                    >
-                      <div className="page-thumbnail-wrapper">
-                        <QueuedThumbnail
-                          src={thumbUrl}
-                          alt={`Page ${pageIdx + 1}`}
-                        />
-                        <span className="page-number-badge">{pageIdx + 1}</span>
-                        {(() => {
-                          const status = derivePageStatus(
-                            page, pageVersions[pageIdx] ?? 0,
-                            processingPages[pageIdx],
-                          );
-                          const label = pageStatusLabel(status.kind);
-                          return label ? (
-                            <span
-                              className={`page-status-dot status-${status.kind}${status.blink ? " status-blink" : ""}`}
-                              title={label}
-                              aria-label={label}
-                            />
-                          ) : null;
-                        })()}
-                      </div>
-                      <div className="page-meta-info">
-                        {renamingIndex === pageIdx ? (
-                          <div className="page-rename" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              ref={renameInputRef}
-                              className="page-rename-input"
-                              value={renameDraft}
-                              onChange={(e) => setRenameDraft(e.target.value)}
-                              onKeyDown={(e) => {
-                                e.stopPropagation();
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  commitRename(pageIdx);
-                                } else if (e.key === "Escape") {
-                                  e.preventDefault();
-                                  cancelRename();
-                                }
-                              }}
-                              onBlur={cancelRename}
-                              spellCheck={false}
-                            />
-                            <span className="page-rename-ext">{splitName(page.filename).ext}</span>
-                          </div>
-                        ) : (
-                          <div className="page-filename" title={page.filename}>{page.filename}</div>
-                        )}
-                        <div className="page-stats">
-                          {page.width}x{page.height} • {page.bubble_count} bubbles
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-                }
-                </div>
               )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {contextMenu && contextMenu.visible && createPortal(
-        (() => {
-          // When the right-clicked page is part of an active multi-selection,
-          // actions apply to the whole selection (mirrors the delete behavior).
-          const isMulti =
-            selectedPageIds.length > 1 && selectedPageIds.includes(contextMenu.pageIndex);
-          const pageIndex = contextMenu.pageIndex;
-          return (
-            <div
-              className="sidebar-context-menu"
-              style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {!isMulti && (
-                <button onClick={() => { startRename(pageIndex); setContextMenu(null); }}>
-                  <Pencil size={12} />
-                  <span>Rename</span>
-                </button>
-              )}
-              <button onClick={() => { onDuplicatePage(pageIndex); setContextMenu(null); }}>
-                <Copy size={12} />
-                <span>Duplicate</span>
-              </button>
-              <button className="danger" onClick={() => { onDeletePage(pageIndex); setContextMenu(null); }}>
-                <Trash2 size={12} />
-                <span>Delete</span>
-              </button>
-              <div className="sidebar-context-menu-separator" />
-              <button onClick={() => { onTranslatePages(pageIndex); setContextMenu(null); }}>
-                <Languages size={12} />
-                <span>{isMulti ? "Translate Pages" : "Translate Page"}</span>
-              </button>
-              <button onClick={() => { onSaveImages(pageIndex); setContextMenu(null); }}>
-                <Download size={12} />
-                <span>{isMulti ? "Save Images…" : "Save Image…"}</span>
-              </button>
-              <div className="sidebar-context-menu-separator" />
-              <button onClick={() => { onSelectAllPages(); setContextMenu(null); }}>
-                <CheckSquare size={12} />
-                <span>Select All</span>
-              </button>
-            </div>
-          );
-        })(),
-        document.body
+          {contextMenu && contextMenu.visible && createPortal(
+            (() => {
+              // When the right-clicked page is part of an active multi-selection,
+              // actions apply to the whole selection (mirrors the delete behavior).
+              const isMulti =
+                selectedPageIds.length > 1 && selectedPageIds.includes(contextMenu.pageIndex);
+              const pageIndex = contextMenu.pageIndex;
+              return (
+                <div
+                  className="sidebar-context-menu"
+                  style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {!isMulti && (
+                    <button onClick={() => { startRename(pageIndex); setContextMenu(null); }}>
+                      <Pencil size={12} />
+                      <span>Rename</span>
+                    </button>
+                  )}
+                  <button onClick={() => { onDuplicatePage(pageIndex); setContextMenu(null); }}>
+                    <Copy size={12} />
+                    <span>Duplicate</span>
+                  </button>
+                  <button className="danger" onClick={() => { onDeletePage(pageIndex); setContextMenu(null); }}>
+                    <Trash2 size={12} />
+                    <span>Delete</span>
+                  </button>
+                  <div className="sidebar-context-menu-separator" />
+                  <button onClick={() => { onTranslatePages(pageIndex); setContextMenu(null); }}>
+                    <Languages size={12} />
+                    <span>{isMulti ? "Translate Pages" : "Translate Page"}</span>
+                  </button>
+                  <button onClick={() => { onSaveImages(pageIndex); setContextMenu(null); }}>
+                    <Download size={12} />
+                    <span>{isMulti ? "Save Images…" : "Save Image…"}</span>
+                  </button>
+                  <div className="sidebar-context-menu-separator" />
+                  <button onClick={() => { onSelectAllPages(); setContextMenu(null); }}>
+                    <CheckSquare size={12} />
+                    <span>Select All</span>
+                  </button>
+                </div>
+              );
+            })(),
+            document.body
+          )}
+        </>
+      ) : (
+        <div className="empty-pages sidebar-empty-only" role="status">
+          <p className="empty-pages-title">No images loaded</p>
+          <button type="button" className="empty-pages-action" onClick={onImportImages}>
+            <Plus size={13} />
+            <span>Add Images</span>
+          </button>
+        </div>
       )}
 
       <style>{`
@@ -526,6 +529,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           flex-direction: column;
           height: 100%;
           user-select: none;
+        }
+
+        .sidebar-container.empty-only {
+          align-items: center;
+          justify-content: center;
+          padding: 40px 24px;
+          text-align: center;
         }
 
         .sidebar-header {
@@ -802,6 +812,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           padding: 28px 18px 26px;
           text-align: center;
           color: var(--text-tertiary);
+        }
+
+        .sidebar-empty-only {
+          width: 100%;
+          padding: 0;
+          gap: 12px;
+        }
+
+        .sidebar-empty-only .empty-pages-title {
+          margin: 0;
+          font-size: 15px;
+        }
+
+        .sidebar-empty-only .empty-pages-action {
+          margin-top: 0;
         }
 
         .empty-pages-icon {
