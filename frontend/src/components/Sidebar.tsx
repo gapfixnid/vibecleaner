@@ -294,6 +294,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 className="pages-add-btn"
                 data-tooltip="Add Images"
+                data-tooltip-pos="sidebar-action"
                 aria-label="Add Images"
                 onClick={onImportImages}
               >
@@ -303,7 +304,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 className="pages-add-btn"
-                data-tooltip="Save Selected Images"
+                data-tooltip="Save Images"
+                data-tooltip-pos="sidebar-action"
                 aria-label="Save Selected Images"
                 disabled={selectedPageIds.length === 0}
                 onClick={onExportSelectedImages}
@@ -508,12 +510,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           display: flex;
           align-items: center;
           justify-content: space-between;
+          gap: 10px;
+          overflow: visible;
         }
 
         .sidebar-title {
           display: flex;
           align-items: center;
           gap: 9px;
+          flex: 1 1 auto;
           min-width: 0;
         }
 
@@ -633,22 +638,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
 
         .sidebar-header-actions {
-          display: flex;
+          display: grid;
+          grid-auto-flow: column;
+          grid-auto-columns: 24px;
           align-items: center;
-          gap: 2px;
+          justify-content: end;
+          gap: 4px;
           flex-shrink: 0;
+          overflow: visible;
         }
 
         /* Header action tooltips sit at the top-right of the sidebar, so
            anchor them to the button's right edge (open leftward) to avoid the
            overflow clip / horizontal scroll at the sidebar boundary. */
-        .sidebar-header-actions [data-tooltip]::after {
+        .sidebar-header-actions [data-tooltip][data-tooltip-pos="sidebar-action"]::after {
           left: auto;
           right: 0;
+          max-width: calc(var(--sidebar-width) - 28px);
           transform: translateX(0) translateY(-2px);
+          text-align: center;
         }
 
-        .sidebar-header-actions [data-tooltip]:hover::after {
+        .sidebar-header-actions [data-tooltip][data-tooltip-pos="sidebar-action"]:hover::after,
+        .sidebar-header-actions [data-tooltip][data-tooltip-pos="sidebar-action"]:focus-visible::after {
           transform: translateX(0) translateY(0);
         }
 
