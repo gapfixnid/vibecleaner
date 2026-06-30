@@ -1,0 +1,770 @@
+# modules/rendering_wrapper.py
+from dataclasses import dataclass
+from typing import Callable, Optional as OptNone, Tuple
+
+import numpy as np
+from PySide6.QtGui import QFont, QFontMetricsF
+from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QRectF, Qt
+from modules.config import config
+from services.typesetting_service import dp_wrap_text, fit_font_size
+from services.font_resolver_service import resolver as font_resolver
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TextLineLayout:
+    text: str
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+@dataclass
+class TextLayoutResult:
+    font: QFont
+    lines: list[str]
+    render_width: float
+    line_layouts: list[TextLineLayout]
+    score: float = 0.0
+    is_overflow: bool = False
+    reached_min_font: bool = False
+
+
+class TextRenderer:
+    def __init__(self):
+        pass
+        
+    def wrap_text(self, text: str, width: float, font: QFont, allow_char_break: bool = False) -> list[str] | None:
+        """Wrap text using DP for optimal line breaking; falls back to greedy."""
+        metrics = QFontMetricsF(font)
+        measure = lambda s: metrics.horizontalAdvance(s)
+        line_height = metrics.lineSpacing()
+        result = dp_wrap_text(text, measure, width, float('inf'), no_space=False, line_height=line_height)
+        if all(metrics.horizontalAdvance(l) <= width * 1.01 for l in result.lines):
+            return result.lines
+        return self._wrap_text_greedy(text, width, font, allow_char_break)
+
+    def _wrap_text_greedy(self, text: str, width: float, font: QFont, allow_char_break: bool = False) -> list[str] | None:
+        """Original greedy wrapping (backward compatibility fallback)."""
+        metrics = QFontMetricsF(font)
+        paragraphs = text.split('\n')
+        all_lines = []
+        for paragraph in paragraphs:
+            if not paragraph.strip():
+                all_lines.append("")
+                continue
+            words = paragraph.split(' ')
+            current_line = ""
+            for word in words:
+                if not word:
+                    continue
+                test_line = word if not current_line else current_line + " " + word
+                if metrics.horizontalAdvance(test_line) <= width:
+                    current_line = test_line
+                else:
+                    if current_line:
+                        all_lines.append(current_line)
+                        current_line = ""
+                        if metrics.horizontalAdvance(word) <= width:
+                            current_line = word
+                            continue
+                    if allow_char_break:
+                        char_line = ""
+                        for char in word:
+                            test_char = char_line + char
+                            if metrics.horizontalAdvance(test_char) <= width:
+                                char_line = test_char
+                            else:
+                                if char_line:
+                                    all_lines.append(char_line)
+                                char_line = char
+                        current_line = char_line
+                    else:
+                        return None
+            if current_line:
+                all_lines.append(current_line)
+        return all_lines
+
+    def wrap_korean_text(self, text: str, width: float, font: QFont, allow_char_break: bool = True) -> list[str] | None:
+        """Wrap Korean/CJK text using DP for optimal line breaking."""
+        metrics = QFontMetricsF(font)
+        measure = lambda s: metrics.horizontalAdvance(s)
+        line_height = metrics.lineSpacing()
+        result = dp_wrap_text(text, measure, width, float('inf'), no_space=True, line_height=line_height)
+        if all(metrics.horizontalAdvance(l) <= width * 1.01 for l in result.lines):
+            return result.lines
+        return self._wrap_korean_text_greedy(text, width, font, allow_char_break)
+
+    def _wrap_korean_text_greedy(self, text: str, width: float, font: QFont, allow_char_break: bool = True) -> list[str] | None:
+        """Original greedy Korean wrapping (backward compatibility fallback)."""
+        metrics = QFontMetricsF(font)
+        paragraphs = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        wrapped = []
+        for paragraph in paragraphs:
+            if not paragraph.strip():
+                wrapped.append("")
+                continue
+            words = paragraph.split(" ")
+            current = ""
+            for word in words:
+                if not word:
+                    continue
+                candidate = word if not current else f"{current} {word}"
+                if metrics.horizontalAdvance(candidate) <= width:
+                    current = candidate
+                    continue
+                if current:
+                    wrapped.append(current)
+                    current = ""
+                if metrics.horizontalAdvance(word) <= width:
+                    current = word
+                    continue
+                if not allow_char_break:
+                    return None
+                parts = self._split_long_korean_word(word, width, metrics)
+                if not parts:
+                    return None
+                wrapped.extend(parts[:-1])
+                current = parts[-1]
+            if current:
+                wrapped.append(current)
+        return wrapped
+
+    def _split_long_korean_word(self, word: str, width: float, metrics: QFontMetricsF) -> list[str]:
+        break_after = set(",.!?;:)]}…")
+        break_before = set("([{")
+        parts: list[str] = []
+        current = ""
+        for char in word:
+            candidate = current + char
+            if not current or metrics.horizontalAdvance(candidate) <= width:
+                current = candidate
+                continue
+            if current[-1:] in break_before and len(current) > 1:
+                parts.append(current[:-1])
+                current = current[-1] + char
+            else:
+                parts.append(current)
+                current = char
+        if current:
+            parts.append(current)
+        merged: list[str] = []
+        for part in parts:
+            if merged and part and part[0] in break_after:
+                merged[-1] += part[0]
+                if len(part) > 1:
+                    merged.append(part[1:])
+            else:
+                merged.append(part)
+        return [part for part in merged if part]
+
+    def find_optimal_font_size(
+        self,
+        text: str,
+        rect: QRectF,
+        font_family: str | None = None,
+        min_size: float | None = None,
+        max_size: float | None = None,
+    ) -> tuple[QFont, list[str], float]:
+        """
+        Employs binary search to find the maximum font size that fits the text inside rect.
+        Includes safety margins and dynamic capping for aesthetically pleasing results.
+        """
+        # Calculate dynamic safety margin padding (proportional to bubble size)
+        if font_family is None:
+            # Use font resolver for best available font
+            resolved_font, chain = font_resolver.resolve(text, target_lang="Korean")
+            font_family = resolved_font.name
+            logger.debug(f"Font resolved: {font_family} (chain: {' → '.join(chain)})")
+        else:
+            app = QApplication.instance()
+            if app is None or not app.font().family():
+                font_family = "Segoe UI"
+        min_size = float(config.min_font_size if min_size is None else min_size)
+        max_size = float(config.max_font_size if max_size is None else max_size)
+
+        padding_x = min(8.0, rect.width() * 0.08)
+        padding_y = min(6.0, rect.height() * 0.08)
+        width = max(10.0, rect.width() - padding_x * 2)
+        height = max(10.0, rect.height() - padding_y * 2)
+        
+        # We first try to find a font size where words do not need to be broken (allow_char_break=False)
+        low = min_size
+        dynamic_max = min(max_size, height * 0.70, width * 0.70)
+        high = max(min_size, dynamic_max)
+        
+        optimal_size = min_size
+        optimal_lines = None
+        
+        # Binary search without character breaking
+        for _ in range(8):
+            mid = (low + high) / 2.0
+            font = QFont(font_family)
+            font.setPointSizeF(mid)
+            
+            lines = self.wrap_korean_text(text, width, font, allow_char_break=False)
+            if lines is None:
+                fits = False
+            else:
+                metrics = QFontMetricsF(font)
+                line_height = metrics.height()
+                total_height = line_height * len(lines)
+                
+                fits = True
+                if total_height > height:
+                    fits = False
+                else:
+                    for line in lines:
+                        if metrics.horizontalAdvance(line) > width:
+                            fits = False
+                            break
+            
+            if fits:
+                optimal_size = mid
+                optimal_lines = lines
+                low = mid + 0.1
+            else:
+                high = mid - 0.1
+                
+        # If we couldn't fit the text without character breaking, fall back to allow character breaking
+        if optimal_lines is None:
+            low = min_size
+            high = max(min_size, dynamic_max)
+            optimal_size = min_size
+            optimal_lines = self.wrap_korean_text(text, width, QFont(font_family, int(min_size)), allow_char_break=True)
+            
+            for _ in range(8):
+                mid = (low + high) / 2.0
+                font = QFont(font_family)
+                font.setPointSizeF(mid)
+                
+                lines = self.wrap_korean_text(text, width, font, allow_char_break=True)
+                metrics = QFontMetricsF(font)
+                line_height = metrics.height()
+                total_height = line_height * len(lines)
+                
+                fits = True
+                if total_height > height:
+                    fits = False
+                else:
+                    for line in lines:
+                        if metrics.horizontalAdvance(line) > width:
+                            fits = False
+                            break
+                            
+                if fits:
+                    optimal_size = mid
+                    optimal_lines = lines
+                    low = mid + 0.1
+                else:
+                    high = mid - 0.1
+                    
+        final_font = QFont(font_family)
+        final_font.setPointSizeF(optimal_size)
+        return final_font, optimal_lines or [text], width
+
+    def layout_lines_in_rect(
+        self,
+        lines: list[str],
+        rect: QRectF,
+        font: QFont,
+        render_width: float,
+        alignment: str = 'center',
+    ) -> TextLayoutResult:
+        metrics = QFontMetricsF(font)
+        line_height = metrics.height()
+        total_height = line_height * len(lines)
+        y_offset = max(0.0, (rect.height() - total_height) / 2.0)
+
+        # Horizontal positioning based on alignment
+        if alignment == 'left':
+            x_pos = rect.x()
+        elif alignment == 'right':
+            x_pos = rect.x() + rect.width() - render_width
+        else:  # center (default)
+            x_pos = rect.x() + (rect.width() - render_width) / 2.0
+
+        line_layouts = [
+            TextLineLayout(
+                text=line,
+                x=x_pos,
+                y=rect.y() + y_offset + index * line_height,
+                width=render_width,
+                height=line_height,
+            )
+            for index, line in enumerate(lines)
+        ]
+        is_overflow = total_height > rect.height() or any(metrics.horizontalAdvance(line) > render_width for line in lines)
+        return TextLayoutResult(
+            font=font,
+            lines=lines,
+            render_width=render_width,
+            line_layouts=line_layouts,
+            is_overflow=is_overflow,
+            reached_min_font=font.pointSizeF() <= float(config.min_font_size) + 0.1,
+        )
+
+    def make_ellipse_mask(self, width: int, height: int, inset: int = 0) -> np.ndarray:
+        width = max(1, int(width))
+        height = max(1, int(height))
+        inset = max(0, int(inset))
+        usable_w = max(1.0, width - inset * 2)
+        usable_h = max(1.0, height - inset * 2)
+        cy_grid, cx_grid = np.ogrid[:height, :width]
+        cx = (width - 1) / 2.0
+        cy = (height - 1) / 2.0
+        rx = max(1.0, usable_w / 2.0)
+        ry = max(1.0, usable_h / 2.0)
+        return ((((cx_grid - cx) / rx) ** 2 + ((cy_grid - cy) / ry) ** 2) <= 1.0).astype(np.uint8)
+
+    def find_optimal_font_size_for_mask(
+        self,
+        text: str,
+        rect: QRectF,
+        mask: np.ndarray,
+        font_family: str | None = None,
+        min_size: float | None = None,
+        max_size: float | None = None,
+    ) -> TextLayoutResult:
+        if font_family is None:
+            resolved_font, chain = font_resolver.resolve(text, target_lang="Korean")
+            font_family = resolved_font.name
+            logger.debug(f"Font resolved (mask): {font_family} (chain: {' → '.join(chain)})")
+        min_size = float(config.min_font_size if min_size is None else min_size)
+        max_size = float(config.max_font_size if max_size is None else max_size)
+
+        # Preprocess mask: Erode to reserve padding away from speech bubble outlines
+        if mask is not None and mask.ndim == 2 and np.any(mask):
+            import cv2
+            mh, mw = mask.shape[:2]
+            border_thickness = max(2, int(min(mw, mh) * 0.03))
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (border_thickness, border_thickness))
+            mask = cv2.erode(mask, kernel, iterations=1)
+
+        mask_bool = np.asarray(mask) > 0
+        if mask_bool.ndim != 2 or not bool(mask_bool.any()):
+            font, lines, render_width = self.find_optimal_font_size(text, rect, font_family, min_size, max_size)
+            return self.layout_lines_in_rect(lines, rect, font, render_width)
+
+        dynamic_max = min(max_size, max(min_size, rect.height() * 0.85, rect.width() * 0.65))
+        candidate_sizes = self._candidate_font_sizes(min_size, dynamic_max)
+        best_layout = self._best_layout_for_font_candidates(
+            text,
+            rect,
+            mask_bool,
+            font_family,
+            candidate_sizes,
+            allow_char_break=False,
+            dynamic_max=dynamic_max,
+        )
+
+        if best_layout is None:
+            best_layout = self._best_layout_for_font_candidates(
+                text,
+                rect,
+                mask_bool,
+                font_family,
+                candidate_sizes,
+                allow_char_break=True,
+                dynamic_max=dynamic_max,
+            )
+
+        if best_layout is not None:
+            return best_layout
+
+        font, lines, render_width = self.find_optimal_font_size(text, rect, font_family, min_size, max_size)
+        return self.layout_lines_in_rect(lines, rect, font, render_width)
+
+    def _candidate_font_sizes(self, min_size: float, max_size: float) -> list[float]:
+        if max_size <= min_size:
+            return [min_size]
+        values = np.linspace(max_size, min_size, num=18)
+        rounded = []
+        for value in values:
+            size = round(float(value) * 2.0) / 2.0
+            if size not in rounded:
+                rounded.append(size)
+        if min_size not in rounded:
+            rounded.append(min_size)
+        return rounded
+
+    def _best_layout_for_font_candidates(
+        self,
+        text: str,
+        rect: QRectF,
+        mask: np.ndarray,
+        font_family: str,
+        candidate_sizes: list[float],
+        allow_char_break: bool,
+        dynamic_max: float,
+    ) -> TextLayoutResult | None:
+        best_layout = None
+        best_score = float("inf")
+
+        for size in candidate_sizes:
+            font = QFont(font_family)
+            font.setPointSizeF(size)
+            layout = self._layout_text_in_mask(text, rect, mask, font, allow_char_break=allow_char_break)
+            if layout is None:
+                continue
+
+            font_reward = (size / max(1.0, dynamic_max)) * 0.22
+            candidate_score = layout.score - font_reward
+            if candidate_score < best_score:
+                best_score = candidate_score
+                best_layout = layout
+
+        return best_layout
+
+    def _layout_text_in_mask(
+        self,
+        text: str,
+        rect: QRectF,
+        mask: np.ndarray,
+        font: QFont,
+        allow_char_break: bool,
+    ) -> TextLayoutResult | None:
+        metrics = QFontMetricsF(font)
+        line_height = max(1.0, metrics.height())
+        slots = self._line_slots_from_mask(mask, rect, line_height)
+        if not slots:
+            return None
+
+        best_result = None
+        best_score = float("inf")
+
+        for start in range(len(slots)):
+            available_slots = slots[start:]
+            wrap_result = self._best_wrap_text_to_slots(text, available_slots, font, allow_char_break)
+            if wrap_result is None:
+                continue
+
+            wrapped, advances, wrap_score = wrap_result
+            used_slots = available_slots[: len(wrapped)]
+            line_layouts = [
+                TextLineLayout(
+                    text=line,
+                    x=slot.x,
+                    y=slot.y,
+                    width=slot.width,
+                    height=slot.height,
+                )
+                for line, slot in zip(wrapped, used_slots)
+            ]
+
+            score = self._layout_score(line_layouts, advances, used_slots, rect, mask, line_height, wrap_score)
+            if score < best_score:
+                best_score = score
+                best_result = TextLayoutResult(
+                    font=font,
+                    lines=wrapped,
+                    render_width=max(slot.width for slot in used_slots),
+                    line_layouts=line_layouts,
+                    score=score,
+                    is_overflow=False,
+                    reached_min_font=font.pointSizeF() <= float(config.min_font_size) + 0.1,
+                )
+
+        return best_result
+
+    def _layout_score(
+        self,
+        line_layouts: list[TextLineLayout],
+        advances: list[float],
+        slots: list[TextLineLayout],
+        rect: QRectF,
+        mask: np.ndarray,
+        line_height: float,
+        wrap_score: float,
+    ) -> float:
+        if not line_layouts:
+            return float("inf")
+
+        used_center = (line_layouts[0].y + line_layouts[-1].y + line_height) / 2.0
+        rect_center = rect.y() + rect.height() / 2.0
+        center_penalty = abs(used_center - rect_center) / max(1.0, rect.height())
+        vertical_fill = (len(line_layouts) * line_height) / max(1.0, rect.height())
+        avg_util = float(
+            np.mean([advance / max(1.0, slot.width) for advance, slot in zip(advances, slots)])
+        )
+        text_area = sum(max(1.0, advance) * line_height * 0.72 for advance in advances)
+        bubble_area = float(max(1, np.count_nonzero(mask)))
+        fill_ratio = text_area / bubble_area
+        target_fill = 0.62
+        fill_penalty = max(0.0, target_fill - fill_ratio) ** 2 * 2.8
+        overfill_penalty = max(0.0, fill_ratio - 0.84) ** 2 * 1.5
+        underfill_penalty = max(0.0, 0.36 - vertical_fill) * 0.4
+        return (
+            wrap_score
+            + center_penalty * 0.9
+            + underfill_penalty
+            + fill_penalty
+            + overfill_penalty
+            - avg_util * 0.10
+        )
+
+    def _line_slots_from_mask(self, mask: np.ndarray, rect: QRectF, line_height: float) -> list[TextLineLayout]:
+        ys, _ = np.where(mask)
+        if ys.size == 0:
+            return []
+
+        y_min = int(ys.min())
+        y_max = int(ys.max()) + 1
+        band_height = max(1, int(round(line_height)))
+        min_width = max(10.0, rect.width() * 0.12)
+        slots: list[TextLineLayout] = []
+
+        top = y_min
+        while top + band_height <= y_max:
+            band = mask[top : top + band_height, :]
+            row_mins = []
+            row_maxs = []
+            for row in band:
+                xs = np.where(row)[0]
+                if xs.size:
+                    row_mins.append(int(xs.min()))
+                    row_maxs.append(int(xs.max()) + 1)
+
+            if len(row_mins) >= max(1, int(band_height * 0.6)):
+                x1 = float(np.percentile(row_mins, 75))
+                x2 = float(np.percentile(row_maxs, 25))
+                width = x2 - x1
+                if width >= min_width:
+                    slots.append(
+                        TextLineLayout(
+                            text="",
+                            x=rect.x() + x1,
+                            y=rect.y() + top,
+                            width=width,
+                            height=line_height,
+                        )
+                    )
+
+            top += band_height
+
+        return slots
+
+    def _best_wrap_text_to_slots(
+        self,
+        text: str,
+        slots: list[TextLineLayout],
+        font: QFont,
+        allow_char_break: bool,
+    ) -> tuple[list[str], list[float], float] | None:
+        paragraphs = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        lines: list[str] = []
+        advances: list[float] = []
+        total_score = 0.0
+        slot_offset = 0
+
+        for index, paragraph in enumerate(paragraphs):
+            remaining = paragraphs[index + 1 :]
+            min_remaining_slots = sum(1 for item in remaining if item.strip()) + sum(1 for item in remaining if not item.strip())
+            max_end = max(slot_offset, len(slots) - min_remaining_slots)
+
+            if not paragraph.strip():
+                if slot_offset >= len(slots):
+                    return None
+                lines.append("")
+                advances.append(0.0)
+                slot_offset += 1
+                continue
+
+            paragraph_slots = slots[slot_offset:max_end]
+            result = self._best_wrap_paragraph_to_slots(paragraph, paragraph_slots, font, allow_char_break)
+            if result is None:
+                return None
+
+            paragraph_lines, paragraph_advances, paragraph_score = result
+            lines.extend(paragraph_lines)
+            advances.extend(paragraph_advances)
+            total_score += paragraph_score
+            slot_offset += len(paragraph_lines)
+
+        if not lines:
+            return None
+        return lines, advances, total_score
+
+    def _best_wrap_paragraph_to_slots(
+        self,
+        paragraph: str,
+        slots: list[TextLineLayout],
+        font: QFont,
+        allow_char_break: bool,
+    ) -> tuple[list[str], list[float], float] | None:
+        if not slots:
+            return None
+
+        candidates = []
+        word_tokens = [token for token in paragraph.split(" ") if token]
+        if word_tokens:
+            candidates.append((word_tokens, " "))
+        if allow_char_break or " " not in paragraph:
+            char_tokens = [char for char in paragraph if not char.isspace()]
+            if char_tokens:
+                candidates.append((char_tokens, ""))
+
+        metrics = QFontMetricsF(font)
+        best = None
+
+        for tokens, joiner in candidates:
+            result = self._wrap_tokens_with_dp(tokens, joiner, slots, metrics)
+            if result is None:
+                continue
+            if best is None or result[2] < best[2]:
+                best = result
+
+        return best
+
+    def _wrap_tokens_with_dp(
+        self,
+        tokens: list[str],
+        joiner: str,
+        slots: list[TextLineLayout],
+        metrics: QFontMetricsF,
+    ) -> tuple[list[str], list[float], float] | None:
+        line_cache: dict[tuple[int, int], tuple[str, float]] = {}
+        memo: dict[tuple[int, int], tuple[float, list[str], list[float]] | None] = {}
+
+        def line_info(start: int, end: int) -> tuple[str, float]:
+            key = (start, end)
+            if key not in line_cache:
+                line = joiner.join(tokens[start:end])
+                line_cache[key] = (line, float(metrics.horizontalAdvance(line)))
+            return line_cache[key]
+
+        def solve(token_index: int, slot_index: int) -> tuple[float, list[str], list[float]] | None:
+            if token_index >= len(tokens):
+                return 0.0, [], []
+            if slot_index >= len(slots):
+                return None
+
+            key = (token_index, slot_index)
+            if key in memo:
+                return memo[key]
+
+            slot_width = slots[slot_index].width
+            best_state = None
+
+            for end in range(token_index + 1, len(tokens) + 1):
+                line, advance = line_info(token_index, end)
+                if advance > slot_width:
+                    break
+
+                rest = solve(end, slot_index + 1)
+                if rest is None:
+                    continue
+
+                is_last_line = end >= len(tokens)
+                line_score = self._line_wrap_score(line, advance, slot_width, is_last_line)
+                rest_score, rest_lines, rest_advances = rest
+                score = line_score + rest_score
+                candidate = (score, [line] + rest_lines, [advance] + rest_advances)
+                if best_state is None or score < best_state[0]:
+                    best_state = candidate
+
+            memo[key] = best_state
+            return best_state
+
+        result = solve(0, 0)
+        if result is None:
+            return None
+        score, lines, advances = result
+        return lines, advances, score
+
+    def _line_wrap_score(self, line: str, advance: float, width: float, is_last_line: bool) -> float:
+        width = max(1.0, width)
+        util = max(0.0, min(1.0, advance / width))
+        unused = 1.0 - util
+        if is_last_line:
+            score = unused * unused * 0.35
+            if util < 0.30:
+                score += (0.30 - util) ** 2 * 0.8
+        else:
+            score = unused * unused * 1.45
+            if util < 0.55:
+                score += (0.55 - util) ** 2 * 1.8
+
+        if len(line.strip()) <= 1:
+            score += 1.2
+        return score + 0.025
+
+    def wrap_text_to_widths(
+        self,
+        text: str,
+        widths: list[float],
+        font: QFont,
+        allow_char_break: bool = False,
+    ) -> list[str] | None:
+        metrics = QFontMetricsF(font)
+        lines: list[str] = []
+        line_index = 0
+
+        def current_width() -> float | None:
+            if line_index >= len(widths):
+                return None
+            return widths[line_index]
+
+        paragraphs = text.split("\n")
+        for paragraph_index, paragraph in enumerate(paragraphs):
+            if paragraph_index > 0:
+                if line_index >= len(widths):
+                    return None
+            if not paragraph.strip():
+                lines.append("")
+                line_index += 1
+                continue
+
+            words = paragraph.split(" ")
+            current_line = ""
+            word_index = 0
+            while word_index < len(words):
+                word = words[word_index]
+                if not word:
+                    word_index += 1
+                    continue
+
+                width = current_width()
+                if width is None:
+                    return None
+
+                candidate = word if not current_line else current_line + " " + word
+                if metrics.horizontalAdvance(candidate) <= width:
+                    current_line = candidate
+                    word_index += 1
+                    continue
+
+                if current_line:
+                    lines.append(current_line)
+                    line_index += 1
+                    current_line = ""
+                    continue
+
+                if not allow_char_break:
+                    return None
+
+                char_line = ""
+                for char in word:
+                    width = current_width()
+                    if width is None:
+                        return None
+
+                    candidate = char_line + char
+                    if not char_line or metrics.horizontalAdvance(candidate) <= width:
+                        char_line = candidate
+                    else:
+                        lines.append(char_line)
+                        line_index += 1
+                        char_line = char
+                current_line = char_line
+                word_index += 1
+
+            if current_line:
+                lines.append(current_line)
+                line_index += 1
+
+        return lines

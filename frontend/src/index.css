@@ -1,0 +1,14 @@
+/* frontend/src/index.css */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* App background follows the active theme. The pre-paint fallback lives inline
+   in index.html so there is no flash before this loads. */
+body {
+  background-color: var(--bg-app);
+}

@@ -1,0 +1,16 @@
+{
+  "name": "vibecleaner-root",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "verify:packaging": ".\\venv\\Scripts\\python.exe scripts/verify-packaging.py",
+    "verify:packaging:models": ".\\venv\\Scripts\\python.exe scripts/verify-packaging.py --require-model-files",
+    "sync-version": "node scripts/sync-version.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.3"
+  }
+}

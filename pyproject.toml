@@ -1,0 +1,25 @@
+[project]
+name = "vibecleaner"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = [".", "backend"]
+
+[tool.mypy]
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_return_any = true
+no_implicit_reexport = true
+strict_equality = true
+ignore_missing_imports = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = ["modules.*", "imkit.*"]
+ignore_errors = true

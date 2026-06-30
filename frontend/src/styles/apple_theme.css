@@ -1,0 +1,255 @@
+/* frontend/src/styles/apple_theme.css */
+
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Accessibility: visible keyboard focus indicator (HIG).
+   Only shown for keyboard navigation, never for mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--system-blue);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Accessibility: respect the user's Reduce Motion setting (HIG). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Custom tooltips (replaces native title boxes).
+   Usage: data-tooltip="Label" + optional data-tooltip-pos="top" (default bottom). */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  transform: translateX(-50%) translateY(-2px);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 1000;
+}
+[data-tooltip][data-tooltip-pos="top"]::after {
+  top: auto;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%) translateY(2px);
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  transition-delay: 0.25s;
+}
+[data-tooltip]:disabled::after {
+  display: none;
+}
+
+/* App container */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--bg-app);
+}
+
+/* Apple Squircle / Continuous Corner Button */
+.apple-button {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-6);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.apple-button:hover {
+  background-color: var(--fill-1);
+}
+
+.apple-button:active {
+  transform: scale(0.97);
+}
+
+.apple-button.primary {
+  background-color: var(--system-blue);
+  border-color: transparent;
+  color: white;
+}
+
+.apple-button.primary:hover {
+  background-color: var(--system-blue-hover);
+}
+
+.apple-button.danger {
+  background-color: rgba(255, 59, 48, 0.15);
+  border-color: rgba(255, 59, 48, 0.3);
+  color: var(--system-red);
+}
+
+.apple-button.danger:hover {
+  background-color: rgba(255, 59, 48, 0.25);
+}
+
+.apple-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Apple SF Input */
+.apple-input {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: var(--space-4) var(--space-6);
+  font-size: 13px;
+  font-family: var(--font-family);
+  width: 100%;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.apple-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+  background-color: var(--bg-input-focus);
+}
+
+/* Apple-style numeric stepper (always-visible up/down buttons) */
+.number-stepper {
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--field-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.number-stepper:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+
+.number-stepper-input {
+  width: 56px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 12px;
+  text-align: center;
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  outline: none;
+}
+
+.number-stepper-unit {
+  display: flex;
+  align-items: center;
+  padding-right: var(--space-3);
+  color: var(--text-secondary);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.number-stepper-buttons {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--separator);
+}
+
+.number-stepper-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  padding: 0;
+  border: none;
+  background: var(--fill-3);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.number-stepper-btn:first-child {
+  border-bottom: 1px solid var(--separator);
+}
+
+.number-stepper-btn:hover:not(:disabled) {
+  background: var(--fill-hover);
+  color: var(--text-primary);
+}
+
+.number-stepper-btn:active:not(:disabled) {
+  background: var(--fill-1);
+}
+
+.number-stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Scrollbar customization to match macOS overlays */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}

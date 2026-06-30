@@ -1,0 +1,53 @@
+# Python Compile Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+
+# Model weight files
+*.pth
+*.pt
+*.onnx
+*.ckpt
+*.bin
+*.safetensors
+
+# Model directories
+weights/
+models/
+checkpoints/
+assets/models/
+
+# Local runtime settings and prompts
+settings.json
+system_prompt.txt
+translation_memory.json
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Electron / React desktop prototype
+desktop/node_modules/
+desktop/dist/
+desktop/dist-electron/
+desktop/.vite/
+
+# Tauri / React Migration Additions
+node_modules/
+frontend/node_modules/
+frontend/dist/
+src-tauri/target/
+artifacts/
+
+# Tests & Test Samples
+tests/
+*pysp*
+
+# CodeGraphCache
+.codegraph/

@@ -1,0 +1,42 @@
+# ============================================================
+# vibecleaner - Python backend dependencies
+# ============================================================
+# Core dependencies required for the application to run.
+# Optional dependencies are listed in the [optional] section.
+# ============================================================
+
+# --- Web framework ---
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.0.0
+python-multipart>=0.0.9
+
+# --- Image processing ---
+numpy>=1.24.0
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# --- GUI (text rendering) ---
+PySide6>=6.6.0
+
+# --- ONNX runtime (detection, OCR, inpainting) ---
+onnxruntime>=1.17.0
+
+# --- HTTP client (translation providers) ---
+requests>=2.31.0
+
+# --- Japanese text normalization ---
+jaconv>=0.3.0
+
+# --- OCR post-processing ---
+pyclipper>=1.3.0
+shapely>=2.0.0
+
+# --- Translation providers ---
+deep-translator>=1.11.0
+
+# --- Optional: PyTorch-based models (inpainting, Manga OCR, RT-DETR, font detection) ---
+torch>=2.0.0
+torchvision>=0.15.0
+torchmetrics>=0.11.0
+pytorch-lightning>=2.0.0
