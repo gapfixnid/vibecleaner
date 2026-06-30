@@ -284,7 +284,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="sidebar-header">
         <div className="sidebar-title">
           <Layers size={14} className="title-icon" />
-          <span>Navigation</span>
+          <div className="sidebar-title-copy">
+            <span className="sidebar-title-main">Pages</span>
+            <span className="sidebar-title-sub">{pages.length} imported</span>
+          </div>
         </div>
       </div>
 
@@ -356,8 +359,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {isImagesExpanded && (
             <div className="pages-list" ref={pagesListRef}>
               {filteredPages.length === 0 ? (
-                <div className="empty-pages">
-                  <p>{searchQuery ? "No matching pages" : "No images loaded"}</p>
+                <div className="empty-pages" role="status">
+                  <div className="empty-pages-icon" aria-hidden="true">
+                    <Layers size={18} />
+                  </div>
+                  <p className="empty-pages-title">
+                    {searchQuery ? "No matching pages" : "No images loaded"}
+                  </p>
+                  <p className="empty-pages-copy">
+                    {searchQuery ? "Try a different filename filter." : "Import manga or comic pages to begin cleanup."}
+                  </p>
+                  {!searchQuery && (
+                    <button type="button" className="empty-pages-action" onClick={onImportImages}>
+                      <Plus size={13} />
+                      <span>Add Images</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="pages-virtual-spacer" style={{ height: `${filteredPages.length * PAGE_ROW_HEIGHT}px` }}>
@@ -500,8 +517,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         .sidebar-container {
           width: var(--sidebar-width);
           border-right: 1px solid var(--border-color);
-          background-color: var(--bg-sidebar);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)),
+            var(--bg-sidebar);
           backdrop-filter: var(--glass-blur);
+          -webkit-backdrop-filter: var(--glass-blur);
           display: flex;
           flex-direction: column;
           height: 100%;
@@ -509,7 +529,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
 
         .sidebar-header {
-          padding: 14px 16px 10px;
+          padding: 15px 14px 11px;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -518,20 +538,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
         .sidebar-title {
           display: flex;
           align-items: center;
-          gap: 8px;
-          font-size: 11px;
-          font-weight: 700;
-          color: var(--text-tertiary);
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
+          gap: 9px;
+          min-width: 0;
         }
 
         .title-icon {
+          width: 24px;
+          height: 24px;
+          padding: 5px;
+          border-radius: 7px;
+          color: var(--text-secondary);
+          background: var(--fill-3);
+          border: 1px solid var(--border-color);
+          flex: 0 0 auto;
+        }
+
+        .sidebar-title-copy {
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+          min-width: 0;
+        }
+
+        .sidebar-title-main {
+          font-size: 13px;
+          font-weight: 650;
+          line-height: 1.1;
+          color: var(--text-primary);
+          letter-spacing: 0;
+        }
+
+        .sidebar-title-sub {
+          font-size: 10.5px;
+          font-weight: 500;
+          line-height: 1.1;
           color: var(--text-tertiary);
+          white-space: nowrap;
         }
 
         .sidebar-search-container {
-          padding: 0 12px 10px;
+          padding: 0 12px 11px;
           border-bottom: 1px solid var(--border-color);
         }
 
@@ -550,21 +596,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
 
         .search-input {
-          background-color: var(--bg-input);
+          background-color: var(--field-bg);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-md);
           color: var(--text-primary);
-          padding: 5px 8px 5px 26px;
+          padding: 6px 8px 6px 27px;
           font-size: 12px;
           font-family: var(--font-family);
           width: 100%;
           outline: none;
-          transition: all 0.15s;
+          transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
         .search-input:focus {
           border-color: var(--border-focus);
           background-color: var(--bg-input-focus);
+          box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16);
         }
 
         .sidebar-scroll-area {
@@ -581,7 +628,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         .sidebar-group-header {
           display: flex;
           align-items: center;
-          padding: 4px 12px;
+          padding: 5px 12px;
           gap: 4px;
           cursor: pointer;
           user-select: none;
@@ -596,10 +643,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
 
         .sidebar-group-title {
-          font-size: 10px;
-          font-weight: 700;
+          font-size: 11px;
+          font-weight: 650;
           color: var(--text-secondary);
-          letter-spacing: 0.5px;
+          letter-spacing: 0;
         }
 
         .pages-group-header {
@@ -621,19 +668,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           display: flex;
           align-items: center;
           justify-content: center;
-          background: transparent;
-          border: none;
+          width: 22px;
+          height: 22px;
+          background: var(--fill-3);
+          border: 1px solid transparent;
           color: var(--text-secondary);
           cursor: pointer;
-          padding: 3px;
+          padding: 0;
           border-radius: 6px;
           flex-shrink: 0;
-          transition: all 0.15s;
+          transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
         }
 
         .pages-add-btn:hover {
-          background: var(--bg-input);
+          background: var(--fill-hover);
+          border-color: var(--border-color);
           color: var(--text-primary);
+        }
+
+        .pages-add-btn:active {
+          transform: translateY(1px) scale(0.98);
         }
 
         .pages-add-btn:disabled {
@@ -741,12 +795,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         .empty-pages {
           display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 24px;
+          gap: 7px;
+          padding: 28px 18px 26px;
           text-align: center;
-          font-size: 12px;
           color: var(--text-tertiary);
+        }
+
+        .empty-pages-icon {
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--fill-3);
+          border: 1px solid var(--border-color);
+          color: var(--text-secondary);
+          box-shadow: var(--control-active-shadow);
+        }
+
+        .empty-pages-title {
+          margin-top: 2px;
+          font-size: 12.5px;
+          font-weight: 650;
+          color: var(--text-primary);
+          line-height: 1.25;
+        }
+
+        .empty-pages-copy {
+          max-width: 170px;
+          font-size: 11.5px;
+          line-height: 1.35;
+          color: var(--text-tertiary);
+        }
+
+        .empty-pages-action {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          height: 28px;
+          margin-top: 5px;
+          padding: 0 10px;
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          background: var(--control-active-bg);
+          color: var(--text-primary);
+          box-shadow: var(--control-active-shadow);
+          font-family: var(--font-family);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+        }
+
+        .empty-pages-action:hover {
+          background: var(--fill-hover);
+        }
+
+        .empty-pages-action:active {
+          transform: translateY(1px) scale(0.98);
         }
 
         .page-item {
