@@ -10,8 +10,6 @@ import {
   Layers,
   Languages,
   CheckSquare,
-  ChevronDown,
-  ChevronRight,
   Search,
   Download
 } from "lucide-react";
@@ -157,7 +155,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollHeight, setScrollHeight] = useState(0);
-  const [isImagesExpanded, setIsImagesExpanded] = useState(true);
   // Inline rename state: which page index is being renamed + the draft stem.
   const [renamingIndex, setRenamingIndex] = useState<number | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -267,7 +264,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     updateScrollMetrics();
     window.addEventListener("resize", updateScrollMetrics);
     return () => window.removeEventListener("resize", updateScrollMetrics);
-  }, [updateScrollMetrics, pages.length, isImagesExpanded, searchQuery]);
+  }, [updateScrollMetrics, pages.length, searchQuery]);
 
   const pagesListTop = pagesListRef.current?.offsetTop ?? 0;
   const visibleTop = Math.max(0, scrollTop - pagesListTop);
@@ -289,8 +286,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Layers size={14} className="title-icon" />
               <div className="sidebar-title-copy">
                 <span className="sidebar-title-main">Pages</span>
-                <span className="sidebar-title-sub">{pages.length} imported</span>
+                <span className="sidebar-title-sub">{pages.length} added</span>
               </div>
+            </div>
+            <div className="sidebar-header-actions">
+              <button
+                type="button"
+                className="pages-add-btn"
+                data-tooltip="Add Images"
+                aria-label="Add Images"
+                onClick={onImportImages}
+              >
+                <Plus size={14} />
+              </button>
+
+              <button
+                type="button"
+                className="pages-add-btn"
+                data-tooltip="Save Selected Images"
+                aria-label="Save Selected Images"
+                disabled={selectedPageIds.length === 0}
+                onClick={onExportSelectedImages}
+              >
+                <Save size={14} />
+              </button>
             </div>
           </div>
 
@@ -308,69 +327,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div className="sidebar-scroll-area" ref={scrollAreaRef} onScroll={updateScrollMetrics}>
-            {/* PAGES GROUP */}
-            <div className="sidebar-group">
-              <div className="sidebar-group-header pages-group-header">
-                <div
-                  className="pages-group-toggle"
-                  role="button"
-                  tabIndex={0}
-                  aria-expanded={isImagesExpanded}
-                  onClick={() => setIsImagesExpanded(!isImagesExpanded)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setIsImagesExpanded(!isImagesExpanded);
-                    }
-                  }}
-                >
-                  <span className="sidebar-group-chevron">
-                    {isImagesExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                  </span>
-                  <span className="sidebar-group-title">Pages ({pages.length})</span>
+            <div className="pages-list" ref={pagesListRef}>
+              {filteredPages.length === 0 ? (
+                <div className="empty-pages" role="status">
+                  <div className="empty-pages-icon" aria-hidden="true">
+                    <Layers size={18} />
+                  </div>
+                  <p className="empty-pages-title">No matching pages</p>
+                  <p className="empty-pages-copy">Try a different filename filter.</p>
                 </div>
-                <div className="pages-header-actions">
-                  <button
-                    type="button"
-                    className="pages-add-btn"
-                    data-tooltip="Add Images"
-                    aria-label="Add Images"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onImportImages();
-                    }}
-                  >
-                    <Plus size={14} />
-                  </button>
-
-                  <button
-                    type="button"
-                    className="pages-add-btn"
-                    data-tooltip="Save Selected Images"
-                    aria-label="Save Selected Images"
-                    disabled={selectedPageIds.length === 0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onExportSelectedImages();
-                    }}
-                  >
-                    <Save size={14} />
-                  </button>
-                </div>
-              </div>
-
-              {isImagesExpanded && (
-                <div className="pages-list" ref={pagesListRef}>
-                  {filteredPages.length === 0 ? (
-                    <div className="empty-pages" role="status">
-                      <div className="empty-pages-icon" aria-hidden="true">
-                        <Layers size={18} />
-                      </div>
-                      <p className="empty-pages-title">No matching pages</p>
-                      <p className="empty-pages-copy">Try a different filename filter.</p>
-                    </div>
-                  ) : (
-                    <div className="pages-virtual-spacer" style={{ height: `${filteredPages.length * PAGE_ROW_HEIGHT}px` }}>
+              ) : (
+                <div className="pages-virtual-spacer" style={{ height: `${filteredPages.length * PAGE_ROW_HEIGHT}px` }}>
                     {visiblePages.map((page, visibleIdx) => {
                       const itemIndex = startIndex + visibleIdx;
                       const pageIdx = page.index;
@@ -452,8 +419,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       );
                     })
                     }
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -631,49 +596,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           padding-bottom: 20px;
         }
 
-        .sidebar-group {
-          margin-top: 14px;
-        }
-
-        .sidebar-group-header {
-          display: flex;
-          align-items: center;
-          padding: 5px 12px;
-          gap: 4px;
-          cursor: pointer;
-          user-select: none;
-        }
-
-        .sidebar-group-chevron {
-          display: flex;
-          align-items: center;
-          color: var(--text-tertiary);
-          width: 16px;
-          justify-content: center;
-        }
-
-        .sidebar-group-title {
-          font-size: 11px;
-          font-weight: 650;
-          color: var(--text-secondary);
-          letter-spacing: 0;
-        }
-
-        .pages-group-header {
-          justify-content: space-between;
-          cursor: default;
-          padding-right: 8px;
-        }
-
-        .pages-group-toggle {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          flex: 1;
-          min-width: 0;
-          cursor: pointer;
-        }
-
         .pages-add-btn {
           display: flex;
           align-items: center;
@@ -710,23 +632,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           color: var(--text-secondary);
         }
 
-        .pages-header-actions {
+        .sidebar-header-actions {
           display: flex;
           align-items: center;
           gap: 2px;
           flex-shrink: 0;
         }
 
-        /* Header action tooltips sit at the top-right inside the scroll area, so
+        /* Header action tooltips sit at the top-right of the sidebar, so
            anchor them to the button's right edge (open leftward) to avoid the
            overflow clip / horizontal scroll at the sidebar boundary. */
-        .pages-header-actions [data-tooltip]::after {
+        .sidebar-header-actions [data-tooltip]::after {
           left: auto;
           right: 0;
           transform: translateX(0) translateY(-2px);
         }
 
-        .pages-header-actions [data-tooltip]:hover::after {
+        .sidebar-header-actions [data-tooltip]:hover::after {
           transform: translateX(0) translateY(0);
         }
 
