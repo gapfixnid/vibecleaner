@@ -698,6 +698,7 @@ function App() {
         onSaveProject={projectApi.handleSaveProject}
         onPreferences={() => setIsSettingsOpen(true)}
         onAbout={() => setIsAboutOpen(true)}
+        isDirty={isDirty}
       />
 
       <div className="main-workspace">

@@ -1,6 +1,6 @@
 // frontend/src/components/Toolbar.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { Menu, FilePlus2, FolderOpen, Save, Settings, Info } from "lucide-react";
+import { FilePlus2, FolderOpen, Info, Menu, Save, Settings } from "lucide-react";
 import * as desktop from "../services/desktop";
 import { APP_NAME } from "../appMeta";
 
@@ -10,6 +10,7 @@ interface ToolbarProps {
   onSaveProject: () => void;
   onPreferences: () => void;
   onAbout: () => void;
+  isDirty: boolean;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -18,6 +19,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onSaveProject,
   onPreferences,
   onAbout,
+  isDirty,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -48,7 +50,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   return (
     <header className="toolbar-container">
       <div className="toolbar-left">
-        {/* macOS Style Traffic Lights Window Controls */}
         <div className="window-controls">
           <button type="button" className="win-btn close" onClick={() => desktop.closeWindow()} aria-label="Close window" />
           <button type="button" className="win-btn minimize" onClick={() => desktop.minimizeWindow()} aria-label="Minimize window" />
@@ -56,17 +57,55 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
 
         <div className="app-logo" data-tauri-drag-region>
-          <span className="logo-text" data-tauri-drag-region>{APP_NAME}</span>
+          <span className="app-mark" aria-hidden="true">V</span>
+          <div className="app-title-stack" data-tauri-drag-region>
+            <span className="logo-text" data-tauri-drag-region>{APP_NAME}</span>
+            <span className="toolbar-subtitle" data-tauri-drag-region>Image cleanup workspace</span>
+          </div>
         </div>
       </div>
 
       <div className="drag-spacer" data-tauri-drag-region />
 
       <div className="toolbar-right">
+        <div className={`save-state ${isDirty ? "dirty" : "clean"}`} aria-live="polite">
+          <span className="save-state-dot" aria-hidden="true" />
+          <span>{isDirty ? "Unsaved changes" : "Saved"}</span>
+        </div>
+
+        <div className="toolbar-command-group" role="group" aria-label="Project actions">
+          <button type="button" className="toolbar-action" data-tooltip="New Project" onClick={onNewProject} aria-label="New Project">
+            <FilePlus2 size={15} />
+          </button>
+          <button type="button" className="toolbar-action" data-tooltip="Open Project" onClick={onOpenProject} aria-label="Open Project">
+            <FolderOpen size={15} />
+          </button>
+          <button
+            type="button"
+            className={`toolbar-action ${isDirty ? "primary" : ""}`}
+            data-tooltip="Save Project"
+            onClick={onSaveProject}
+            aria-label="Save Project"
+          >
+            <Save size={15} />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          className="toolbar-action standalone"
+          data-tooltip="Preferences"
+          onClick={onPreferences}
+          aria-label="Preferences"
+        >
+          <Settings size={15} />
+        </button>
+
         <div className="menu-wrapper" ref={menuRef}>
           <button
             type="button"
-            className="icon-btn"
+            className={`toolbar-action standalone ${menuOpen ? "active" : ""}`}
+            data-tooltip="More"
             aria-label="Menu"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
@@ -106,21 +145,26 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       <style>{`
         .toolbar-container {
           height: var(--toolbar-height);
-          background-color: var(--bg-toolbar);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)),
+            var(--bg-toolbar);
           backdrop-filter: var(--glass-blur);
+          -webkit-backdrop-filter: var(--glass-blur);
           border-bottom: 1px solid var(--border-color);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 16px;
+          padding: 0 12px 0 14px;
           z-index: 10;
           user-select: none;
+          font-family: var(--font-family);
         }
 
         .window-controls {
           display: flex;
           gap: 8px;
-          margin-right: 12px;
+          margin-right: 14px;
           align-items: center;
           pointer-events: auto;
         }
@@ -133,7 +177,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           cursor: pointer;
           position: relative;
           padding: 0;
-          transition: filter 0.1s;
+          box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18);
+          transition: filter 0.12s ease, transform 0.12s ease;
           pointer-events: auto;
           display: flex;
           align-items: center;
@@ -142,6 +187,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         .win-btn:hover {
           filter: brightness(0.85);
+        }
+
+        .win-btn:active {
+          transform: scale(0.92);
         }
 
         .win-btn.close {
@@ -165,27 +214,99 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         .toolbar-left, .toolbar-right {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
+          min-width: 0;
         }
 
         .toolbar-right {
           justify-content: flex-end;
+          pointer-events: auto;
         }
 
         .app-logo {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 9px;
+          min-width: 0;
         }
 
-        .logo-icon {
-          color: var(--text-secondary);
+        .app-mark {
+          width: 24px;
+          height: 24px;
+          border-radius: 7px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 auto;
+          background:
+            linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04)),
+            var(--fill-2);
+          border: 1px solid var(--overlay-border);
+          box-shadow: var(--control-active-shadow);
+          color: var(--text-primary);
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0;
+          line-height: 1;
+        }
+
+        .app-title-stack {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 1px;
+          min-width: 0;
         }
 
         .logo-text {
-          font-weight: 700;
+          font-weight: 650;
           font-size: 14px;
-          letter-spacing: -0.3px;
+          letter-spacing: 0;
+          line-height: 1.1;
+          color: var(--text-primary);
+        }
+
+        .toolbar-subtitle {
+          color: var(--text-tertiary);
+          font-size: 10.5px;
+          font-weight: 500;
+          line-height: 1.1;
+          white-space: nowrap;
+        }
+
+        .save-state {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          height: 26px;
+          padding: 0 9px;
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-full);
+          background: var(--fill-3);
+          color: var(--text-secondary);
+          font-size: 11.5px;
+          font-weight: 600;
+          white-space: nowrap;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .save-state-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: var(--radius-full);
+          background: var(--system-green);
+          box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.10);
+        }
+
+        .save-state.dirty {
+          color: var(--text-primary);
+          background: rgba(255, 149, 0, 0.12);
+          border-color: rgba(255, 149, 0, 0.28);
+        }
+
+        .save-state.dirty .save-state-dot {
+          background: var(--system-orange);
+          box-shadow: 0 0 0 3px rgba(255, 149, 0, 0.14);
         }
 
         .menu-wrapper {
@@ -193,14 +314,83 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           pointer-events: auto;
         }
 
+        .toolbar-command-group {
+          display: inline-flex;
+          align-items: center;
+          gap: 2px;
+          height: 30px;
+          padding: 2px;
+          border: 1px solid var(--border-color);
+          border-radius: 9px;
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+            var(--fill-4);
+          box-shadow: var(--inset-track-shadow);
+        }
+
+        .toolbar-action {
+          width: 26px;
+          height: 26px;
+          border: 1px solid transparent;
+          background: transparent;
+          color: var(--text-secondary);
+          cursor: pointer;
+          border-radius: 7px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          transition:
+            background-color 0.16s ease,
+            border-color 0.16s ease,
+            color 0.16s ease,
+            box-shadow 0.16s ease,
+            transform 0.12s ease;
+        }
+
+        .toolbar-action:hover {
+          background: var(--fill-hover);
+          border-color: var(--border-color);
+          color: var(--text-primary);
+        }
+
+        .toolbar-action:active {
+          transform: translateY(1px) scale(0.98);
+        }
+
+        .toolbar-action.primary {
+          background: var(--system-blue);
+          border-color: transparent;
+          color: white;
+          box-shadow: 0 5px 14px rgba(0, 122, 255, 0.22);
+        }
+
+        .toolbar-action.primary:hover {
+          background: var(--system-blue-hover);
+          color: white;
+        }
+
+        .toolbar-action.standalone {
+          background: var(--fill-3);
+          border-color: var(--border-color);
+        }
+
+        .toolbar-action.active {
+          background: var(--control-active-bg);
+          color: var(--text-primary);
+          box-shadow: var(--control-active-shadow);
+        }
+
         .toolbar-menu {
           position: absolute;
-          top: calc(100% + 6px);
+          top: calc(100% + 8px);
           right: 0;
           min-width: 184px;
-          background: var(--bg-panel);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+            var(--bg-panel);
           border: 1px solid var(--border-color);
-          border-radius: 10px;
+          border-radius: 11px;
           box-shadow: var(--shadow-lg);
           padding: 6px;
           display: flex;
@@ -220,10 +410,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           background: transparent;
           color: var(--text-primary);
           font-size: 13px;
+          font-weight: 500;
           font-family: var(--font-family);
           text-align: left;
           border-radius: 6px;
           cursor: pointer;
+          transition: background-color 0.14s ease, color 0.14s ease;
         }
 
         .toolbar-menu button:hover {
@@ -241,28 +433,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           margin: 4px 6px;
         }
 
-        .icon-btn {
-          background: transparent;
-          border: none;
-          color: var(--text-secondary);
-          cursor: pointer;
-          padding: 6px;
-          border-radius: var(--radius-md);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.2s;
-        }
-
-        .icon-btn:hover {
-          background: var(--bg-input);
-          color: var(--text-primary);
-        }
-
         .toolbar-divider {
           width: 1px;
           height: 20px;
           background-color: var(--border-color);
+        }
+
+        @media (max-width: 760px) {
+          .toolbar-subtitle,
+          .save-state {
+            display: none;
+          }
         }
       `}</style>
     </header>
