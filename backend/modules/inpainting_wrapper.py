@@ -31,10 +31,15 @@ class HybridInpainter:
         
         if self.lama_model is None:
             import logging
-            logging.info("Initializing LaMa inpainting model...")
-            from modules.inpainting.lama import LaMa
-            device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
-            self.lama_model = LaMa(device=device, backend="onnx")
+            import threading
+            if not hasattr(self, '_init_lock'):
+                self._init_lock = threading.Lock()
+            with self._init_lock:
+                if self.lama_model is None:
+                    logging.info("Initializing LaMa inpainting model...")
+                    from modules.inpainting.lama import LaMa
+                    device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
+                    self.lama_model = LaMa(device=device, backend="onnx")
         
         for index, box in enumerate(boxes):
             x1, y1, x2, y2 = [int(v) for v in box]

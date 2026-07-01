@@ -3,23 +3,14 @@
 #
 # Usage:
 #   from modules.config import config          # AppConfig singleton
-#   from modules.config import APP_DATA_DIR    # module-level constants
-#   config.TRANSLATION_PROVIDER = "google"     # read / write settings
-#   config.load()                              # reload from disk
-#   config.save()                              # persist to disk
 
 from __future__ import annotations
-
-import json
 import logging
 import os
 import platform
-from dataclasses import dataclass, field, asdict
-from typing import Any
-
+from dataclasses import dataclass
 import cv2
 import numpy as np
-
 from app.version import APP_NAME
 
 logger = logging.getLogger(__name__)
@@ -27,37 +18,27 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Module-level constants (never change at runtime)
 # ---------------------------------------------------------------------------
-
 OLLAMA_API_URL = "http://127.0.0.1:11434"
 
-
 def _get_app_data_dir() -> str:
-    """Return the OS-specific application data directory."""
     if platform.system() == "Windows":
         base_dir = os.environ.get("APPDATA") or os.path.expanduser("~")
         return os.path.join(base_dir, APP_NAME)
     if platform.system() == "Darwin":
         return os.path.expanduser(f"~/Library/Application Support/{APP_NAME}")
-    # Linux / Unix
     return os.path.expanduser(f"~/.config/{APP_NAME}")
-
 
 APP_DATA_DIR: str = _get_app_data_dir()
 os.makedirs(APP_DATA_DIR, exist_ok=True)
-SETTINGS_FILE_PATH: str = os.path.join(APP_DATA_DIR, "settings.json")
 
 # ---------------------------------------------------------------------------
 # AppConfig — mutable settings container (single instance: `config`)
 # ---------------------------------------------------------------------------
 
-
 @dataclass
 class AppConfig:
     # -- Translation --------------------------------------------------------
     translation_model: str = ""
-    translation_provider: str = "google"
-    translation_api_base_url: str = ""
-    translation_api_key: str = ""
     translation_timeout_seconds: int = 90
     translation_supports_vision: bool = False
     translation_cache_enabled: bool = True
@@ -122,99 +103,8 @@ class AppConfig:
     def BUBBLES_ONLY(self, value: bool) -> None:
         self.bubbles_only = value
 
-    # -----------------------------------------------------------------------
-    # Mapping: JSON key → dataclass field name  (round-trip safe)
-    # -----------------------------------------------------------------------
-    _FIELD_MAP: dict[str, str] = field(
-        init=False,
-        repr=False,
-        compare=False,
-        default_factory=lambda: {
-            "translation_model": "translation_model",
-            "translation_provider": "translation_provider",
-            "translation_api_base_url": "translation_api_base_url",
-            "translation_api_key": "translation_api_key",
-            "translation_timeout_seconds": "translation_timeout_seconds",
-            "translation_supports_vision": "translation_supports_vision",
-            "translation_cache_enabled": "translation_cache_enabled",
-            "translation_cache_mode": "translation_cache_mode",
-            "system_prompt": "system_prompt",
-            "source_language": "source_language",
-            "target_language": "target_language",
-            "detect_model": "detect_model",
-            "confidence_threshold": "confidence_threshold",
-            "tiling_enabled": "tiling_enabled",
-            "ocr_padding": "ocr_padding",
-            "line_merge_sensitivity": "line_merge_sensitivity",
-            "adaptive_binarization": "adaptive_binarization",
-            "smart_direction": "smart_direction",
-            "bubbles_only": "bubbles_only",
-            "min_font_size": "min_font_size",
-            "max_font_size": "max_font_size",
-            "default_font_size": "default_font_size",
-            "inpaint_mask_dilation": "inpaint_mask_dilation",
-            "inpaint_use_textbox_only": "inpaint_use_textbox_only",
-            "inpaint_clip_to_bubble": "inpaint_clip_to_bubble",
-        },
-    )
-
-    # -----------------------------------------------------------------------
-    # Persistence
-    # -----------------------------------------------------------------------
-
-    def load(self) -> None:
-        """Load settings from *SETTINGS_FILE_PATH* (if it exists)."""
-        if not os.path.exists(SETTINGS_FILE_PATH):
-            return
-
-        try:
-            with open(SETTINGS_FILE_PATH, "r", encoding="utf-8") as fh:
-                data: dict[str, Any] = json.load(fh)
-        except Exception:
-            logger.exception("Failed to read settings from %s", SETTINGS_FILE_PATH)
-            return
-
-        for json_key, field_name in self._FIELD_MAP.items():
-            value = data.get(json_key)
-            if value is None:
-                continue
-            # Legacy migrations
-            if field_name == "translation_provider" and value == "argos":
-                value = "google"
-            if field_name == "detect_model" and value == "Small (INT8) [기본값]":
-                value = "High Precision (FP32)"
-            if field_name == "confidence_threshold" and value == 0.30:
-                value = 0.45
-            setattr(self, field_name, value)
-
-        logger.info("Settings loaded from %s", SETTINGS_FILE_PATH)
-
-    def save(self) -> bool:
-        """Persist current settings to *SETTINGS_FILE_PATH*."""
-        data = {json_key: getattr(self, field_name)
-                for json_key, field_name in self._FIELD_MAP.items()}
-        try:
-            with open(SETTINGS_FILE_PATH, "w", encoding="utf-8") as fh:
-                json.dump(data, fh, indent=4, ensure_ascii=False)
-            logger.info("Settings saved to %s", SETTINGS_FILE_PATH)
-            return True
-        except Exception:
-            logger.exception("Failed to save settings to %s", SETTINGS_FILE_PATH)
-            return False
-
-    # -----------------------------------------------------------------------
-    # Legacy alias functions (keep old call sites working)
-    # -----------------------------------------------------------------------
-
     @staticmethod
     def apply_adaptive_binarization(crop: np.ndarray) -> np.ndarray:
-        """Apply adaptive thresholding to an image crop to isolate text lines.
-
-        Pipeline: RGB→Gray → CLAHe contrast enhancement → adaptive binarization.
-        CLAHe (Contrast Limited Adaptive Histogram Equalization) boosts local
-        contrast so small / low-contrast Japanese kanas are more readable for
-        the OCR engine.
-        """
         if crop is None or crop.size == 0:
             return crop
         try:
@@ -228,12 +118,8 @@ class AppConfig:
             else:
                 gray = crop
 
-            # CLAHe: adaptive histogram equalization with contrast limiting.
-            # clipLimit=2.0 amplifies local contrast; tileGridSize=8×8 works
-            # well for typical manga text crops (20–200 px).
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             enhanced = clahe.apply(gray)
-
             thresh = cv2.adaptiveThreshold(
                 enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
             )
@@ -242,46 +128,13 @@ class AppConfig:
             logger.exception("Adaptive binarization failed")
             return crop
 
-
 # ---------------------------------------------------------------------------
 # Singleton instance
 # ---------------------------------------------------------------------------
-
 config: AppConfig = AppConfig()
 
-# Auto-load on import (preserves existing behaviour)
-config.load()
-
-# ---------------------------------------------------------------------------
-# Legacy top-level aliases (backward compat — deprecated)
-# These are kept so that code doing `app_config.TRANSLATION_MODEL` still
-# works via `__getattr__` on the module level (see below).
-# ---------------------------------------------------------------------------
-
-
-def __getattr__(name: str) -> Any:
-    """Fallback: redirect bare-name access to the singleton instance."""
-    if name in ("TRANSLATION_MODEL", "TRANSLATION_PROVIDER",
-                "TRANSLATION_API_BASE_URL", "TRANSLATION_API_KEY",
-                "TRANSLATION_TIMEOUT_SECONDS", "TRANSLATION_SUPPORTS_VISION",
-                "TRANSLATION_CACHE_ENABLED", "TRANSLATION_CACHE_MODE",
-                "SYSTEM_PROMPT",
-                "SOURCE_LANGUAGE", "TARGET_LANGUAGE",
-                "DETECT_MODEL", "CONFIDENCE_THRESHOLD",
-                "TILING_ENABLED", "BUBBLES_ONLY",
-                "OCR_PADDING", "LINE_MERGE_SENSITIVITY",
-                "ADAPTIVE_BINARIZATION", "SMART_DIRECTION",
-                "MIN_FONT_SIZE", "MAX_FONT_SIZE", "DEFAULT_FONT_SIZE",
-                "INPAINT_MASK_DILATION", "INPAINT_USE_TEXTBOX_ONLY",
-                "INPAINT_CLIP_TO_BUBBLE"):
-        # Map SCREAMING_SNAKE_CASE → snake_case on the config instance
-        snake = name.lower()
-        if hasattr(config, snake):
-            return getattr(config, snake)
+def __getattr__(name: str):
+    snake = name.lower()
+    if hasattr(config, snake):
+        return getattr(config, snake)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-# Also expose the old function names for backward compatibility.
-load_settings = config.load
-save_settings = config.save
-apply_adaptive_binarization = config.apply_adaptive_binarization

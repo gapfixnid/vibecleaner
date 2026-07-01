@@ -7,28 +7,18 @@ import shutil
 import numpy as np
 from typing import List, Optional, Any, Dict, cast
 from modules.config import config, APP_DATA_DIR, OLLAMA_API_URL
-from modules.translation_wrapper import (
-    OllamaTranslator,
-    OpenAICompatibleTranslator,
-    GoogleTranslatorWrapper,
-    DeepLTranslatorWrapper,
-    OpenAITranslatorWrapper,
-    ClaudeTranslatorWrapper,
-    PapagoTranslatorWrapper,
-    BaiduTranslatorWrapper
-)
+from modules.translation_wrapper import OllamaTranslator
 from modules.base_translator import BaseTranslator
 
 logger = logging.getLogger(__name__)
-
 
 class TranslationService:
     _TM_CACHE_MAX = 10000
 
     def __init__(self, translator: Optional[BaseTranslator] = None) -> None:
         configured_translator = translator or self._build_configured_translator()
-        self.translators: Dict[str, BaseTranslator] = {config.translation_provider: configured_translator}
-        self.active_translator_name: str = config.translation_provider
+        self.translators: Dict[str, BaseTranslator] = {"ollama": configured_translator}
+        self.active_translator_name: str = "ollama"
         self._cache: Dict[str, str] = {}  # In-memory translation cache (src_text -> translated_text)
         self._cache_lock = threading.RLock()
         self._translator_lock = threading.RLock()
@@ -88,68 +78,19 @@ class TranslationService:
 
     @property
     def translator(self) -> Any:
-        """Dynamically references the active translator (for backward compatibility)."""
         return self.translators[self.active_translator_name]
 
     def reload(self) -> None:
-        """Rebuild the active translator from the current settings.
-
-        Must be called after settings change so provider/model/API key/timeout
-        updates take effect without an app restart.
-        """
         with self._translator_lock:
-            override = self.system_prompt  # preserve any custom prompt
-            provider = config.translation_provider
+            override = self.system_prompt
             new_translator = self._build_configured_translator()
             if override and hasattr(new_translator, "system_prompt_override"):
                 new_translator.system_prompt_override = override
-            self.translators[provider] = new_translator
-            self.active_translator_name = provider
-        logger.info("Translation service reloaded (provider=%s)", provider)
+            self.translators["ollama"] = new_translator
+            self.active_translator_name = "ollama"
+        logger.info("Translation service reloaded (provider=ollama)")
 
     def _build_configured_translator(self) -> BaseTranslator:
-        provider = (config.translation_provider or "google").lower()
-        if provider == "google":
-            return GoogleTranslatorWrapper()
-        elif provider == "deepl":
-            return DeepLTranslatorWrapper(
-                api_key=config.translation_api_key,
-                timeout_seconds=int(config.translation_timeout_seconds)
-            )
-        elif provider == "openai":
-            return OpenAITranslatorWrapper(
-                api_key=config.translation_api_key,
-                model=config.translation_model or "gpt-4o-mini",
-                timeout_seconds=int(config.translation_timeout_seconds),
-                supports_vision=bool(config.translation_supports_vision),
-            )
-        elif provider == "claude":
-            return ClaudeTranslatorWrapper(
-                api_key=config.translation_api_key,
-                model=config.translation_model or "claude-3-5-sonnet-20241022",
-                timeout_seconds=int(config.translation_timeout_seconds),
-                supports_vision=bool(config.translation_supports_vision),
-            )
-        elif provider == "papago":
-            return PapagoTranslatorWrapper(
-                client_id=config.translation_api_base_url,
-                client_secret=config.translation_api_key,
-                timeout_seconds=int(config.translation_timeout_seconds)
-            )
-        elif provider == "baidu":
-            return BaiduTranslatorWrapper(
-                app_id=config.translation_api_base_url,
-                secret_key=config.translation_api_key,
-                timeout_seconds=int(config.translation_timeout_seconds)
-            )
-        elif provider in {"openai_compatible", "openai-compatible", "llamacpp", "llama.cpp", "lmstudio", "lm_studio"}:
-            return OpenAICompatibleTranslator(
-                api_url=config.translation_api_base_url,
-                model=config.translation_model or "local-model",
-                api_key=config.translation_api_key,
-                timeout_seconds=int(config.translation_timeout_seconds),
-                supports_vision=bool(config.translation_supports_vision),
-            )
         return OllamaTranslator(
             api_url=OLLAMA_API_URL,
             model=config.translation_model or "llama3",
@@ -186,8 +127,7 @@ class TranslationService:
 
         # Call active translator for untranslated blocks
         if to_translate:
-            with self._translator_lock:
-                self.translator.translate_blocks(to_translate, src_lang, tgt_lang, cv_image)
+            self.translator.translate_blocks(to_translate, src_lang, tgt_lang, cv_image)
 
             # Cache the newly translated text blocks and save to Translation Memory file
             with self._cache_lock:

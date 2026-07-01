@@ -1,2 +1,0 @@
-# Build-only dependencies for packaging the Python backend sidecar.
-pyinstaller>=6.11.0

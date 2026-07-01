@@ -171,10 +171,8 @@ class TextRenderer:
         max_size: float | None = None,
     ) -> tuple[QFont, list[str], float]:
         """
-        Employs binary search to find the maximum font size that fits the text inside rect.
-        Includes safety margins and dynamic capping for aesthetically pleasing results.
+        Employs DP-based font fitting algorithm from typesetting_service to find the optimal size and wrap.
         """
-        # Calculate dynamic safety margin padding (proportional to bubble size)
         if font_family is None:
             # Use font resolver for best available font
             resolved_font, chain = font_resolver.resolve(text, target_lang="Korean")
@@ -184,6 +182,7 @@ class TextRenderer:
             app = QApplication.instance()
             if app is None or not app.font().family():
                 font_family = "Segoe UI"
+                
         min_size = float(config.min_font_size if min_size is None else min_size)
         max_size = float(config.max_font_size if max_size is None else max_size)
 
@@ -191,81 +190,31 @@ class TextRenderer:
         padding_y = min(6.0, rect.height() * 0.08)
         width = max(10.0, rect.width() - padding_x * 2)
         height = max(10.0, rect.height() - padding_y * 2)
-        
-        # We first try to find a font size where words do not need to be broken (allow_char_break=False)
-        low = min_size
-        dynamic_max = min(max_size, height * 0.70, width * 0.70)
-        high = max(min_size, dynamic_max)
-        
-        optimal_size = min_size
-        optimal_lines = None
-        
-        # Binary search without character breaking
-        for _ in range(8):
-            mid = (low + high) / 2.0
+
+        def measure_fn(s: str, size: int) -> tuple[float, float]:
             font = QFont(font_family)
-            font.setPointSizeF(mid)
-            
-            lines = self.wrap_korean_text(text, width, font, allow_char_break=False)
-            if lines is None:
-                fits = False
-            else:
-                metrics = QFontMetricsF(font)
-                line_height = metrics.height()
-                total_height = line_height * len(lines)
-                
-                fits = True
-                if total_height > height:
-                    fits = False
-                else:
-                    for line in lines:
-                        if metrics.horizontalAdvance(line) > width:
-                            fits = False
-                            break
-            
-            if fits:
-                optimal_size = mid
-                optimal_lines = lines
-                low = mid + 0.1
-            else:
-                high = mid - 0.1
-                
-        # If we couldn't fit the text without character breaking, fall back to allow character breaking
-        if optimal_lines is None:
-            low = min_size
-            high = max(min_size, dynamic_max)
-            optimal_size = min_size
-            optimal_lines = self.wrap_korean_text(text, width, QFont(font_family, int(min_size)), allow_char_break=True)
-            
-            for _ in range(8):
-                mid = (low + high) / 2.0
-                font = QFont(font_family)
-                font.setPointSizeF(mid)
-                
-                lines = self.wrap_korean_text(text, width, font, allow_char_break=True)
-                metrics = QFontMetricsF(font)
-                line_height = metrics.height()
-                total_height = line_height * len(lines)
-                
-                fits = True
-                if total_height > height:
-                    fits = False
-                else:
-                    for line in lines:
-                        if metrics.horizontalAdvance(line) > width:
-                            fits = False
-                            break
-                            
-                if fits:
-                    optimal_size = mid
-                    optimal_lines = lines
-                    low = mid + 0.1
-                else:
-                    high = mid - 0.1
-                    
+            font.setPointSizeF(size)
+            metrics = QFontMetricsF(font)
+            lines = s.split('\n')
+            w = max((metrics.horizontalAdvance(line) for line in lines), default=0.0)
+            h = metrics.lineSpacing() * len(lines)
+            return w, h
+
+        fit_result = fit_font_size(
+            text=text,
+            measure=measure_fn,
+            roi_width=width,
+            roi_height=height,
+            no_space=True,
+            min_size=int(min_size),
+            max_size=int(max_size),
+        )
+
         final_font = QFont(font_family)
-        final_font.setPointSizeF(optimal_size)
-        return final_font, optimal_lines or [text], width
+        final_font.setPointSizeF(fit_result.fontSize)
+        optimal_lines = fit_result.wrappedText.split('\n')
+        
+        return final_font, optimal_lines, width
 
     def layout_lines_in_rect(
         self,

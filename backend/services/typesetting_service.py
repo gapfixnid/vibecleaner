@@ -171,6 +171,12 @@ def dp_wrap_text(
 
     chunks = _split_into_chunks(text, no_space)
     n = len(chunks)
+    
+    measure_cache = {}
+    def _cached_measure(s: str) -> float:
+        if s not in measure_cache:
+            measure_cache[s] = measure(s)
+        return measure_cache[s]
 
     # Group chunks into segments separated by mandatory breaks ('\n')
     segments: List[List[int]] = []  # lists of chunk indices
@@ -224,7 +230,7 @@ def dp_wrap_text(
 
                     line_chunks = [chunks[idx] for idx in seg_indices[i:j]]
                     line_text = _assemble_line(line_chunks, no_space)
-                    line_w = measure(line_text)
+                    line_w = _cached_measure(line_text)
                     
                     overflow = max(0.0, line_w - limit_w)
                     line_cost = 0.0
@@ -241,6 +247,10 @@ def dp_wrap_text(
                     if total < dp_cost[i][r]:
                         dp_cost[i][r] = total
                         dp_break[i][r] = j
+                        
+                    # Early termination if the line is getting ridiculously long
+                    if overflow > 0 and line_w > max_width * 1.5:
+                        break
 
         if dp_cost[0][0] == INF:
             return ([], INF)
