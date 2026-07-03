@@ -1,21 +1,15 @@
 // frontend/src/components/Inspector.tsx
 import React, { useState } from "react";
 import {
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  Bold,
-  Italic,
-  RefreshCw,
-  Languages,
   Baseline,
-  ChevronDown,
   Sparkles,
   Type,
   Layers
 } from "lucide-react";
 import type { BubbleInfo, Settings } from "../types";
 import { useBubbleEditing } from "../hooks/useBubbleEditing";
+import { InspectorTextSection } from "./inspector/InspectorTextSection";
+import { InspectorStyleSection } from "./inspector/InspectorStyleSection";
 
 interface InspectorProps {
   selectedBubble: BubbleInfo | null;
@@ -225,177 +219,28 @@ export const Inspector: React.FC<InspectorProps> = ({
 
       <div className="inspector-scrollable">
         {activeTab === "text" ? (
-          <>
-            {/* original text (Japanese) */}
-            <div className="section-panel">
-              <div className="section-title">
-                <span>Original ({settings.source_language})</span>
-                <button 
-                  className="action-link-btn" 
-                  onClick={() => onReOcrBubble(selectedBubble.id)}
-                  disabled={isProcessing}
-                >
-                  <RefreshCw size={11} className={isProcessing ? "spin" : ""} />
-                  <span>Re-OCR</span>
-                </button>
-              </div>
-              <textarea
-                className="apple-textarea"
-                value={origText}
-                onChange={(e) => setOrigText(e.target.value)}
-                onBlur={saveTextEdits}
-                placeholder="No original text detected."
-              />
-            </div>
-
-            {/* Translation text (Korean) */}
-            <div className="section-panel">
-              <div className="section-title">
-                <span>Translation ({settings.target_language})</span>
-                <button 
-                  className="action-link-btn primary" 
-                  onClick={() => onReTranslateBubble(selectedBubble.id)}
-                  disabled={isProcessing}
-                >
-                  <Languages size={11} />
-                  <span>Translate</span>
-                </button>
-              </div>
-              <textarea
-                className="apple-textarea trans"
-                value={transText}
-                onChange={(e) => setTransText(e.target.value)}
-                onBlur={saveTextEdits}
-                placeholder="Translation result will show here..."
-              />
-            </div>
-          </>
+          <InspectorTextSection
+            bubbleId={selectedBubble.id}
+            isProcessing={isProcessing}
+            origText={origText}
+            transText={transText}
+            settings={settings}
+            onOrigTextChange={setOrigText}
+            onTransTextChange={setTransText}
+            onSaveTextEdits={saveTextEdits}
+            onReOcrBubble={onReOcrBubble}
+            onReTranslateBubble={onReTranslateBubble}
+          />
         ) : (
-          /* Typography and styling settings */
-          <div className="section-panel">
-            <div className="section-title-simple">Typography & Design</div>
-            
-            <div className="form-row">
-              <label className="form-label">Font Family</label>
-              <div className="form-control-right">
-                <div className="select-wrapper">
-                  <select
-                    className="apple-select"
-                    value={selectedBubble.font_family || "Pretendard Variable"}
-                    onChange={(e) => updateBubbleField("font_family", e.target.value)}
-                  >
-                    <option value="Pretendard Variable">Pretendard</option>
-                    <option value="Malgun Gothic">Malgun Gothic</option>
-                    <option value="Gulim">Gulim</option>
-                    <option value="Arial">Arial</option>
-                  </select>
-                  <ChevronDown size={12} className="select-chevron" />
-                </div>
-              </div>
-            </div>
-
-            <div className="form-row size-row">
-              <label className="form-label">Font Size</label>
-              <div className="form-control-right font-size-controls" style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px" }}>
-                <input
-                  type="range"
-                  min={settings.min_font_size || 6}
-                  max={settings.max_font_size || 48}
-                  className="apple-slider"
-                  value={fontSizeDraft}
-                  onChange={(e) => setFontSizeDraft(parseInt(e.target.value))}
-                  onMouseUp={() => updateBubbleField("font_size", fontSizeDraft)}
-                  onKeyUp={() => updateBubbleField("font_size", fontSizeDraft)}
-                  style={{ flex: 1 }}
-                />
-                <span className="size-indicator" style={{ minWidth: "48px", textAlign: "right" }}>
-                  {fontSizeDraft}px
-                </span>
-              </div>
-            </div>
-
-            <div className="form-row">
-              <label className="form-label">Font Style</label>
-              <div className="form-control-right">
-                <div className="style-buttons-group">
-                  <button
-                    className={`style-toggle-btn ${selectedBubble.bold ? "active" : ""}`}
-                    onClick={() => updateBubbleField("bold", !selectedBubble.bold)}
-                    data-tooltip="Bold"
-                    aria-label="Bold"
-                    aria-pressed={selectedBubble.bold}
-                  >
-                    <Bold size={13} />
-                  </button>
-                  <button
-                    className={`style-toggle-btn ${selectedBubble.italic ? "active" : ""}`}
-                    onClick={() => updateBubbleField("italic", !selectedBubble.italic)}
-                    data-tooltip="Italic"
-                    aria-label="Italic"
-                    aria-pressed={selectedBubble.italic}
-                  >
-                    <Italic size={13} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="form-row">
-              <label className="form-label">Alignment</label>
-              <div className="form-control-right">
-                <div className="align-buttons-group">
-                  <button
-                    className={`align-btn ${selectedBubble.alignment === "left" ? "active" : ""}`}
-                    onClick={() => updateBubbleField("alignment", "left")}
-                    data-tooltip="Align Left"
-                    aria-label="Align left"
-                    aria-pressed={selectedBubble.alignment === "left"}
-                  >
-                    <AlignLeft size={13} />
-                  </button>
-                  <button
-                    className={`align-btn ${selectedBubble.alignment === "center" ? "active" : ""}`}
-                    onClick={() => updateBubbleField("alignment", "center")}
-                    data-tooltip="Align Center"
-                    aria-label="Align center"
-                    aria-pressed={selectedBubble.alignment === "center"}
-                  >
-                    <AlignCenter size={13} />
-                  </button>
-                  <button
-                    className={`align-btn ${selectedBubble.alignment === "right" ? "active" : ""}`}
-                    onClick={() => updateBubbleField("alignment", "right")}
-                    data-tooltip="Align Right"
-                    aria-label="Align right"
-                    aria-pressed={selectedBubble.alignment === "right"}
-                  >
-                    <AlignRight size={13} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="form-row">
-              <label className="form-label">Text Color</label>
-              <div className="form-control-right color-picker-row">
-                <input
-                  type="color"
-                  className="apple-color-picker"
-                  value={colorDraft}
-                  onChange={(e) => setColorDraft(e.target.value)}
-                  onBlur={() => updateBubbleField("color", colorDraft)}
-                />
-                <span className="color-hex-text">{colorDraft}</span>
-              </div>
-            </div>
-
-            <div className="form-row border-top-row">
-              <label className="form-label">Category</label>
-              <div className="form-control-right text-right">
-                <span className="text-class-badge">{selectedBubble.text_class || "unknown"}</span>
-              </div>
-            </div>
-          </div>
+          <InspectorStyleSection
+            selectedBubble={selectedBubble}
+            settings={settings}
+            fontSizeDraft={fontSizeDraft}
+            colorDraft={colorDraft}
+            setFontSizeDraft={setFontSizeDraft}
+            setColorDraft={setColorDraft}
+            updateBubbleField={updateBubbleField}
+          />
         )}
       </div>
 
