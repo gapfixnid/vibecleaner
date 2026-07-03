@@ -3,6 +3,8 @@ import React, { useRef, useState, useEffect, useLayoutEffect, useCallback } from
 import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
 import { CanvasMultiSelectEmpty } from "./canvas/CanvasMultiSelectEmpty";
+import { CanvasBubbleBoxOverlay } from "./canvas/CanvasBubbleBoxOverlay";
+import { CanvasBubbleTextOverlay } from "./canvas/CanvasBubbleTextOverlay";
 
 interface CanvasProps {
   imageUrl: string;
@@ -468,104 +470,18 @@ export const Canvas: React.FC<CanvasProps> = ({
 
               {/* Render Bubble Bounding Boxes & Text */}
               {!isWaitingForImageReload && (
-                <svg
-                  className="canvas-svg-overlay"
+                <CanvasBubbleBoxOverlay
+                  bubbles={bubbles}
+                  selectedBubbleId={selectedBubbleId}
+                  scale={scale}
                   width={imageDimensions.w || "100%"}
                   height={imageDimensions.h || "100%"}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    pointerEvents: "none",
-                    overflow: "visible"
-                  }}
-                >
-                  {bubbles.map((b) => {
-                  const isSelected = b.id === selectedBubbleId;
-                  const statusColor = b.translated ? "var(--system-green)" : "var(--system-orange)";
-                  return (
-                    <g key={b.id}>
-                      <rect
-                        x={b.x}
-                        y={b.y}
-                        width={b.width}
-                        height={b.height}
-                        fill="rgba(0, 122, 255, 0.02)"
-                        stroke={isSelected ? "var(--system-blue)" : statusColor}
-                        strokeWidth={isSelected ? 3 / scale : 1.8 / scale}
-                        style={{ pointerEvents: "auto", cursor: "move" }}
-                        onMouseDown={(e) => startBubbleDrag(e, b, "move")}
-                      />
-
-                      {isSelected && (
-                        <circle
-                          cx={b.x + b.width}
-                          cy={b.y + b.height}
-                          r={6 / scale}
-                          fill="var(--system-blue)"
-                          stroke="white"
-                          strokeWidth={1 / scale}
-                          style={{ pointerEvents: "auto", cursor: "se-resize" }}
-                          onMouseDown={(e) => startBubbleDrag(e, b, "resize")}
-                        />
-                      )}
-                    </g>
-                  );
-                })}
-                </svg>
+                  onStartBubbleDrag={startBubbleDrag}
+                />
               )}
 
               {!isWaitingForImageReload && (
-              <div className="canvas-text-overlay" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-                {bubbles.map((b) => {
-                  const showText = b.translated;
-                  if (!showText) return null;
-                  const isSelected = b.id === selectedBubbleId;
-
-                  return (
-                    <div
-                      key={b.id}
-                      className={`bubble-text-box ${isSelected ? "selected" : ""}`}
-                      style={{
-                        position: "absolute",
-                        left: `${b.x}px`,
-                        top: `${b.y}px`,
-                        width: `${b.width}px`,
-                        height: `${b.height}px`,
-                        overflow: "hidden"
-                      }}
-                    >
-                      {b.lines && b.lines.map((line, lIdx) => {
-                        const lx = line.x - b.x;
-                        const ly = line.y - b.y;
-                        return (
-                          <div
-                            key={lIdx}
-                            style={{
-                              position: "absolute",
-                              left: `${lx}px`,
-                              top: `${ly}px`,
-                              width: `${line.width}px`,
-                              height: `${line.height}px`,
-                              fontFamily: b.font_family || "var(--font-family)",
-                              fontSize: `${b.font_size === 0 ? b.computed_font_size : b.font_size}px`,
-                              fontWeight: b.bold ? "bold" : "normal",
-                              fontStyle: b.italic ? "italic" : "normal",
-                              color: b.color || "#000000",
-                              textAlign: b.alignment as any,
-                              lineHeight: `${line.height}px`,
-                              whiteSpace: "nowrap",
-                              textShadow: "0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff"
-                            }}
-                          >
-                            {line.text}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
+                <CanvasBubbleTextOverlay bubbles={bubbles} selectedBubbleId={selectedBubbleId} />
               )}
 
 
