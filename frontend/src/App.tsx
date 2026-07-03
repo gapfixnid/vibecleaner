@@ -10,7 +10,6 @@ import { AboutModal } from "./components/AboutModal";
 import { BackendErrorScreen } from "./components/BackendErrorScreen";
 import "./styles/apple_theme.css";
 import * as api from "./services/api";
-import * as desktop from "./services/desktop";
 import type { PageInfo, Settings } from "./types";
 import { useDialog } from "./hooks/useDialog";
 import { useProcessingTask } from "./hooks/useProcessingTask";
@@ -22,6 +21,7 @@ import { useAutoTypeset } from "./hooks/useAutoTypeset";
 import { usePageExport } from "./hooks/usePageExport";
 import { usePageSelection } from "./hooks/usePageSelection";
 import { useBackendBootstrap } from "./hooks/useBackendBootstrap";
+import { useWindowCloseGuard } from "./hooks/useWindowCloseGuard";
 import { buildPageImageUrl as buildPageImageRequestUrl } from "./lib/pageImageUrl";
 
 const DEFAULT_SETTINGS: Settings = {
@@ -229,52 +229,7 @@ function App() {
     [isDirty, showUnsavedPrompt, projectApi]
   );
 
-  // Window-close listener is registered once; refs feed it the latest values.
-  const isDirtyRef = useRef(false);
-  const closingRef = useRef(false);
-  const guardUnsavedRef = useRef(guardUnsaved);
-  useEffect(() => {
-    isDirtyRef.current = isDirty;
-  }, [isDirty]);
-  useEffect(() => {
-    guardUnsavedRef.current = guardUnsaved;
-  }, [guardUnsaved]);
-
-  // Guard window close (traffic-light close button → close(), Alt+F4, taskbar)
-  // against unsaved changes. CRITICAL: only ever preventDefault when the project
-  // is dirty AND a close isn't already in progress — so a clean project (and the
-  // app at startup) always closes normally and can never get trapped.
-  useEffect(() => {
-    let unlisten: () => void = () => {};
-    let active = true;
-    desktop
-      .onWindowCloseRequested((event) => {
-        console.log("[close-guard] close requested. dirty=", isDirtyRef.current, "closing=", closingRef.current);
-        if (closingRef.current || !isDirtyRef.current) {
-          return; // allow the close to proceed
-        }
-        event.preventDefault();
-        try {
-          guardUnsavedRef.current(() => {
-            closingRef.current = true;
-            desktop.destroyWindow();
-          });
-        } catch (e) {
-          // Fail-safe: never trap the user if the prompt logic throws.
-          console.error("[close-guard] prompt failed; forcing close", e);
-          closingRef.current = true;
-          desktop.destroyWindow();
-        }
-      })
-      .then((fn) => {
-        if (active) unlisten = fn;
-        else fn();
-      });
-    return () => {
-      active = false;
-      unlisten();
-    };
-  }, []);
+  useWindowCloseGuard(isDirty, guardUnsaved);
 
   const handleNewProject = useCallback(() => {
     guardUnsaved(async () => {
