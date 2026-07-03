@@ -18,6 +18,7 @@ import { useBubbles } from "./hooks/useBubbles";
 import { usePages } from "./hooks/usePages";
 import { useProject } from "./hooks/useProject";
 import { useTheme } from "./hooks/useTheme";
+import { useAutoTypeset } from "./hooks/useAutoTypeset";
 import { buildPageImageUrl as buildPageImageRequestUrl } from "./lib/pageImageUrl";
 
 const DEFAULT_SETTINGS: Settings = {
@@ -135,6 +136,25 @@ function App() {
   const { theme, setTheme, themes } = useTheme();
   const [backendError, setBackendError] = useState<string | null>(null);
   const [isRetryingBackend, setIsRetryingBackend] = useState(false);
+
+  useEffect(() => {
+    selectionRef.current = selectedPageIds;
+  }, [selectedPageIds]);
+
+  const { handleTranslate, handleTranslatePages } = useAutoTypeset({
+    pages,
+    selectedPageIds,
+    currentIndexRef,
+    runTask,
+    waitForJob,
+    syncBubblesToBackend,
+    setIsWaitingForImageReload,
+    setIsProcessing,
+    bumpPageVersion,
+    loadPagesFromServer,
+    setSelectedPageIds,
+    selectPage: pagesApi.handleSelectPage,
+  });
 
   const loadSettingsFromServer = useCallback(async () => {
     try {
@@ -316,88 +336,6 @@ function App() {
       setSelectedBubbleId(null);
     }
   }, [selectedPageIds.length, setSelectedBubbleId]);
-
-  // --- Page-level processing jobs (orchestration over hooks) ---
-
-  const handleTranslateCurrentPage = useCallback(async () => {
-    const idx = currentIndexRef.current;
-    if (idx < 0) return;
-    const pageId = pages[idx]?.page_id;
-    if (!pageId) return;
-    await runTask(
-      "Translating page...",
-      async () => {
-        // _translate_all_job atomically handles:
-        //   - detect (if no bubbles exist)
-        //   - inpaint (if no inpainted_image yet)
-        //   - translate untranslated bubbles
-        const job = await api.translateAll(pageId);
-        await waitForJob(job, "Translating page...");
-        setIsWaitingForImageReload(true);
-        bumpPageVersion(idx);
-        await loadPagesFromServer(idx);
-      },
-      { errorTitle: "Translation Failed", keepBusyOnSuccess: true }
-    );
-  }, [pages, runTask, waitForJob, setIsWaitingForImageReload, bumpPageVersion, loadPagesFromServer]);
-
-  // Refs to access latest values without closure issues in handleTranslate
-  const selectedPageIdsRef = useRef<number[]>([]);
-  useEffect(() => {
-    selectedPageIdsRef.current = selectedPageIds;
-    selectionRef.current = selectedPageIds;
-  }, [selectedPageIds]);
-
-  // Multi-page batch translation: sort by page index, delegate to backend batch job,
-  // then reload all affected pages.
-  const handleTranslatePages = useCallback(async (pageIds: number[]) => {
-    // Sort by page index for deterministic processing order
-    const sorted = [...pageIds].sort((a, b) => a - b);
-    const total = sorted.length;
-
-    await runTask(
-      `Translating ${total} pages...`,
-      async () => {
-        // Sync current page's bubbles before starting the batch job
-        await syncBubblesToBackend();
-
-        // Start the batch job on the backend
-        const job = await api.translateBatch(sorted);
-        await waitForJob(job, `Translating ${total} page${total > 1 ? 's' : ''}...`, {
-          ignoreBackendMessage: true,
-        });
-
-        // All pages translated — bump versions so canvas thumbnails reload
-        setIsWaitingForImageReload(true);
-        for (const idx of sorted) bumpPageVersion(idx);
-
-        await loadPagesFromServer();
-
-        // Explicit cleanup: because the canvas was hidden (multi-select empty
-        // state) during translation, onImageLoaded may never fire. Clear the
-        // processing state now so the UI doesn't stay stuck on "Loading...".
-        setIsProcessing(false);
-        setIsWaitingForImageReload(false);
-
-        // Exit multi-select: show the first translated page so the canvas
-        // renders the image instead of the empty multi-select overlay.
-        setSelectedPageIds([sorted[0]]);
-        pagesApi.handleSelectPage(sorted[0], { deferActivation: 200 });
-      },
-      { errorTitle: "Multi-Page Translation Failed", keepBusyOnSuccess: true }
-    );
-  }, [runTask, waitForJob, syncBubblesToBackend, setIsWaitingForImageReload, setIsProcessing, bumpPageVersion, loadPagesFromServer, setSelectedPageIds, pagesApi]);
-
-  // Unified Translate entry point — takes a snapshot, delegates to handlers
-  const handleTranslate = useCallback(async () => {
-    const pageIds = [...selectedPageIdsRef.current];
-
-    if (pageIds.length > 1) {
-      return handleTranslatePages(pageIds);
-    }
-
-    return handleTranslateCurrentPage();
-  }, [handleTranslatePages, handleTranslateCurrentPage]);
 
   // Clean (if needed) then export a single page to an absolute path.
   // Does NOT mark the project dirty — export is a read-only flow.
