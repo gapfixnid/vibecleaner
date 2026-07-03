@@ -269,13 +269,24 @@ def encode_preview_jpeg_bytes(image: np.ndarray) -> bytes:
     return encode_resized_jpeg_bytes(image, PREVIEW_MAX_DIMENSION)
 
 
+def load_cv_image(file_path: str) -> np.ndarray | None:
+    """Load an image from disk without relying on OpenCV's path handling."""
+    try:
+        data = np.fromfile(file_path, dtype=np.uint8)
+    except OSError:
+        return None
+    if data.size == 0:
+        return None
+    return cv2.imdecode(data, cv2.IMREAD_COLOR)
+
+
 def ensure_original_thumbnail(page: MangaPage) -> bytes:
     cached = getattr(page, "_thumbnail_original_bytes", None)
     if cached is not None:
         return cached
 
     if getattr(page, "_loaded", True) is False and page.file_path:
-        img = cv2.imread(page.file_path)
+        img = load_cv_image(page.file_path)
         if img is None:
             logger.error("Failed to load image for thumbnail: %s", page.file_path)
             raise HTTPException(status_code=500, detail="Failed to load page image")
@@ -320,7 +331,7 @@ def invalidate_page_caches(
 
 def ensure_page_image(page: MangaPage) -> None:
     if getattr(page, "_loaded", True) is False or page.cv_image is None or page.cv_image.size == 0:
-        cv_img = cv2.imread(page.file_path)
+        cv_img = load_cv_image(page.file_path)
         if cv_img is None:
             logger.error("Failed to load page image: %s", page.file_path)
             raise HTTPException(status_code=500, detail="Failed to load page image")

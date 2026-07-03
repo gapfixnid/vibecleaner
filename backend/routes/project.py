@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Form
 from PIL import Image
 from core import (
     encode_preview_jpeg_bytes,
+    load_cv_image,
     logger,
     state,
     submit_cache_task,
@@ -236,7 +237,7 @@ def save_project(file_path: str = Form(...), selected_indices: str = Form("")):
                 cv_image = snap["cv_image"]
                 read_from_disk = cv_image is None or getattr(cv_image, "size", 0) == 0
                 if read_from_disk:
-                    cv_image = cv2.imread(snap["file_path"])
+                    cv_image = load_cv_image(snap["file_path"])
                     if cv_image is None:
                         logger.error("Failed to load image while saving project: %s", snap["file_path"])
                         raise HTTPException(

@@ -23,6 +23,7 @@ from core import (
     ensure_page_image,
     ensure_original_thumbnail,
     invalidate_page_caches,
+    load_cv_image,
     logger,
     render_service,
     detection_service,
@@ -502,7 +503,7 @@ def get_page_image(page_id: str, type: str = "original", thumbnail: bool = False
 
     # --- Phase 2: load (if needed) + encode OUTSIDE the lock ---
     if needs_disk_load:
-        source_img = cv2.imread(load_path)
+        source_img = load_cv_image(load_path)
         if source_img is None:
             logger.error("Failed to load page image: %s", load_path)
             raise HTTPException(status_code=500, detail="Failed to load page image")
@@ -542,7 +543,7 @@ def get_bubbles(page_id: str):
         }
 
     if source_img is None:
-        source_img = cv2.imread(load_path)
+        source_img = load_cv_image(load_path)
         if source_img is None:
             logger.error("Failed to load page image for bubble layout: %s", load_path)
             raise HTTPException(status_code=500, detail="Failed to load page image")
