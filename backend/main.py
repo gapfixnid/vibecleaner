@@ -25,6 +25,7 @@ logger = logging.getLogger(APP_NAME)
 from routes.settings import router as settings_router
 from routes.project import router as project_router
 from routes.pages import router as pages_router
+from routes.jobs import router as jobs_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -85,6 +86,7 @@ app.add_middleware(
 app.include_router(settings_router)
 app.include_router(project_router)
 app.include_router(pages_router)
+app.include_router(jobs_router)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
