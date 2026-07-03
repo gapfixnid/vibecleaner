@@ -23,6 +23,7 @@ import { usePageSelection } from "./hooks/usePageSelection";
 import { useBackendBootstrap } from "./hooks/useBackendBootstrap";
 import { useWindowCloseGuard } from "./hooks/useWindowCloseGuard";
 import { useAppChrome } from "./hooks/useAppChrome";
+import { useProjectActions } from "./hooks/useProjectActions";
 import { buildPageImageUrl as buildPageImageRequestUrl } from "./lib/pageImageUrl";
 
 const DEFAULT_SETTINGS: Settings = {
@@ -177,51 +178,34 @@ function App() {
 
   useAppChrome({ openSettings: () => setIsSettingsOpen(true) });
 
-  // --- Project lifecycle with unsaved-changes guard ---
-
-  // Run `proceed` immediately when clean; otherwise prompt Save / Don't Save / Cancel.
-  const guardUnsaved = useCallback(
-    (proceed: () => void) => {
-      if (!isDirty) {
-        proceed();
-        return;
-      }
-      showUnsavedPrompt(
-        "Unsaved Changes",
-        "You have unsaved changes. Do you want to save them before continuing?",
-        async () => {
-          const saved = await projectApi.handleSaveProject();
-          if (saved) proceed();
-        },
-        () => proceed()
-      );
-    },
-    [isDirty, showUnsavedPrompt, projectApi]
-  );
+  const {
+    guardUnsaved,
+    handleNewProject,
+    handleOpenProject,
+    handleImportImages,
+    handleDeletePage,
+    handleRenamePage,
+  } = useProjectActions({
+    isDirty,
+    showUnsavedPrompt,
+    saveProject: projectApi.handleSaveProject,
+    newProject: projectApi.handleNewProject,
+    loadProject: projectApi.handleLoadProject,
+    openFiles: projectApi.handleOpenFiles,
+    pages,
+    selectedPageIds,
+    runTask,
+    loadPagesFromServer,
+    currentIndexRef,
+    markDirty,
+    resetPageVersions,
+    selectPage: pagesApi.handleSelectPage,
+    deletePages: pagesApi.handleDeletePages,
+    setSelectedPageIds,
+    setSelectedBubbleId,
+  });
 
   useWindowCloseGuard(isDirty, guardUnsaved);
-
-  const handleNewProject = useCallback(() => {
-    guardUnsaved(async () => {
-      const ok = await projectApi.handleNewProject();
-      if (ok) {
-        resetPageVersions();
-        setSelectedPageIds([]);
-        setSelectedBubbleId(null);
-      }
-    });
-  }, [guardUnsaved, projectApi, resetPageVersions, setSelectedBubbleId]);
-
-  const handleOpenProject = useCallback(() => {
-    guardUnsaved(async () => {
-      const restoredSelection = await projectApi.handleLoadProject();
-      if (restoredSelection) {
-        resetPageVersions();
-        setSelectedPageIds(restoredSelection);
-        setSelectedBubbleId(null);
-      }
-    });
-  }, [guardUnsaved, projectApi, resetPageVersions, setSelectedBubbleId]);
 
   const handleContextTranslate = useCallback(
     (idx: number) => {
@@ -236,23 +220,6 @@ function App() {
       handleExportPages(resolveContextTargets(idx));
     },
     [resolveContextTargets, handleExportPages]
-  );
-
-  const handleRenamePage = useCallback(
-    async (idx: number, name: string) => {
-      const pageId = pages[idx]?.page_id;
-      if (!pageId) return;
-      await runTask(
-        "Renaming page...",
-        async () => {
-          await api.renamePage(pageId, name);
-          await loadPagesFromServer(currentIndexRef.current, { skipPageActivation: true });
-          markDirty();
-        },
-        { errorTitle: "Rename Failed" }
-      );
-    },
-    [pages, runTask, loadPagesFromServer, markDirty]
   );
 
   const handleSaveSettings = useCallback(async (updated: Settings) => {
@@ -324,28 +291,9 @@ function App() {
           onPageClick={handlePageSelection}
           onSelectAllPages={handleSelectAllPages}
           onDuplicatePage={(idx) => pagesApi.handleDuplicatePages(resolveContextTargets(idx))}
-          onDeletePage={(idx) => {
-            // If the right-clicked page is part of the multi-selection, delete all selected.
-            const isSelected = selectedPageIds.length > 1 && selectedPageIds.includes(idx);
-            pagesApi.handleDeletePages(isSelected ? selectedPageIds : [idx]);
-          }}
+          onDeletePage={handleDeletePage}
           onReorderPages={pagesApi.handleReorderPages}
-          onImportImages={async () => {
-            const result = await projectApi.handleOpenFiles();
-            if (!result) return;
-            const { beforeCount, afterCount, addedCount } = result;
-            if (beforeCount === 0 && addedCount > 0) {
-              // 빈 프로젝트 + N장 추가 → 첫 페이지 선택
-              pagesApi.handleSelectPage(0);
-              setSelectedPageIds([0]);
-            } else if (addedCount === 1) {
-              // 1장 추가 → 새 페이지 선택
-              const newIndex = afterCount - 1;
-              pagesApi.handleSelectPage(newIndex);
-              setSelectedPageIds([newIndex]);
-            }
-            // else: 기존 프로젝트 + N장 → 현재 선택 유지
-          }}
+          onImportImages={handleImportImages}
           onExportSelectedImages={() => handleExportPages(selectedPageIds)}
           onRenamePage={handleRenamePage}
           onTranslatePages={handleContextTranslate}
