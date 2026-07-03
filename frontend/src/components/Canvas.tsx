@@ -1,5 +1,5 @@
 // frontend/src/components/Canvas.tsx
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState } from "react";
 import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
 import { CanvasMultiSelectEmpty } from "./canvas/CanvasMultiSelectEmpty";
@@ -7,6 +7,7 @@ import { CanvasImageStage } from "./canvas/CanvasImageStage";
 import { useCanvasKeyboardGuards } from "./canvas/useCanvasKeyboardGuards";
 import { useCanvasImageLoader } from "./canvas/useCanvasImageLoader";
 import { useCanvasViewport } from "./canvas/useCanvasViewport";
+import { useBubbleDrag } from "./canvas/useBubbleDrag";
 
 interface CanvasProps {
   imageUrl: string;
@@ -100,39 +101,22 @@ export const Canvas: React.FC<CanvasProps> = ({
     hasUserAdjustedRef,
   });
 
-  // Dragging bubble state
-  const [draggingBubble, setDraggingBubble] = useState<{
-    id: number;
-    type: "move" | "resize";
-    startX: number;
-    startY: number;
-    initialX: number;
-    initialY: number;
-    initialW: number;
-    initialH: number;
-  } | null>(null);
-  const latestDragBubblesRef = useRef<BubbleInfo[] | null>(null);
-
-  const finishBubbleDrag = useCallback(() => {
-    if (!draggingBubble) return;
-    const committed = latestDragBubblesRef.current;
-    latestDragBubblesRef.current = null;
-    setDraggingBubble(null);
-    if (committed) {
-      onUpdateBubbles(committed);
-    }
-  }, [draggingBubble, onUpdateBubbles]);
-
-  useEffect(() => {
-    if (!draggingBubble) return;
-    window.addEventListener("mouseup", finishBubbleDrag);
-    return () => window.removeEventListener("mouseup", finishBubbleDrag);
-  }, [draggingBubble, finishBubbleDrag]);
-
-  const draggingBubbleRef = useRef(draggingBubble);
-  useEffect(() => {
-    draggingBubbleRef.current = draggingBubble;
-  }, [draggingBubble]);
+  const {
+    draggingBubble,
+    draggingBubbleRef,
+    finishBubbleDrag,
+    setDraggingBubble,
+    startBubbleDrag,
+    updateBubbleDrag,
+  } = useBubbleDrag({
+    imageRef,
+    imageDimensions,
+    scale,
+    bubbles,
+    onSelectBubble,
+    onPreviewBubbles,
+    onUpdateBubbles,
+  });
 
   useCanvasKeyboardGuards({
     draggingBubbleRef,
@@ -158,32 +142,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const handleMouseMove = (e: React.MouseEvent) => {
     if (updateCanvasPan(e)) return;
 
-    if (draggingBubble) {
-      if (!imageRef.current) return;
-      const imgWidth = imageDimensions.w || imageRef.current.naturalWidth;
-      const imgHeight = imageDimensions.h || imageRef.current.naturalHeight;
-      const deltaX = (e.clientX - draggingBubble.startX) / scale;
-      const deltaY = (e.clientY - draggingBubble.startY) / scale;
-
-      const updated = bubbles.map((b) => {
-        if (b.id !== draggingBubble.id) return b;
-        if (draggingBubble.type === "move") {
-          return {
-            ...b,
-            x: Math.max(0, Math.min(imgWidth - b.width, draggingBubble.initialX + deltaX)),
-            y: Math.max(0, Math.min(imgHeight - b.height, draggingBubble.initialY + deltaY)),
-          };
-        } else {
-          return {
-            ...b,
-            width: Math.max(20, draggingBubble.initialW + deltaX),
-            height: Math.max(20, draggingBubble.initialH + deltaY),
-          };
-        }
-      });
-      latestDragBubblesRef.current = updated;
-      onPreviewBubbles(updated);
-    }
+    updateBubbleDrag(e);
   };
 
   const handleMouseUp = () => {
@@ -192,24 +151,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (draggingBubble) {
       finishBubbleDrag();
     }
-  };
-
-  const startBubbleDrag = (e: React.MouseEvent, bubble: BubbleInfo, type: "move" | "resize") => {
-    // Left button only; let right/middle clicks fall through (pan/context).
-    if (e.button !== 0) return;
-    e.stopPropagation();
-    onSelectBubble(bubble.id);
-    latestDragBubblesRef.current = null;
-    setDraggingBubble({
-      id: bubble.id,
-      type,
-      startX: e.clientX,
-      startY: e.clientY,
-      initialX: bubble.x,
-      initialY: bubble.y,
-      initialW: bubble.width,
-      initialH: bubble.height,
-    });
   };
 
   return (
