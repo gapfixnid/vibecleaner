@@ -1,12 +1,10 @@
 import os
-import cv2
 import io
-import mimetypes
 import numpy as np
 from functools import lru_cache
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Form
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from PIL import Image
 
@@ -14,16 +12,13 @@ from app.models import MangaPage, TextBubble
 from modules.utils.textblock import TextBlock
 from modules.config import config
 from services.auto_typeset_pipeline import auto_typeset_pipeline, bubble_clip_boxes, inpaint_boxes
+from services.page_image_service import get_page_image_response
 from services.review_state_service import derive_bubble_status, derive_page_status, refresh_bubble_status, refresh_page_status
 from core import (
     state,
     job_manager,
-    encode_jpeg_bytes,
-    encode_png_bytes,
     encode_preview_jpeg_bytes,
-    encode_thumbnail_bytes,
     ensure_page_image,
-    ensure_original_thumbnail,
     invalidate_page_caches,
     load_cv_image,
     logger,
@@ -35,8 +30,6 @@ from core import (
 )
 
 router = APIRouter()
-
-IMAGE_CACHE_HEADERS = {"Cache-Control": "public, max-age=3600"}
 
 
 def _validate_page_idx(page_idx: int) -> None:
@@ -321,79 +314,7 @@ def reorder_pages(from_index: int = Form(...), to_index: int = Form(...)):
 
 @router.get("/api/pages/{page_id}/image")
 def get_page_image(page_id: str, type: str = "original", thumbnail: bool = False, preview: bool = False):
-    # --- Phase 1: fast paths / capture source, holding the lock only briefly ---
-    with state.lock:
-        page = _resolve_page(page_id)
-        page_idx = _resolve_page_index(page_id)
-
-        if thumbnail:
-            if type == "inpainted" and page.inpainted_image is not None:
-                cached_bytes = getattr(page, "_thumbnail_inpainted_bytes", None)
-                if cached_bytes is None:
-                    cached_bytes = encode_thumbnail_bytes(page.inpainted_image)
-                    page._thumbnail_inpainted_bytes = cached_bytes
-            else:
-                cached_bytes = ensure_original_thumbnail(page)
-            return StreamingResponse(
-                io.BytesIO(cached_bytes),
-                media_type="image/png",
-                headers=IMAGE_CACHE_HEADERS,
-            )
-
-        if not preview and type == "original" and page.file_path and os.path.exists(page.file_path):
-            media_type = mimetypes.guess_type(page.file_path)[0] or "application/octet-stream"
-            return FileResponse(
-                page.file_path,
-                media_type=media_type,
-                headers=IMAGE_CACHE_HEADERS,
-            )
-
-        response_kind = "inpainted" if (type == "inpainted" and page.inpainted_image is not None) else "original"
-        if preview:
-            cache_attr = f"_preview_{response_kind}_bytes"
-            media_type = "image/jpeg"
-        else:
-            cache_attr = f"_{response_kind}_response_bytes"
-            media_type = "image/jpeg" if response_kind == "inpainted" else "image/png"
-
-        cached_bytes = getattr(page, cache_attr, None)
-        if cached_bytes is not None:
-            return StreamingResponse(io.BytesIO(cached_bytes), media_type=media_type, headers=IMAGE_CACHE_HEADERS)
-
-        # Cache miss: capture the source image reference; defer disk load + encode
-        # until after releasing the lock so heavy work never blocks other requests.
-        if response_kind == "inpainted":
-            source_img = page.inpainted_image
-            needs_disk_load = False
-        else:
-            loaded = getattr(page, "_loaded", True) and page.cv_image is not None and page.cv_image.size > 0
-            source_img = page.cv_image if loaded else None
-            needs_disk_load = not loaded
-        load_path = page.file_path
-
-    # --- Phase 2: load (if needed) + encode OUTSIDE the lock ---
-    if needs_disk_load:
-        source_img = load_cv_image(load_path)
-        if source_img is None:
-            logger.error("Failed to load page image: %s", load_path)
-            raise HTTPException(status_code=500, detail="Failed to load page image")
-
-    if preview:
-        encoded = encode_preview_jpeg_bytes(source_img)
-    else:
-        encoded = encode_jpeg_bytes(source_img) if response_kind == "inpainted" else encode_png_bytes(source_img)
-
-    # --- Phase 3: store the cache under the lock (best-effort; re-validate page) ---
-    with state.lock:
-        if 0 <= page_idx < len(state.pages) and state.pages[page_idx] is page:
-            setattr(page, cache_attr, encoded)
-            if needs_disk_load and response_kind == "original" and (page.cv_image is None or page.cv_image.size == 0):
-                page.cv_image = source_img
-                page._width = source_img.shape[1]
-                page._height = source_img.shape[0]
-                page._loaded = True
-
-    return StreamingResponse(io.BytesIO(encoded), media_type=media_type, headers=IMAGE_CACHE_HEADERS)
+    return get_page_image_response(page_id, image_type=type, thumbnail=thumbnail, preview=preview)
 
 @router.get("/api/pages/{page_id}/bubbles")
 def get_bubbles(page_id: str):
