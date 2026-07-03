@@ -9,7 +9,6 @@ import { CustomDialog } from "./components/CustomDialog";
 import { AboutModal } from "./components/AboutModal";
 import { BackendErrorScreen } from "./components/BackendErrorScreen";
 import "./styles/apple_theme.css";
-import * as api from "./services/api";
 import type { PageInfo } from "./types";
 import { useDialog } from "./hooks/useDialog";
 import { useProcessingTask } from "./hooks/useProcessingTask";
@@ -25,7 +24,7 @@ import { useWindowCloseGuard } from "./hooks/useWindowCloseGuard";
 import { useAppChrome } from "./hooks/useAppChrome";
 import { useProjectActions } from "./hooks/useProjectActions";
 import { useAppSettings } from "./hooks/useAppSettings";
-import { buildPageImageUrl as buildPageImageRequestUrl } from "./lib/pageImageUrl";
+import { usePageImageRequests } from "./hooks/usePageImageRequests";
 
 function App() {
   // --- Cross-cutting concerns (dialog + processing) ---
@@ -203,41 +202,15 @@ function App() {
   // --- Derived view data ---
   const activePage: PageInfo | undefined = pages[currentIndex];
   const activeBubble = bubbles.find((b) => b.id === selectedBubbleId) || null;
-  const currentBackendUrl = api.getBackendUrl();
 
   // Selection-derived values
   const isMultiPageSelection = selectedPageIds.length > 1;
 
-  const buildPageImageUrl = useCallback(
-    (page: PageInfo, preview = true) => {
-      return buildPageImageRequestUrl({
-        backendUrl: currentBackendUrl,
-        page,
-        pageVersion: pageVersions[page.index] || 0,
-        preview,
-      });
-    },
-    [currentBackendUrl, pageVersions]
-  );
-
-  // Prefetch adjacent pages so navigation hits the browser cache.
-  useEffect(() => {
-    if (currentIndex < 0 || pages.length === 0) return;
-    const adjacentPages = [pages[currentIndex + 1], pages[currentIndex - 1]].filter(
-      (page): page is PageInfo => Boolean(page)
-    );
-    const prefetchers = adjacentPages.map((page) => {
-      const img = new Image();
-      img.decoding = "async";
-      img.src = buildPageImageUrl(page);
-      return img;
-    });
-    return () => {
-      prefetchers.forEach((img) => {
-        img.src = "";
-      });
-    };
-  }, [buildPageImageUrl, currentIndex, pages]);
+  const { backendUrl: currentBackendUrl, buildPageImageUrl } = usePageImageRequests({
+    pages,
+    currentIndex,
+    pageVersions,
+  });
 
   return (
     <div className="app-container">
