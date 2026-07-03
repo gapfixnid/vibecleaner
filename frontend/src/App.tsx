@@ -79,16 +79,6 @@ function App() {
   } = useProcessingTask(showError);
 
   // Shared active-page index ref, used by both pages and bubbles hooks.
-  type PageProcessingTask = "translate";
-  /** Tracks which pages are being processed — ref for synchronous reads in sidebar. */
-  const processingPagesRef = useRef<Record<number, PageProcessingTask>>({});
-  // Force re-render when processing changes (ref doesn't trigger renders)
-  const [, forceRenderProcessing] = useState(0);
-  const setProcessingPages = useCallback((updater: (prev: Record<number, PageProcessingTask>) => Record<number, PageProcessingTask>) => {
-    processingPagesRef.current = updater(processingPagesRef.current);
-    forceRenderProcessing((n) => n + 1);
-  }, []);
-  const processingPages = processingPagesRef.current;
   const currentIndexRef = useRef<number>(-1);
   const pagesRef = useRef<PageInfo[]>([]);
 
@@ -334,7 +324,6 @@ function App() {
     if (idx < 0) return;
     const pageId = pages[idx]?.page_id;
     if (!pageId) return;
-    setProcessingPages((p) => ({ ...p, [idx]: "translate" }));
     await runTask(
       "Translating page...",
       async () => {
@@ -350,7 +339,6 @@ function App() {
       },
       { errorTitle: "Translation Failed", keepBusyOnSuccess: true }
     );
-    setProcessingPages((p) => { const { [idx]: _, ...rest } = p; return rest; });
   }, [pages, runTask, waitForJob, setIsWaitingForImageReload, bumpPageVersion, loadPagesFromServer]);
 
   // Refs to access latest values without closure issues in handleTranslate
@@ -367,36 +355,16 @@ function App() {
     const sorted = [...pageIds].sort((a, b) => a - b);
     const total = sorted.length;
 
-    // Mark all pages as processing
-    setProcessingPages((p) => {
-      const updated = { ...p };
-      for (const idx of sorted) updated[idx] = "translate";
-      return updated;
-    });
-
     await runTask(
       `Translating ${total} pages...`,
       async () => {
         // Sync current page's bubbles before starting the batch job
         await syncBubblesToBackend();
 
-        // Track pages already marked completed by onProgress
-        const completedInFlight = new Set<number>();
-
         // Start the batch job on the backend
         const job = await api.translateBatch(sorted);
         await waitForJob(job, `Translating ${total} page${total > 1 ? 's' : ''}...`, {
           ignoreBackendMessage: true,
-          onProgress: (job) => {
-            const completedPages = job.result?.completed_pages;
-            if (!Array.isArray(completedPages)) return;
-            for (const idx of completedPages) {
-              if (completedInFlight.has(idx)) continue;
-              completedInFlight.add(idx);
-              // Clear processing state for this page
-              setProcessingPages((p) => { const { [idx]: _, ...rest } = p; return rest; });
-            }
-          },
         });
 
         // All pages translated — bump versions so canvas thumbnails reload
@@ -418,12 +386,6 @@ function App() {
       },
       { errorTitle: "Multi-Page Translation Failed", keepBusyOnSuccess: true }
     );
-    // Clear processing state after the batch finishes.
-    setProcessingPages((p) => {
-      const updated = { ...p };
-      for (const idx of sorted) delete updated[idx];
-      return updated;
-    });
   }, [runTask, waitForJob, syncBubblesToBackend, setIsWaitingForImageReload, setIsProcessing, bumpPageVersion, loadPagesFromServer, setSelectedPageIds, pagesApi]);
 
   // Unified Translate entry point — takes a snapshot, delegates to handlers
@@ -713,7 +675,6 @@ function App() {
           pages={pages}
           currentIndex={currentIndex}
           selectedPageIds={selectedPageIds}
-          processingPages={processingPages}
           pageVersions={pageVersions}
           onSelectPage={pagesApi.handleSelectPage}
           onPageClick={handlePageSelection}

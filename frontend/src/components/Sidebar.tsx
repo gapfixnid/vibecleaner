@@ -1,7 +1,7 @@
 // frontend/src/components/Sidebar.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { 
+import {
   Plus,
   Save,
   Pencil,
@@ -14,7 +14,6 @@ import {
   Download
 } from "lucide-react";
 import type { PageInfo } from "../types";
-import { derivePageStatus, pageStatusLabel } from "../lib/pageStatus";
 import { buildPageImageUrl } from "../lib/pageImageUrl";
 
 const PAGE_ROW_HEIGHT = 78;
@@ -125,8 +124,6 @@ interface SidebarProps {
   /** Save image(s) for the right-clicked page (or the whole multi-selection). */
   onSaveImages: (idx: number) => void;
   backendUrl: string;
-  /** Pages currently being processed, keyed by page index. */
-  processingPages: Record<number, "translate">;
   /** Image version per page — bumps when the underlying image changes. */
   pageVersions: Record<number, number>;
 }
@@ -147,7 +144,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onTranslatePages,
   onSaveImages,
   backendUrl,
-  processingPages,
   pageVersions,
 }) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -380,19 +376,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               alt={`Page ${pageIdx + 1}`}
                             />
                             <span className="page-number-badge">{pageIdx + 1}</span>
-                            {(() => {
-                              const status = derivePageStatus(
-                                page, pageVersions[pageIdx] ?? 0,
-                                processingPages[pageIdx],
-                              );
-                              const label = pageStatusLabel(status.kind);
-                              return label ? (
-                                <span
-                                  className={`page-status-dot status-${status.kind}${status.blink ? " status-blink" : ""}`}
-                                  aria-label={label}
-                                />
-                              ) : null;
-                            })()}
                           </div>
                           <div className="page-meta-info">
                             {renamingIndex === pageIdx ? (
@@ -902,30 +885,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           padding: 1px 3px;
           border-radius: 2px;
           font-weight: 600;
-        }
-
-        .page-status-dot {
-          position: absolute;
-          top: 3px;
-          left: 3px;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          border: 1.5px solid rgba(0, 0, 0, 0.55);
-          box-sizing: border-box;
-        }
-
-        .page-status-dot.status-orange { background: var(--system-orange); }
-        .page-status-dot.status-green { background: var(--system-green); }
-        .page-status-dot.status-orange-blink { background: var(--system-orange); }
-
-        .page-status-dot.status-blink {
-          animation: status-blink 0.8s ease-in-out infinite;
-        }
-
-        @keyframes status-blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.25; }
         }
 
         .page-meta-info {
