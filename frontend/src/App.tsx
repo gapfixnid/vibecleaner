@@ -22,6 +22,7 @@ import { usePageExport } from "./hooks/usePageExport";
 import { usePageSelection } from "./hooks/usePageSelection";
 import { useBackendBootstrap } from "./hooks/useBackendBootstrap";
 import { useWindowCloseGuard } from "./hooks/useWindowCloseGuard";
+import { useAppChrome } from "./hooks/useAppChrome";
 import { buildPageImageUrl as buildPageImageRequestUrl } from "./lib/pageImageUrl";
 
 const DEFAULT_SETTINGS: Settings = {
@@ -174,38 +175,7 @@ function App() {
     loadPagesFromServer,
   });
 
-  // Keyboard shortcuts (Ctrl+,: settings)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const activeTag = document.activeElement?.tagName.toLowerCase();
-      if (activeTag === "input" || activeTag === "textarea" || activeTag === "select") {
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === ",") {
-        e.preventDefault();
-        setIsSettingsOpen(true);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  // Restrict default context menu to allowed areas
-  useEffect(() => {
-    const handleGlobalContextMenu = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target) return;
-      const isAllowed =
-        target.closest(".canvas-container") ||
-        target.closest(".page-item") ||
-        target.closest(".sidebar-context-menu") ||
-        target.tagName.toLowerCase() === "input" ||
-        target.tagName.toLowerCase() === "textarea";
-      if (!isAllowed) e.preventDefault();
-    };
-    window.addEventListener("contextmenu", handleGlobalContextMenu);
-    return () => window.removeEventListener("contextmenu", handleGlobalContextMenu);
-  }, []);
+  useAppChrome({ openSettings: () => setIsSettingsOpen(true) });
 
   // --- Project lifecycle with unsaved-changes guard ---
 
