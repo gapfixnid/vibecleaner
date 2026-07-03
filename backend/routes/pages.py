@@ -1,12 +1,7 @@
-import os
-import io
-from functools import lru_cache
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Form
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.models import MangaPage
 from services.auto_typeset_pipeline import auto_typeset_pipeline, bubble_clip_boxes, inpaint_boxes
 from services.bubble_service import (
     BubbleUpdateSchema,
@@ -29,6 +24,7 @@ from services.page_crud_service import (
     resolve_page_index as _resolve_page_index,
     select_page_response,
 )
+from services.page_export_service import export_page_response
 from services.review_state_service import refresh_page_status
 from core import (
     state,
@@ -37,7 +33,6 @@ from core import (
     ensure_page_image,
     invalidate_page_caches,
     inpainting_service,
-    export_service,
 )
 
 router = APIRouter()
@@ -232,56 +227,6 @@ def _inpaint_job(job: dict, page_id: str):
         return {"status": "ok"}
 
 
-@lru_cache(maxsize=64)
-def resolve_font_path(font_family: str | None) -> str | None:
-    """Resolve font path using the 6-level fallback chain.
-
-    Delegates to FontResolverService for centralized font resolution.
-    """
-    from services.font_resolver_service import resolver as font_resolver
-
-    resolved, chain = font_resolver.resolve(
-        text="",
-        requested_family=font_family,
-        target_lang="Korean",
-    )
-    return resolved.path
-
 @router.post("/api/pages/{page_id}/export")
 def export_page(page_id: str, save_path: Optional[str] = Form(None), use_dialog: bool = Form(False)):
-    with state.lock:
-        source = _resolve_page(page_id)
-        ensure_page_image(source)
-
-        if source.inpainted_image is None:
-            raise HTTPException(status_code=409, detail="Page must be cleaned before export")
-
-        page = MangaPage(
-            file_path=source.file_path,
-            cv_image=source.cv_image.copy(),
-            inpainted_image=source.inpainted_image.copy(),
-            bubbles=[bubble.without_item() for bubble in source.bubbles],
-            bubble_counter=source.bubble_counter,
-        )
-
-    font_path = resolve_font_path("Pretendard Variable")
-
-    pil_image = export_service.render_page(
-        page,
-        font_path=font_path,
-        font_family="Pretendard Variable",
-        font_resolver=resolve_font_path
-    )
-    
-    if pil_image is None:
-        raise HTTPException(status_code=500, detail="Failed to render page image")
-        
-    if save_path:
-        os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
-        pil_image.save(save_path)
-        return {"status": "ok", "saved_path": save_path}
-    else:
-        buffer = io.BytesIO()
-        pil_image.save(buffer, format="PNG")
-        buffer.seek(0)
-        return StreamingResponse(buffer, media_type="image/png")
+    return export_page_response(page_id, save_path=save_path)
