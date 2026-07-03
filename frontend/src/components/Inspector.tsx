@@ -10,6 +10,7 @@ import type { BubbleInfo, Settings } from "../types";
 import { useBubbleEditing } from "../hooks/useBubbleEditing";
 import { InspectorTextSection } from "./inspector/InspectorTextSection";
 import { InspectorStyleSection } from "./inspector/InspectorStyleSection";
+import { InspectorProblemsSection } from "./inspector/InspectorProblemsSection";
 
 interface InspectorProps {
   selectedBubble: BubbleInfo | null;
@@ -242,6 +243,7 @@ export const Inspector: React.FC<InspectorProps> = ({
             updateBubbleField={updateBubbleField}
           />
         )}
+        <InspectorProblemsSection selectedBubble={selectedBubble} />
       </div>
 
       <style>{`
@@ -541,6 +543,36 @@ export const Inspector: React.FC<InspectorProps> = ({
           padding: 2px 6px;
           border-radius: 8px;
           border: 1px solid var(--border-color);
+        }
+
+        .review-status-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--text-secondary);
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: capitalize;
+        }
+
+        .problems-panel.ok .review-status-row {
+          color: var(--system-green);
+        }
+
+        .problems-panel.has-problems .review-status-row {
+          color: var(--system-orange);
+        }
+
+        .problem-list {
+          margin: 10px 0 0;
+          padding-left: 18px;
+          color: var(--text-secondary);
+          font-size: 11px;
+          line-height: 1.45;
+        }
+
+        .problem-item + .problem-item {
+          margin-top: 6px;
         }
 
         @keyframes spin {
