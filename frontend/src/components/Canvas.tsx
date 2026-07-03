@@ -3,8 +3,7 @@ import React, { useRef, useState, useEffect, useLayoutEffect, useCallback } from
 import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
 import { CanvasMultiSelectEmpty } from "./canvas/CanvasMultiSelectEmpty";
-import { CanvasBubbleBoxOverlay } from "./canvas/CanvasBubbleBoxOverlay";
-import { CanvasBubbleTextOverlay } from "./canvas/CanvasBubbleTextOverlay";
+import { CanvasImageStage } from "./canvas/CanvasImageStage";
 
 interface CanvasProps {
   imageUrl: string;
@@ -442,52 +441,20 @@ export const Canvas: React.FC<CanvasProps> = ({
       {isMultiPageSelection ? (
         <CanvasMultiSelectEmpty selectedPageCount={selectedPageCount} />
       ) : (
-        <div
-          className="canvas-viewport"
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-            transformOrigin: "0 0",
-            opacity: isImageLoading ? 0 : 1,
-            transition: isImageLoading ? "none" : "opacity 0.15s ease-in-out"
-          }}
-        >
-          {displayImageUrl && (
-            <div className="canvas-image-wrapper" style={{ position: "relative" }}>
-              <img
-                ref={imageRef}
-                src={displayImageUrl}
-                alt="Manga Page"
-                className="canvas-image"
-                decoding="async"
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-                draggable={false}
-                style={{
-                  width: imageDimensions.w ? `${imageDimensions.w}px` : undefined,
-                  height: imageDimensions.h ? `${imageDimensions.h}px` : undefined,
-                }}
-              />
-
-              {/* Render Bubble Bounding Boxes & Text */}
-              {!isWaitingForImageReload && (
-                <CanvasBubbleBoxOverlay
-                  bubbles={bubbles}
-                  selectedBubbleId={selectedBubbleId}
-                  scale={scale}
-                  width={imageDimensions.w || "100%"}
-                  height={imageDimensions.h || "100%"}
-                  onStartBubbleDrag={startBubbleDrag}
-                />
-              )}
-
-              {!isWaitingForImageReload && (
-                <CanvasBubbleTextOverlay bubbles={bubbles} selectedBubbleId={selectedBubbleId} />
-              )}
-
-
-            </div>
-          )}
-        </div>
+        <CanvasImageStage
+          displayImageUrl={displayImageUrl}
+          imageRef={imageRef}
+          imageDimensions={imageDimensions}
+          pan={pan}
+          scale={scale}
+          isImageLoading={isImageLoading}
+          bubbles={bubbles}
+          selectedBubbleId={selectedBubbleId}
+          isWaitingForImageReload={isWaitingForImageReload}
+          onImageLoad={handleImageLoad}
+          onImageError={handleImageError}
+          onStartBubbleDrag={startBubbleDrag}
+        />
       )}
 
       {/* Floating control bar */}
