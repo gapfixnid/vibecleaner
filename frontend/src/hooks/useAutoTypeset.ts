@@ -11,9 +11,9 @@ interface UseAutoTypesetDeps {
   waitForJob: WaitForJob;
   syncBubblesToBackend: () => Promise<void>;
   setIsWaitingForImageReload: Dispatch<SetStateAction<boolean>>;
-  setIsProcessing: Dispatch<SetStateAction<boolean>>;
   bumpPageVersion: (idx: number) => void;
   loadPagesFromServer: (selectIndex?: number, options?: { skipPageActivation?: boolean }) => Promise<void>;
+  fetchBubblesForPage: (pageIdx: number) => Promise<void>;
   setSelectedPageIds: Dispatch<SetStateAction<number[]>>;
   selectPage: (idx: number, options?: { deferActivation?: number }) => void;
 }
@@ -26,9 +26,9 @@ export function useAutoTypeset({
   waitForJob,
   syncBubblesToBackend,
   setIsWaitingForImageReload,
-  setIsProcessing,
   bumpPageVersion,
   loadPagesFromServer,
+  fetchBubblesForPage,
   setSelectedPageIds,
   selectPage,
 }: UseAutoTypesetDeps) {
@@ -50,15 +50,28 @@ export function useAutoTypeset({
         await waitForJob(job, "Translating page...");
         setIsWaitingForImageReload(true);
         bumpPageVersion(idx);
-        await loadPagesFromServer(idx);
+        await loadPagesFromServer(idx, { skipPageActivation: true });
+        await fetchBubblesForPage(idx);
       },
       { errorTitle: "Translation Failed", keepBusyOnSuccess: true }
     );
-  }, [pages, currentIndexRef, runTask, waitForJob, setIsWaitingForImageReload, bumpPageVersion, loadPagesFromServer]);
+  }, [
+    pages,
+    currentIndexRef,
+    runTask,
+    waitForJob,
+    setIsWaitingForImageReload,
+    bumpPageVersion,
+    loadPagesFromServer,
+    fetchBubblesForPage,
+  ]);
 
   const handleTranslatePages = useCallback(async (pageIds: number[]) => {
     const sorted = [...pageIds].sort((a, b) => a - b);
     const total = sorted.length;
+    if (total === 0) return;
+    const activeIdx = currentIndexRef.current;
+    const displayIdx = sorted.includes(activeIdx) ? activeIdx : sorted[0];
 
     await runTask(
       `Translating ${total} pages...`,
@@ -73,13 +86,10 @@ export function useAutoTypeset({
         setIsWaitingForImageReload(true);
         for (const idx of sorted) bumpPageVersion(idx);
 
-        await loadPagesFromServer();
-
-        setIsProcessing(false);
-        setIsWaitingForImageReload(false);
-
-        setSelectedPageIds([sorted[0]]);
-        selectPage(sorted[0], { deferActivation: 200 });
+        setSelectedPageIds([displayIdx]);
+        selectPage(displayIdx);
+        await loadPagesFromServer(displayIdx, { skipPageActivation: true });
+        await fetchBubblesForPage(displayIdx);
       },
       { errorTitle: "Multi-Page Translation Failed", keepBusyOnSuccess: true }
     );
@@ -87,10 +97,11 @@ export function useAutoTypeset({
     runTask,
     syncBubblesToBackend,
     waitForJob,
+    currentIndexRef,
     setIsWaitingForImageReload,
     bumpPageVersion,
     loadPagesFromServer,
-    setIsProcessing,
+    fetchBubblesForPage,
     setSelectedPageIds,
     selectPage,
   ]);

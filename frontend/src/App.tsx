@@ -37,7 +37,6 @@ function App() {
 
   const {
     isProcessing,
-    setIsProcessing,
     isWaitingForImageReload,
     setIsWaitingForImageReload,
     waitForJob,
@@ -102,9 +101,9 @@ function App() {
     waitForJob,
     syncBubblesToBackend,
     setIsWaitingForImageReload,
-    setIsProcessing,
     bumpPageVersion: pagesApi.bumpPageVersion,
     loadPagesFromServer,
+    fetchBubblesForPage: bubblesApi.fetchBubblesForPage,
     setSelectedPageIds,
     selectPage: pagesApi.handleSelectPage,
   });
