@@ -20,6 +20,7 @@ import { useProject } from "./hooks/useProject";
 import { useTheme } from "./hooks/useTheme";
 import { useAutoTypeset } from "./hooks/useAutoTypeset";
 import { usePageExport } from "./hooks/usePageExport";
+import { usePageSelection } from "./hooks/usePageSelection";
 import { buildPageImageUrl as buildPageImageRequestUrl } from "./lib/pageImageUrl";
 
 const DEFAULT_SETTINGS: Settings = {
@@ -123,16 +124,26 @@ function App() {
 
   // --- Local UI state ---
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [selectedPageIds, setSelectedPageIds] = useState<number[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const { theme, setTheme, themes } = useTheme();
   const [backendError, setBackendError] = useState<string | null>(null);
   const [isRetryingBackend, setIsRetryingBackend] = useState(false);
 
-  useEffect(() => {
-    selectionRef.current = selectedPageIds;
-  }, [selectedPageIds]);
+  const clearBubbleSelection = useCallback(() => setSelectedBubbleId(null), [setSelectedBubbleId]);
+  const {
+    selectedPageIds,
+    setSelectedPageIds,
+    handlePageSelection,
+    handleSelectAllPages,
+    resolveContextTargets,
+  } = usePageSelection({
+    pages,
+    currentIndex,
+    selectionRef,
+    selectPage: pagesApi.handleSelectPage,
+    clearBubbleSelection,
+  });
 
   const { handleTranslate, handleTranslatePages } = useAutoTypeset({
     pages,
@@ -267,79 +278,6 @@ function App() {
     return () => window.removeEventListener("contextmenu", handleGlobalContextMenu);
   }, []);
 
-  // --- Selection state management ---
-
-  // Anchor for Shift-range selection — always tracks the "base" page index.
-  const rangeAnchorRef = useRef<number | null>(null);
-
-  // Keep in sync with currentIndex so Shift+click works right after page load
-  // (when no user click has occurred yet).
-  useEffect(() => {
-    rangeAnchorRef.current = currentIndex;
-  }, [currentIndex]);
-
-  // Selection handlers (owner of selection logic lives in App, not Sidebar).
-  const handlePageSelection = useCallback(
-    (e: React.MouseEvent, pageIdx: number) => {
-      if (e.ctrlKey || e.metaKey) {
-        // Ctrl/Cmd click: toggle selection (always keep at least 1 selected)
-        const exists = selectedPageIds.includes(pageIdx);
-        let nextIds: number[];
-        if (exists) {
-          if (selectedPageIds.length === 1) return; // 마지막 1개는 deselect 불가
-          nextIds = selectedPageIds.filter((id) => id !== pageIdx);
-        } else {
-          nextIds = [...selectedPageIds, pageIdx];
-        }
-        setSelectedPageIds(nextIds);
-        if (nextIds.length === 1) pagesApi.handleSelectPage(nextIds[0]);
-      } else if (e.shiftKey && rangeAnchorRef.current !== null) {
-        // Shift click: range selection
-        const from = Math.min(rangeAnchorRef.current, pageIdx);
-        const to = Math.max(rangeAnchorRef.current, pageIdx);
-        const range: number[] = [];
-        for (let i = from; i <= to; i++) {
-          range.push(i);
-        }
-        setSelectedPageIds(range);
-        if (range.length === 1) pagesApi.handleSelectPage(range[0]);
-      } else {
-        // Normal click: single selection
-        pagesApi.handleSelectPage(pageIdx);
-        setSelectedPageIds([pageIdx]);
-      }
-      rangeAnchorRef.current = pageIdx;
-    },
-    [pagesApi, selectedPageIds]
-  );
-
-  const handleSelectAllPages = useCallback(() => {
-    const allIds = pages.map((p) => p.index);
-    setSelectedPageIds(allIds);
-  }, [pages]);
-
-  // Ctrl+A select all (when focus is in Sidebar).
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
-        const inSidebar = document.activeElement?.closest?.(".sidebar-container");
-        if (inSidebar) {
-          e.preventDefault();
-          handleSelectAllPages();
-        }
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSelectAllPages]);
-
-  // Clear bubble selection when multiple pages are selected (future-proofing).
-  useEffect(() => {
-    if (selectedPageIds.length > 1) {
-      setSelectedBubbleId(null);
-    }
-  }, [selectedPageIds.length, setSelectedBubbleId]);
-
   // --- Project lifecycle with unsaved-changes guard ---
 
   // Run `proceed` immediately when clean; otherwise prompt Save / Don't Save / Cancel.
@@ -430,14 +368,6 @@ function App() {
       }
     });
   }, [guardUnsaved, projectApi, resetPageVersions, setSelectedBubbleId]);
-
-  // Resolve the target page set for a context-menu action: the whole
-  // multi-selection if the right-clicked page is part of it, else just that page.
-  const resolveContextTargets = useCallback(
-    (idx: number) =>
-      selectedPageIds.length > 1 && selectedPageIds.includes(idx) ? [...selectedPageIds] : [idx],
-    [selectedPageIds]
-  );
 
   const handleContextTranslate = useCallback(
     (idx: number) => {
