@@ -14,6 +14,7 @@ from app.models import MangaPage, TextBubble
 from modules.utils.textblock import TextBlock
 from modules.config import config
 from services.auto_typeset_pipeline import auto_typeset_pipeline, bubble_clip_boxes, inpaint_boxes
+from services.review_state_service import derive_bubble_status, derive_page_status, refresh_bubble_status, refresh_page_status
 from core import (
     state,
     job_manager,
@@ -167,6 +168,8 @@ def get_pages():
                 "filename": p.display_name or os.path.basename(p.file_path),
                 "width": w,
                 "height": h,
+                "status": derive_page_status(p),
+                "problems": list(p.problems),
                 "bubble_count": len(p.bubbles),
                 "translated_count": sum(1 for b in p.bubbles if (b.translated or "").strip()),
                 "has_inpaint": p.inpainted_image is not None
@@ -439,6 +442,9 @@ def get_bubbles(page_id: str):
             "color": b.color,
             "alignment": b.alignment,
             "text_class": b.text_class,
+            "status": derive_bubble_status(b),
+            "problems": list(b.problems),
+            "edited": b.edited,
             "lines": cached_layout["lines"]
         })
 
@@ -470,6 +476,24 @@ def update_bubbles(page_id: str, bubbles: List[BubbleUpdateSchema]):
             existing = next((eb for eb in page.bubbles if eb.id == b_schema.id), None)
             text_box = existing.text_box if existing else None
             text_class = existing.text_class if existing else "text_bubble"
+            edited = bool(existing.edited) if existing else True
+            problems = list(existing.problems) if existing else []
+            status = existing.status if existing else "needs_review"
+            if existing is not None:
+                edited = edited or any((
+                    existing.box.x() != b_schema.x,
+                    existing.box.y() != b_schema.y,
+                    existing.box.width() != b_schema.width,
+                    existing.box.height() != b_schema.height,
+                    existing.text != b_schema.text,
+                    existing.translated != b_schema.translated,
+                    existing.font_family != b_schema.font_family,
+                    existing.font_size != b_schema.font_size,
+                    existing.bold != b_schema.bold,
+                    existing.italic != b_schema.italic,
+                    existing.color != b_schema.color,
+                    existing.alignment != b_schema.alignment,
+                ))
 
             tb = TextBubble(
                 id=b_schema.id,
@@ -483,14 +507,19 @@ def update_bubbles(page_id: str, bubbles: List[BubbleUpdateSchema]):
                 bold=b_schema.bold,
                 italic=b_schema.italic,
                 color=b_schema.color,
-                alignment=b_schema.alignment
+                alignment=b_schema.alignment,
+                status=status,
+                problems=problems,
+                edited=edited,
             )
+            refresh_bubble_status(tb)
             updated_bubbles.append(tb)
 
         page.bubbles = updated_bubbles
         # Keep the counter monotonic so deleting bubbles cannot cause a
         # future generated bubble to reuse an old id.
         page.bubble_counter = max(page.bubble_counter, max((b.id for b in page.bubbles), default=0))
+        refresh_page_status(page)
         invalidate_page_caches(page)
         state.touch()
         return {"status": "ok"}
@@ -521,6 +550,8 @@ def re_ocr_bubble(page_id: str, bubble_id: int):
         if not bubble:
             raise HTTPException(status_code=404, detail="Bubble not found")
         bubble.text = tb_block.text
+        bubble.edited = True
+        refresh_page_status(page)
         invalidate_page_caches(page)
         state.touch()
         return {"status": "ok", "text": bubble.text}
@@ -639,6 +670,7 @@ def _translate_single_bubble_job(job: dict, page_id: str, bubble_id: int):
         if not bubble:
             raise RuntimeError("Bubble not found")
         bubble.translated = tb_block.translation
+        refresh_page_status(page)
         invalidate_page_caches(page)
         state.touch()
         return {"translated": bubble.translated}
@@ -677,6 +709,7 @@ def _inpaint_single_bubble_job(job: dict, page_id: str, bubble_id: int):
         page_idx = _resolve_page_index(page_id)
         page = state.pages[page_idx]
         page.inpainted_image = inpainted_image
+        refresh_page_status(page)
         invalidate_page_caches(page, thumbnails=True, layouts=False, responses=True)
         page._preview_inpainted_bytes = preview_bytes
         state.touch()
@@ -707,6 +740,7 @@ def _inpaint_job(job: dict, page_id: str):
         page_idx = _resolve_page_index(page_id)
         page = state.pages[page_idx]
         page.inpainted_image = inpainted_image
+        refresh_page_status(page)
         invalidate_page_caches(page, thumbnails=True, layouts=False, responses=True)
         page._preview_inpainted_bytes = preview_bytes
         state.touch()

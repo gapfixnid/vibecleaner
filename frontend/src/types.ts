@@ -37,6 +37,9 @@ export interface BubbleInfo {
   color: string;
   alignment: string;
   text_class: string;
+  status: string;
+  problems: string[];
+  edited: boolean;
   lines: LineLayout[];
 }
 
@@ -67,6 +70,8 @@ export interface PageInfo {
   bubble_count: number;
   translated_count: number;
   has_inpaint: boolean;
+  status: string;
+  problems: string[];
 }
 
 export interface AreaDragState {

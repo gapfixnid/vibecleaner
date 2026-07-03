@@ -30,7 +30,8 @@ export interface PageDto {
   file_path: string;
   width: number;
   height: number;
-  status: "idle" | "processing" | "success" | "warning" | "error";
+  status: "idle" | "processing" | "ready_for_review" | "has_warnings" | "reviewed" | "exported" | "error" | "success" | "warning";
+  has_inpaint?: boolean;
   bubbles: BubbleDto[];
   problems: string[];
   bubble_count?: number;

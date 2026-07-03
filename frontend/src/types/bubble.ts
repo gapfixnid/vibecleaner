@@ -30,10 +30,21 @@ export interface BubbleDto {
   layoutBox: Rect;     // translated text placement region
   text: string;        // OCR original text
   translated: string;  // translated text
-  status: "idle" | "success" | "warning" | "error";
+  status:
+    | "idle"
+    | "ok"
+    | "needs_review"
+    | "ocr_warning"
+    | "translation_warning"
+    | "layout_overflow"
+    | "edited"
+    | "error"
+    | "success"
+    | "warning";
   style: TextStyleDto;
   layout: TextLayoutDto;
   problems: string[];
+  edited?: boolean;
   text_class?: string;
 }
 

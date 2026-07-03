@@ -43,7 +43,14 @@ export const getPages = async (): Promise<PagesResponse> => {
     height: p.height,
     bubble_count: p.bubble_count ?? 0,
     translated_count: p.translated_count ?? 0,
-    has_inpaint: p.status === "success" || p.status === "warning",
+    has_inpaint: p.has_inpaint ?? (
+      p.status === "success" ||
+      p.status === "warning" ||
+      p.status === "ready_for_review" ||
+      p.status === "has_warnings"
+    ),
+    status: p.status,
+    problems: p.problems ?? [],
   }));
   return {
     pages,
@@ -69,6 +76,9 @@ export const getBubbles = async (pageId: string): Promise<BubblesResponse> => {
     color: b.style.color,
     alignment: b.style.alignment,
     text_class: b.text_class || "",
+    status: b.status,
+    problems: b.problems ?? [],
+    edited: Boolean(b.edited),
     lines: b.layout.lines.map((l) => ({
       text: l.text,
       x: l.x,

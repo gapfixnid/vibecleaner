@@ -19,6 +19,9 @@ class TextBubble:
     italic: bool = False
     color: str = "#000000"
     alignment: str = "center"
+    status: str = "idle"
+    problems: List[str] = field(default_factory=list)
+    edited: bool = False
     item: Any = None  # Reference to BubbleGraphicsItem
 
     @staticmethod
@@ -48,6 +51,9 @@ class TextBubble:
             "box": [self.box.x(), self.box.y(), self.box.width(), self.box.height()],
             "text": self.text,
             "translated": self.translated,
+            "status": self.status,
+            "problems": list(self.problems),
+            "edited": self.edited,
             "style": {
                 "font_family": self.font_family,
                 "font_size": self.font_size,
@@ -81,6 +87,9 @@ class TextBubble:
             italic=style.get("italic", data.get("italic", False)),
             color=style.get("color", data.get("color", "#000000")),
             alignment=style.get("alignment", data.get("alignment", "center")),
+            status=data.get("status", "idle"),
+            problems=list(data.get("problems", [])),
+            edited=bool(data.get("edited", False)),
         )
 
     def without_item(self) -> "TextBubble":
@@ -97,6 +106,9 @@ class TextBubble:
             italic=self.italic,
             color=self.color,
             alignment=self.alignment,
+            status=self.status,
+            problems=list(self.problems),
+            edited=self.edited,
         )
 
 
@@ -111,12 +123,16 @@ class MangaPage:
     # for the sidebar/filtering. None = use the original file name.
     display_name: Optional[str] = None
     page_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    status: str = "idle"
+    problems: List[str] = field(default_factory=list)
 
     def to_project_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {
             "page_id": self.page_id,
             "file_path": self.file_path,
             "bubble_counter": self.bubble_counter,
+            "status": self.status,
+            "problems": list(self.problems),
             "bubbles": [bubble.to_project_dict() for bubble in self.bubbles],
         }
         if self.display_name:
@@ -134,4 +150,6 @@ class MangaPage:
             bubbles=bubbles,
             bubble_counter=data.get("bubble_counter", len(bubbles)),
             display_name=data.get("display_name"),
+            status=data.get("status", "idle"),
+            problems=list(data.get("problems", [])),
         )

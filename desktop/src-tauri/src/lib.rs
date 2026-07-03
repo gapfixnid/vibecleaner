@@ -296,8 +296,10 @@ async fn get_project(port_state: tauri::State<'_, PortState>) -> Result<serde_js
             let has_inpaint = p.get("has_inpaint").and_then(|v| v.as_bool()).unwrap_or(false);
             let bubble_count = p.get("bubble_count").and_then(|v| v.as_i64()).unwrap_or(0);
             let translated_count = p.get("translated_count").and_then(|v| v.as_i64()).unwrap_or(0);
-            
-            let status = if has_inpaint { "success" } else { "idle" };
+            let status = p.get("status").cloned().unwrap_or_else(|| {
+                serde_json::json!(if has_inpaint { "ready_for_review" } else { "idle" })
+            });
+            let problems = p.get("problems").cloned().unwrap_or(serde_json::json!([]));
             
             serde_json::json!({
                 "id": page_id,
@@ -307,10 +309,11 @@ async fn get_project(port_state: tauri::State<'_, PortState>) -> Result<serde_js
                 "width": width,
                 "height": height,
                 "status": status,
+                "has_inpaint": has_inpaint,
                 "bubble_count": bubble_count,
                 "translated_count": translated_count,
                 "bubbles": [], 
-                "problems": []
+                "problems": problems
             })
         }).collect()
     } else {
@@ -364,6 +367,11 @@ async fn get_page(
             let alignment = b.get("alignment").and_then(|v| v.as_str()).unwrap_or("center");
             let text_class = b.get("text_class").and_then(|v| v.as_str()).unwrap_or("");
             let lines = b.get("lines").cloned().unwrap_or(serde_json::json!([]));
+            let status = b.get("status").cloned().unwrap_or_else(|| {
+                serde_json::json!(if translated.is_empty() { "needs_review" } else { "ok" })
+            });
+            let problems = b.get("problems").cloned().unwrap_or(serde_json::json!([]));
+            let edited = b.get("edited").and_then(|v| v.as_bool()).unwrap_or(false);
 
             serde_json::json!({
                 "id": format!("bubble_{}", id),
@@ -372,7 +380,7 @@ async fn get_page(
                 "layoutBox": { "x": x, "y": y, "width": w, "height": h },
                 "text": text,
                 "translated": translated,
-                "status": if translated.is_empty() { "idle" } else { "success" },
+                "status": status,
                 "style": {
                     "font_family": font_family,
                     "font_size": font_size,
@@ -387,7 +395,8 @@ async fn get_page(
                     "overflow": false
                 },
                 "text_class": text_class,
-                "problems": []
+                "problems": problems,
+                "edited": edited
             })
         }).collect()
     } else {
@@ -398,6 +407,10 @@ async fn get_page(
     let height = page_info.get("height").cloned().unwrap_or(serde_json::json!(100));
     let filename = page_info.get("filename").cloned().unwrap_or(serde_json::json!(""));
     let has_inpaint = page_info.get("has_inpaint").and_then(|v| v.as_bool()).unwrap_or(false);
+    let status = page_info.get("status").cloned().unwrap_or_else(|| {
+        serde_json::json!(if has_inpaint { "ready_for_review" } else { "idle" })
+    });
+    let problems = page_info.get("problems").cloned().unwrap_or(serde_json::json!([]));
 
     Ok(serde_json::json!({
         "id": page_id,
@@ -406,9 +419,10 @@ async fn get_page(
         "file_path": "",
         "width": width,
         "height": height,
-        "status": if has_inpaint { "success" } else { "idle" },
+        "status": status,
+        "has_inpaint": has_inpaint,
         "bubbles": bubbles_dto,
-        "problems": []
+        "problems": problems
     }))
 }
 

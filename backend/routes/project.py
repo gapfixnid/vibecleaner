@@ -215,6 +215,8 @@ def save_project(file_path: str = Form(...), selected_indices: str = Form("")):
                     "inpainted_image": source.inpainted_image,
                     "bubble_counter": source.bubble_counter,
                     "display_name": source.display_name,
+                    "status": source.status,
+                    "problems": list(source.problems),
                     "bubbles": [bubble.to_project_dict() for bubble in source.bubbles],
                 })
 
@@ -270,6 +272,8 @@ def save_project(file_path: str = Form(...), selected_indices: str = Form("")):
                     "inpaint_file_name": inpaint_name,
                     "bubble_counter": snap["bubble_counter"],
                     "display_name": snap["display_name"],
+                    "status": snap["status"],
+                    "problems": snap["problems"],
                     "bubbles": snap["bubbles"],
                 })
 

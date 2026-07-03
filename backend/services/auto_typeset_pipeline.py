@@ -13,6 +13,7 @@ from modules.utils.textblock import TextBlock
 from services.image_encoding_service import encode_preview_jpeg_bytes, encode_thumbnail_bytes
 from services.job_service import job_manager
 from services.page_image_loader import ensure_page_image, invalidate_page_caches
+from services.review_state_service import refresh_page_status
 from services.service_registry import (
     bubble_analysis_service,
     detection_service,
@@ -318,6 +319,7 @@ class AutoTypesetPipeline:
             page.bubbles = local_bubbles
             page.bubble_counter = bubble_counter
             page.inpainted_image = inpainted_image
+            refresh_page_status(page)
             invalidate_page_caches(page, thumbnails=True, responses=True)
             page._thumbnail_original_bytes = encode_thumbnail_bytes(page.cv_image)
             if inpainted_preview_bytes is not None:
