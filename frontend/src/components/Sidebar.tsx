@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { PageInfo } from "../types";
 import { derivePageStatus, pageStatusLabel } from "../lib/pageStatus";
+import { buildPageImageUrl } from "../lib/pageImageUrl";
 
 const PAGE_ROW_HEIGHT = 78;
 const PAGE_OVERSCAN = 6;
@@ -344,7 +345,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       const itemIndex = startIndex + visibleIdx;
                       const pageIdx = page.index;
                       const isSelected = selectedPageIds.includes(pageIdx);
-                      const thumbUrl = `${backendUrl}/api/pages/${pageIdx}/image?type=original&thumbnail=true`;
+                      const thumbUrl = buildPageImageUrl({
+                        backendUrl,
+                        page,
+                        pageVersion: pageVersions[pageIdx] ?? 0,
+                        thumbnail: true,
+                      });
                       return (
                         <div
                           key={pageIdx}

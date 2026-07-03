@@ -45,6 +45,10 @@ export function usePages({
     setPageVersions((prev) => ({ ...prev, [idx]: (prev[idx] || 0) + 1 }));
   }, []);
 
+  const resetPageVersions = useCallback(() => {
+    setPageVersions({});
+  }, []);
+
   const loadPagesFromServer = useCallback(
     async (selectIndex?: number, options?: { skipPageActivation?: boolean }) => {
       try {
@@ -200,6 +204,7 @@ export function usePages({
     setCurrentIndex,
     pageVersions,
     bumpPageVersion,
+    resetPageVersions,
     loadPagesFromServer,
     handleSelectPage,
     handleDuplicatePage,

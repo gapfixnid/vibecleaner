@@ -18,6 +18,7 @@ import { useBubbles } from "./hooks/useBubbles";
 import { usePages } from "./hooks/usePages";
 import { useProject } from "./hooks/useProject";
 import { useTheme } from "./hooks/useTheme";
+import { buildPageImageUrl as buildPageImageRequestUrl } from "./lib/pageImageUrl";
 
 const DEFAULT_SETTINGS: Settings = {
   translation_model: "",
@@ -122,7 +123,7 @@ function App() {
     getSelectedIndices,
   });
 
-  const { pages, currentIndex, pageVersions, bumpPageVersion, loadPagesFromServer } = pagesApi;
+  const { pages, currentIndex, pageVersions, bumpPageVersion, resetPageVersions, loadPagesFromServer } = pagesApi;
 
   useEffect(() => {
     pagesRef.current = pages;
@@ -590,21 +591,23 @@ function App() {
     guardUnsaved(async () => {
       const ok = await projectApi.handleNewProject();
       if (ok) {
+        resetPageVersions();
         setSelectedPageIds([]);
         setSelectedBubbleId(null);
       }
     });
-  }, [guardUnsaved, projectApi, setSelectedBubbleId]);
+  }, [guardUnsaved, projectApi, resetPageVersions, setSelectedBubbleId]);
 
   const handleOpenProject = useCallback(() => {
     guardUnsaved(async () => {
       const restoredSelection = await projectApi.handleLoadProject();
       if (restoredSelection) {
+        resetPageVersions();
         setSelectedPageIds(restoredSelection);
         setSelectedBubbleId(null);
       }
     });
-  }, [guardUnsaved, projectApi, setSelectedBubbleId]);
+  }, [guardUnsaved, projectApi, resetPageVersions, setSelectedBubbleId]);
 
   // Resolve the target page set for a context-menu action: the whole
   // multi-selection if the right-clicked page is part of it, else just that page.
@@ -665,8 +668,12 @@ function App() {
 
   const buildPageImageUrl = useCallback(
     (page: PageInfo, preview = true) => {
-      const imageType = page.has_inpaint ? "inpainted" : "original";
-      return `${currentBackendUrl}/api/pages/${page.index}/image?type=${imageType}&preview=${preview ? "true" : "false"}&v=${pageVersions[page.index] || 0}`;
+      return buildPageImageRequestUrl({
+        backendUrl: currentBackendUrl,
+        page,
+        pageVersion: pageVersions[page.index] || 0,
+        preview,
+      });
     },
     [currentBackendUrl, pageVersions]
   );
