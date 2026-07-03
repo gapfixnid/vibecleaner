@@ -19,6 +19,7 @@ import { usePages } from "./hooks/usePages";
 import { useProject } from "./hooks/useProject";
 import { useTheme } from "./hooks/useTheme";
 import { useAutoTypeset } from "./hooks/useAutoTypeset";
+import { usePageExport } from "./hooks/usePageExport";
 import { buildPageImageUrl as buildPageImageRequestUrl } from "./lib/pageImageUrl";
 
 const DEFAULT_SETTINGS: Settings = {
@@ -43,14 +44,6 @@ const DEFAULT_SETTINGS: Settings = {
   inpaint_use_textbox_only: true,
   inpaint_clip_to_bubble: true,
 };
-
-/** Derive a base filename (without extension) for an exported page image. */
-function deriveExportBaseName(filename: string | undefined, idx: number): string {
-  if (!filename) return `page_${idx + 1}`;
-  const dot = filename.lastIndexOf(".");
-  const base = dot > 0 ? filename.slice(0, dot) : filename;
-  return base.trim() || `page_${idx + 1}`;
-}
 
 function App() {
   // --- Cross-cutting concerns (dialog + processing) ---
@@ -154,6 +147,16 @@ function App() {
     loadPagesFromServer,
     setSelectedPageIds,
     selectPage: pagesApi.handleSelectPage,
+  });
+
+  const { handleExportPages } = usePageExport({
+    pages,
+    runTask,
+    waitForJob,
+    syncBubblesToBackend,
+    bumpPageVersion,
+    loadPagesFromServer,
+    showAlert,
   });
 
   const loadSettingsFromServer = useCallback(async () => {
@@ -336,87 +339,6 @@ function App() {
       setSelectedBubbleId(null);
     }
   }, [selectedPageIds.length, setSelectedBubbleId]);
-
-  // Clean (if needed) then export a single page to an absolute path.
-  // Does NOT mark the project dirty — export is a read-only flow.
-  const exportPageToPath = useCallback(
-    async (idx: number, savePath: string) => {
-      const pageId = pages[idx]?.page_id;
-      if (!pageId) throw new Error("Page ID not found");
-      if (!pages[idx]?.has_inpaint) {
-        const job = await api.inpaint(pageId);
-        await waitForJob(job, "Cleaning page before export...");
-        bumpPageVersion(idx);
-        await loadPagesFromServer(idx);
-      }
-      const formData = new FormData();
-      formData.append("save_path", savePath);
-      formData.append("use_dialog", "false");
-      return api.exportPage(pageId, formData);
-    },
-    [pages, waitForJob, bumpPageVersion, loadPagesFromServer]
-  );
-
-  // Export pages as images. One page → file dialog. Multiple → pick a folder
-  // once and write every page into it. Used by the sidebar "Save..." (all pages)
-  // and the page context menu ("Save Image…" / "Save Images…").
-  const handleExportPages = useCallback(
-    async (ids: number[]) => {
-      const targets = Array.from(new Set(ids))
-        .filter((i) => i >= 0 && i < pages.length)
-        .sort((a, b) => a - b);
-      if (targets.length === 0) return;
-
-      if (targets.length === 1) {
-        const idx = targets[0];
-        const file = await desktop.saveFile({
-          title: "Export Page Image",
-          defaultExt: ".png",
-          filters: [
-            ["PNG Image", ["png"]],
-            ["JPEG Image", ["jpg", "jpeg"]],
-            ["WebP Image", ["webp"]],
-          ],
-        });
-        if (!file) return; // Cancelled
-        await runTask(
-          "Exporting page...",
-          async () => {
-            await syncBubblesToBackend(undefined, { silent: true });
-            const data = await exportPageToPath(idx, file);
-            if (data.status === "cancelled") return;
-            showAlert("success", "Export Successful", `Successfully saved to:\n${data.saved_path}`);
-          },
-          { errorTitle: "Export Failed" }
-        );
-        return;
-      }
-
-      // Multiple pages → choose a destination folder once.
-      const dir = await desktop.selectDirectory();
-      if (!dir) return; // Cancelled
-      await runTask(
-        `Exporting ${targets.length} pages...`,
-        async () => {
-          await syncBubblesToBackend(undefined, { silent: true });
-          const usedNames = new Set<string>();
-          for (const idx of targets) {
-            const base = deriveExportBaseName(pages[idx]?.filename, idx);
-            let name = `${base}.png`;
-            let suffix = 1;
-            while (usedNames.has(name.toLowerCase())) {
-              name = `${base}_${suffix++}.png`;
-            }
-            usedNames.add(name.toLowerCase());
-            await exportPageToPath(idx, `${dir}/${name}`);
-          }
-          showAlert("success", "Export Successful", `Saved ${targets.length} images to:\n${dir}`);
-        },
-        { errorTitle: "Export Failed" }
-      );
-    },
-    [pages, runTask, syncBubblesToBackend, exportPageToPath, showAlert]
-  );
 
   // --- Project lifecycle with unsaved-changes guard ---
 
