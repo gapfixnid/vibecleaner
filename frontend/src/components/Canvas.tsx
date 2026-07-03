@@ -1,10 +1,8 @@
 // frontend/src/components/Canvas.tsx
 import React, { useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
-import {
-  Sparkles,
-  Layers
-} from "lucide-react";
 import type { BubbleInfo } from "../types";
+import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
+import { CanvasMultiSelectEmpty } from "./canvas/CanvasMultiSelectEmpty";
 
 interface CanvasProps {
   imageUrl: string;
@@ -428,23 +426,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
-  // Translate button: shows "Translating..." during processing, "Translate" otherwise.
-  const translateButton = (
-    <button
-      className={isProcessing ? "primary processing" : "primary"}
-      onClick={onTranslate}
-      disabled={isProcessing}
-      data-tooltip={isProcessing ? "Translating..." : (isMultiPageSelection ? `Translate ${selectedPageCount} pages` : "Translate current page")}
-      data-tooltip-pos="top"
-      aria-label="Translate"
-    >
-      <span className="translate-btn-icon">
-        <Sparkles size={14} />
-      </span>
-      <span className="translate-btn-label">{isProcessing ? "Translating..." : "Translate"}</span>
-    </button>
-  );
-
   return (
     <div 
       className="canvas-container" 
@@ -457,10 +438,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       style={{ cursor: isSpacePressed || isPanning ? "grab" : "default" }}
     >
       {isMultiPageSelection ? (
-        <div className="canvas-multi-select-empty">
-          <Layers size={48} className="multi-select-icon" />
-          <div className="multi-select-count">{selectedPageCount} pages selected</div>
-        </div>
+        <CanvasMultiSelectEmpty selectedPageCount={selectedPageCount} />
       ) : (
         <div
           className="canvas-viewport"
@@ -600,7 +578,12 @@ export const Canvas: React.FC<CanvasProps> = ({
       {displayImageUrl && (
         <div className="canvas-floating-controls">
           <div className="actions-capsule">
-            {translateButton}
+            <CanvasTranslateButton
+              isProcessing={isProcessing}
+              isMultiPageSelection={isMultiPageSelection}
+              selectedPageCount={selectedPageCount}
+              onTranslate={onTranslate}
+            />
           </div>
         </div>
       )}
