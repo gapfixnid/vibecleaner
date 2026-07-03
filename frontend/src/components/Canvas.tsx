@@ -4,6 +4,7 @@ import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
 import { CanvasMultiSelectEmpty } from "./canvas/CanvasMultiSelectEmpty";
 import { CanvasImageStage } from "./canvas/CanvasImageStage";
+import { useCanvasKeyboardGuards } from "./canvas/useCanvasKeyboardGuards";
 
 interface CanvasProps {
   imageUrl: string;
@@ -119,77 +120,15 @@ export const Canvas: React.FC<CanvasProps> = ({
     draggingBubbleRef.current = draggingBubble;
   }, [draggingBubble]);
 
-  // Prevent right-clicks (button 2) from interrupting active left-click drags
-  useEffect(() => {
-    const blockRightClickDuringDrag = (e: MouseEvent) => {
-      if (draggingBubbleRef.current !== null && e.button === 2) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-
-    const blockContextMenuDuringDrag = (e: MouseEvent) => {
-      if (draggingBubbleRef.current !== null) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-
-    window.addEventListener("mousedown", blockRightClickDuringDrag, { capture: true });
-    window.addEventListener("mouseup", blockRightClickDuringDrag, { capture: true });
-    window.addEventListener("contextmenu", blockContextMenuDuringDrag, { capture: true });
-
-    return () => {
-      window.removeEventListener("mousedown", blockRightClickDuringDrag, { capture: true });
-      window.removeEventListener("mouseup", blockRightClickDuringDrag, { capture: true });
-      window.removeEventListener("contextmenu", blockContextMenuDuringDrag, { capture: true });
-    };
-  }, []);
-
-  // Track key press for spacebar panning
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Space" && e.target === document.body) {
-        e.preventDefault();
-        setIsSpacePressed(true);
-      }
-      if (e.code === "Escape") {
-        if (draggingBubbleRef.current !== null) {
-          setDraggingBubble(null);
-          onPreviewBubbles(bubbles);
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        return;
-      }
-      if (e.code === "Delete") {
-        if (selectedBubbleId !== null) {
-          const activeTag = document.activeElement?.tagName.toLowerCase();
-          const isEditing =
-            activeTag === "input" ||
-            activeTag === "textarea" ||
-            activeTag === "select" ||
-            (document.activeElement as HTMLElement | null)?.isContentEditable;
-          if (!isEditing) {
-            onDeleteBubble(selectedBubbleId);
-          }
-        }
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
-        setIsSpacePressed(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-    };
-  }, [selectedBubbleId, onDeleteBubble, bubbles, onPreviewBubbles]);
+  useCanvasKeyboardGuards({
+    draggingBubbleRef,
+    setDraggingBubble,
+    setIsSpacePressed,
+    selectedBubbleId,
+    bubbles,
+    onPreviewBubbles,
+    onDeleteBubble,
+  });
 
   // Center image on load
   const handleImageLoad = () => {
