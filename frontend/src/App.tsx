@@ -21,6 +21,7 @@ import { useTheme } from "./hooks/useTheme";
 import { useAutoTypeset } from "./hooks/useAutoTypeset";
 import { usePageExport } from "./hooks/usePageExport";
 import { usePageSelection } from "./hooks/usePageSelection";
+import { useBackendBootstrap } from "./hooks/useBackendBootstrap";
 import { buildPageImageUrl as buildPageImageRequestUrl } from "./lib/pageImageUrl";
 
 const DEFAULT_SETTINGS: Settings = {
@@ -127,8 +128,6 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const { theme, setTheme, themes } = useTheme();
-  const [backendError, setBackendError] = useState<string | null>(null);
-  const [isRetryingBackend, setIsRetryingBackend] = useState(false);
 
   const clearBubbleSelection = useCallback(() => setSelectedBubbleId(null), [setSelectedBubbleId]);
   const {
@@ -170,80 +169,10 @@ function App() {
     showAlert,
   });
 
-  const loadSettingsFromServer = useCallback(async () => {
-    try {
-      const data = await api.getSettings();
-      setSettings(data);
-    } catch (e) {
-      console.error("Failed to load settings from server", e);
-    }
-  }, []);
-
-  // Initial bootstrap: resolve port, check backend health, then load data.
-  useEffect(() => {
-    const initTauri = async () => {
-      let backendOk = true;
-      try {
-        const port = await desktop.getApiPort();
-        api.setBackendUrl(`http://127.0.0.1:${port}`);
-        console.log("Resolved dynamic API port from Tauri:", port);
-        try {
-          const status = await desktop.getBackendStatus();
-          if (!status.running) {
-            backendOk = false;
-            setBackendError(status.error || "백엔드 서버를 시작하지 못했습니다.");
-          }
-        } catch (e) {
-          // Command unavailable (e.g. running outside Tauri) — assume the
-          // backend is managed externally and proceed.
-          console.log("getBackendStatus unavailable; assuming backend managed externally", e);
-        }
-      } catch (e) {
-        console.log("Not running inside Tauri or failed to get port. Using fallback port 8000.", e);
-      }
-      if (backendOk) {
-        // The backend process may be up but not yet accepting HTTP connections.
-        // Probe with a few retries; surface a recoverable error if unreachable.
-        let reachable = false;
-        for (let attempt = 0; attempt < 8; attempt++) {
-          try {
-            await api.getSettings();
-            reachable = true;
-            break;
-          } catch {
-            await new Promise((r) => setTimeout(r, 500));
-          }
-        }
-        if (!reachable) {
-          setBackendError("백엔드 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
-          return;
-        }
-        loadSettingsFromServer();
-        loadPagesFromServer();
-      }
-    };
-    initTauri();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleRetryBackend = useCallback(async () => {
-    setIsRetryingBackend(true);
-    try {
-      const status = await desktop.retryBackend();
-      if (status.running) {
-        setBackendError(null);
-        loadSettingsFromServer();
-        await loadPagesFromServer();
-      } else {
-        setBackendError(status.error || "백엔드 서버를 시작하지 못했습니다.");
-      }
-    } catch (e) {
-      console.error("retry_backend invocation failed", e);
-      setBackendError("백엔드 재시작 명령을 호출하지 못했습니다.");
-    } finally {
-      setIsRetryingBackend(false);
-    }
-  }, [loadSettingsFromServer, loadPagesFromServer]);
+  const { backendError, isRetryingBackend, handleRetryBackend } = useBackendBootstrap({
+    setSettings,
+    loadPagesFromServer,
+  });
 
   // Keyboard shortcuts (Ctrl+,: settings)
   useEffect(() => {
