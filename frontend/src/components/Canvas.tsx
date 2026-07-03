@@ -6,6 +6,7 @@ import { CanvasMultiSelectEmpty } from "./canvas/CanvasMultiSelectEmpty";
 import { CanvasImageStage } from "./canvas/CanvasImageStage";
 import { useCanvasKeyboardGuards } from "./canvas/useCanvasKeyboardGuards";
 import { useCanvasImageLoader } from "./canvas/useCanvasImageLoader";
+import { useCanvasViewport } from "./canvas/useCanvasViewport";
 
 interface CanvasProps {
   imageUrl: string;
@@ -51,9 +52,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   const imageRef = useRef<HTMLImageElement>(null);
   const [scale, setScale] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState<boolean>(false);
-  const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
 
   // Tracks whether the user has manually zoomed/panned the current page, so
   // that container resizes don't reset their view.
@@ -78,6 +76,28 @@ export const Canvas: React.FC<CanvasProps> = ({
     setPan,
     hasUserAdjustedRef,
     onImageLoaded,
+  });
+  const {
+    handleWheel,
+    isPanning,
+    isSpacePressed,
+    setIsSpacePressed,
+    startCanvasPan,
+    updateCanvasPan,
+    finishCanvasPan,
+  } = useCanvasViewport({
+    containerRef,
+    imageRef,
+    imageWidth,
+    imageHeight,
+    imageDimensions,
+    setImageDimensions,
+    isImageLoading,
+    scale,
+    setScale,
+    pan,
+    setPan,
+    hasUserAdjustedRef,
   });
 
   // Dragging bubble state
@@ -124,117 +144,19 @@ export const Canvas: React.FC<CanvasProps> = ({
     onDeleteBubble,
   });
 
-  // Recalculate scale/pan on resize
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const observer = new ResizeObserver((entries) => {
-      if (!imageRef.current) return;
-      const entry = entries[0];
-      if (!entry) return;
-      
-      const containerWidth = entry.contentRect.width;
-      const containerHeight = entry.contentRect.height;
-      const imgWidth = imageWidth || imageRef.current.naturalWidth;
-      const imgHeight = imageHeight || imageRef.current.naturalHeight;
-
-      if (imgWidth === 0 || imgHeight === 0 || containerWidth === 0 || containerHeight === 0) return;
-
-      // Keep dimensions in sync, but preserve the user's zoom/pan: only
-      // re-fit when they haven't manually adjusted the view.
-      setImageDimensions({ w: imgWidth, h: imgHeight });
-      if (hasUserAdjustedRef.current) return;
-
-      const scaleX = (containerWidth - 60) / imgWidth;
-      const scaleY = (containerHeight - 60) / imgHeight;
-      const initialScale = Math.min(scaleX, scaleY, 1);
-
-      setScale(initialScale);
-      setPan({
-        x: (containerWidth - imgWidth * initialScale) / 2,
-        y: (containerHeight - imgHeight * initialScale) / 2,
-      });
-    });
-
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [imageWidth, imageHeight]);
-
-  // Self-correction hook
-  useEffect(() => {
-    if (isImageLoading || !imageRef.current || !containerRef.current) return;
-    
-    const imgWidth = imageWidth || imageRef.current.naturalWidth;
-    const imgHeight = imageHeight || imageRef.current.naturalHeight;
-    const containerWidth = containerRef.current.clientWidth;
-    const containerHeight = containerRef.current.clientHeight;
-
-    if (imgWidth === 0 || imgHeight === 0 || containerWidth === 0 || containerHeight === 0) return;
-
-    if (scale === 1 && !hasUserAdjustedRef.current) {
-      const scaleX = (containerWidth - 60) / imgWidth;
-      const scaleY = (containerHeight - 60) / imgHeight;
-      const initialScale = Math.min(scaleX, scaleY, 1);
-
-      setScale(initialScale);
-      setPan({
-        x: (containerWidth - imgWidth * initialScale) / 2,
-        y: (containerHeight - imgHeight * initialScale) / 2,
-      });
-      setImageDimensions({ w: imgWidth, h: imgHeight });
-    }
-  }, [isImageLoading, scale, imageWidth, imageHeight]);
-
-  // Zoom on wheel (Ctrl + Wheel)
-  const handleWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey || isSpacePressed) {
-      e.preventDefault();
-      hasUserAdjustedRef.current = true;
-      const zoomFactor = 1.1;
-      const nextScale = e.deltaY < 0 ? Math.min(scale * zoomFactor, 5) : Math.max(scale / zoomFactor, 0.15);
-
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        const imgX = (mouseX - pan.x) / scale;
-        const imgY = (mouseY - pan.y) / scale;
-
-        setScale(nextScale);
-        setPan({
-          x: mouseX - imgX * nextScale,
-          y: mouseY - imgY * nextScale,
-        });
-      }
-    }
-  };
-
   const handleMouseDown = (e: React.MouseEvent) => {
     if (draggingBubble !== null) {
       e.preventDefault();
       return;
     }
 
-    if (isSpacePressed || e.button === 1 || e.button === 2) {
-      e.preventDefault();
-      hasUserAdjustedRef.current = true;
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-      return;
-    }
+    if (startCanvasPan(e)) return;
 
     onSelectBubble(null);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning) {
-      setPan({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      });
-      return;
-    }
+    if (updateCanvasPan(e)) return;
 
     if (draggingBubble) {
       if (!imageRef.current) return;
@@ -265,10 +187,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   };
 
   const handleMouseUp = () => {
-    if (isPanning) {
-      setIsPanning(false);
-      return;
-    }
+    if (finishCanvasPan()) return;
 
     if (draggingBubble) {
       finishBubbleDrag();
