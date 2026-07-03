@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
 import { Canvas } from "./components/Canvas";
@@ -9,22 +9,18 @@ import { CustomDialog } from "./components/CustomDialog";
 import { AboutModal } from "./components/AboutModal";
 import { BackendErrorScreen } from "./components/BackendErrorScreen";
 import "./styles/apple_theme.css";
-import type { PageInfo } from "./types";
 import { useDialog } from "./hooks/useDialog";
 import { useProcessingTask } from "./hooks/useProcessingTask";
-import { useBubbles } from "./hooks/useBubbles";
-import { usePages } from "./hooks/usePages";
 import { useProject } from "./hooks/useProject";
 import { useTheme } from "./hooks/useTheme";
 import { useAutoTypeset } from "./hooks/useAutoTypeset";
 import { usePageExport } from "./hooks/usePageExport";
-import { usePageSelection } from "./hooks/usePageSelection";
 import { useBackendBootstrap } from "./hooks/useBackendBootstrap";
 import { useWindowCloseGuard } from "./hooks/useWindowCloseGuard";
 import { useAppChrome } from "./hooks/useAppChrome";
 import { useProjectActions } from "./hooks/useProjectActions";
 import { useAppSettings } from "./hooks/useAppSettings";
-import { usePageImageRequests } from "./hooks/usePageImageRequests";
+import { useWorkspacePages } from "./hooks/useWorkspacePages";
 
 function App() {
   // --- Cross-cutting concerns (dialog + processing) ---
@@ -39,10 +35,6 @@ function App() {
   const markDirty = useCallback(() => setIsDirty(true), []);
   const markClean = useCallback(() => setIsDirty(false), []);
 
-  // Latest sidebar selection, exposed to useProject for save/restore.
-  const selectionRef = useRef<number[]>([]);
-  const getSelectedIndices = useCallback(() => selectionRef.current, []);
-
   const {
     isProcessing,
     setIsProcessing,
@@ -53,32 +45,29 @@ function App() {
     finishImageReload,
   } = useProcessingTask(showError);
 
-  // Shared active-page index ref, used by both pages and bubbles hooks.
-  const currentIndexRef = useRef<number>(-1);
-  const pagesRef = useRef<PageInfo[]>([]);
-
   // --- Domain hooks ---
-  // Ref pattern: onPageTranslationChanged callback is set after loadPagesFromServer
-  // is available (avoids circular dependency with usePages).
-  const onTranslationChangedRef = useRef<(() => void) | undefined>(undefined);
-  const bubblesApi = useBubbles({
-    currentIndexRef,
-    pagesRef,
+  const workspacePages = useWorkspacePages({
     runTask,
     waitForJob,
     showError,
-    markDirty,
-    onPageTranslationChanged: () => onTranslationChangedRef.current?.(),
-  });
-  const pagesApi = usePages({
-    currentIndexRef,
-    runTask,
-    showError,
     showConfirm,
-    onPageActivated: bubblesApi.handlePageActivated,
-    onPagesCleared: bubblesApi.clearBubbles,
     markDirty,
   });
+  const {
+    activeBubble,
+    activePage,
+    backendUrl: currentBackendUrl,
+    bubblesApi,
+    buildPageImageUrl,
+    currentIndex,
+    currentIndexRef,
+    getSelectedIndices,
+    isMultiPageSelection,
+    loadPagesFromServer,
+    pages,
+    pagesApi,
+    selectionApi,
+  } = workspacePages;
   const projectApi = useProject({
     runTask,
     showAlert,
@@ -87,17 +76,6 @@ function App() {
     markClean,
     getSelectedIndices,
   });
-
-  const { pages, currentIndex, pageVersions, bumpPageVersion, resetPageVersions, loadPagesFromServer } = pagesApi;
-
-  useEffect(() => {
-    pagesRef.current = pages;
-  }, [pages]);
-
-  // Wire up the translation-changed callback once loadPagesFromServer is ready.
-  useEffect(() => {
-    onTranslationChangedRef.current = () => loadPagesFromServer();
-  }, [loadPagesFromServer]);
 
   const { bubbles, selectedBubbleId, setSelectedBubbleId, syncBubblesToBackend } =
     bubblesApi;
@@ -108,20 +86,13 @@ function App() {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const { theme, setTheme, themes } = useTheme();
 
-  const clearBubbleSelection = useCallback(() => setSelectedBubbleId(null), [setSelectedBubbleId]);
   const {
     selectedPageIds,
     setSelectedPageIds,
     handlePageSelection,
     handleSelectAllPages,
     resolveContextTargets,
-  } = usePageSelection({
-    pages,
-    currentIndex,
-    selectionRef,
-    selectPage: pagesApi.handleSelectPage,
-    clearBubbleSelection,
-  });
+  } = selectionApi;
 
   const { handleTranslate, handleTranslatePages } = useAutoTypeset({
     pages,
@@ -132,7 +103,7 @@ function App() {
     syncBubblesToBackend,
     setIsWaitingForImageReload,
     setIsProcessing,
-    bumpPageVersion,
+    bumpPageVersion: pagesApi.bumpPageVersion,
     loadPagesFromServer,
     setSelectedPageIds,
     selectPage: pagesApi.handleSelectPage,
@@ -143,7 +114,7 @@ function App() {
     runTask,
     waitForJob,
     syncBubblesToBackend,
-    bumpPageVersion,
+    bumpPageVersion: pagesApi.bumpPageVersion,
     loadPagesFromServer,
     showAlert,
   });
@@ -175,7 +146,7 @@ function App() {
     loadPagesFromServer,
     currentIndexRef,
     markDirty,
-    resetPageVersions,
+    resetPageVersions: pagesApi.resetPageVersions,
     selectPage: pagesApi.handleSelectPage,
     deletePages: pagesApi.handleDeletePages,
     setSelectedPageIds,
@@ -199,19 +170,6 @@ function App() {
     [resolveContextTargets, handleExportPages]
   );
 
-  // --- Derived view data ---
-  const activePage: PageInfo | undefined = pages[currentIndex];
-  const activeBubble = bubbles.find((b) => b.id === selectedBubbleId) || null;
-
-  // Selection-derived values
-  const isMultiPageSelection = selectedPageIds.length > 1;
-
-  const { backendUrl: currentBackendUrl, buildPageImageUrl } = usePageImageRequests({
-    pages,
-    currentIndex,
-    pageVersions,
-  });
-
   return (
     <div className="app-container">
       <Toolbar
@@ -228,7 +186,7 @@ function App() {
           pages={pages}
           currentIndex={currentIndex}
           selectedPageIds={selectedPageIds}
-          pageVersions={pageVersions}
+          pageVersions={pagesApi.pageVersions}
           onSelectPage={pagesApi.handleSelectPage}
           onPageClick={handlePageSelection}
           onSelectAllPages={handleSelectAllPages}
