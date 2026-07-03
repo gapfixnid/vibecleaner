@@ -1,5 +1,5 @@
 // frontend/src/components/Inspector.tsx
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   AlignLeft,
   AlignCenter,
@@ -15,6 +15,7 @@ import {
   Layers
 } from "lucide-react";
 import type { BubbleInfo, Settings } from "../types";
+import { useBubbleEditing } from "../hooks/useBubbleEditing";
 
 interface InspectorProps {
   selectedBubble: BubbleInfo | null;
@@ -35,31 +36,23 @@ export const Inspector: React.FC<InspectorProps> = ({
   isProcessing,
   isMultiPageSelection,
 }) => {
-  const [origText, setOrigText] = useState("");
-  const [transText, setTransText] = useState("");
-  const [fontSizeDraft, setFontSizeDraft] = useState<number>(18);
-  const [colorDraft, setColorDraft] = useState<string>("#000000");
   const [activeTab, setActiveTab] = useState<"text" | "style">("text");
-
-  useEffect(() => {
-    if (selectedBubble) {
-      setOrigText(selectedBubble.text || "");
-      setTransText(selectedBubble.translated || "");
-      setFontSizeDraft(selectedBubble.font_size || selectedBubble.computed_font_size || settings.default_font_size || 18);
-      setColorDraft(selectedBubble.color || "#000000");
-    }
-    // Reset only when switching bubbles or when the bubble's own text/style
-    // changes from the backend (re-OCR/translate) — not on every re-render,
-    // which would otherwise wipe unsaved keystrokes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    selectedBubble?.id,
-    selectedBubble?.text,
-    selectedBubble?.translated,
-    selectedBubble?.font_size,
-    selectedBubble?.computed_font_size,
-    selectedBubble?.color,
-  ]);
+  const {
+    colorDraft,
+    fontSizeDraft,
+    origText,
+    transText,
+    saveTextEdits,
+    setColorDraft,
+    setFontSizeDraft,
+    setOrigText,
+    setTransText,
+    updateBubbleField,
+  } = useBubbleEditing({
+    selectedBubble,
+    settings,
+    onUpdateBubble,
+  });
 
   if (isMultiPageSelection) {
     return (
@@ -206,21 +199,6 @@ export const Inspector: React.FC<InspectorProps> = ({
     );
   }
 
-  const handleStyleChange = (key: keyof BubbleInfo, value: any) => {
-    onUpdateBubble({
-      ...selectedBubble,
-      [key]: value,
-    });
-  };
-
-  const handleSaveTextEdits = () => {
-    onUpdateBubble({
-      ...selectedBubble,
-      text: origText,
-      translated: transText,
-    });
-  };
-
   return (
     <aside className="inspector-container">
       <div className="inspector-header">
@@ -265,7 +243,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                 className="apple-textarea"
                 value={origText}
                 onChange={(e) => setOrigText(e.target.value)}
-                onBlur={handleSaveTextEdits}
+                onBlur={saveTextEdits}
                 placeholder="No original text detected."
               />
             </div>
@@ -287,7 +265,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                 className="apple-textarea trans"
                 value={transText}
                 onChange={(e) => setTransText(e.target.value)}
-                onBlur={handleSaveTextEdits}
+                onBlur={saveTextEdits}
                 placeholder="Translation result will show here..."
               />
             </div>
@@ -304,7 +282,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                   <select
                     className="apple-select"
                     value={selectedBubble.font_family || "Pretendard Variable"}
-                    onChange={(e) => handleStyleChange("font_family", e.target.value)}
+                    onChange={(e) => updateBubbleField("font_family", e.target.value)}
                   >
                     <option value="Pretendard Variable">Pretendard</option>
                     <option value="Malgun Gothic">Malgun Gothic</option>
@@ -326,8 +304,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                   className="apple-slider"
                   value={fontSizeDraft}
                   onChange={(e) => setFontSizeDraft(parseInt(e.target.value))}
-                  onMouseUp={() => handleStyleChange("font_size", fontSizeDraft)}
-                  onKeyUp={() => handleStyleChange("font_size", fontSizeDraft)}
+                  onMouseUp={() => updateBubbleField("font_size", fontSizeDraft)}
+                  onKeyUp={() => updateBubbleField("font_size", fontSizeDraft)}
                   style={{ flex: 1 }}
                 />
                 <span className="size-indicator" style={{ minWidth: "48px", textAlign: "right" }}>
@@ -342,7 +320,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                 <div className="style-buttons-group">
                   <button
                     className={`style-toggle-btn ${selectedBubble.bold ? "active" : ""}`}
-                    onClick={() => handleStyleChange("bold", !selectedBubble.bold)}
+                    onClick={() => updateBubbleField("bold", !selectedBubble.bold)}
                     data-tooltip="Bold"
                     aria-label="Bold"
                     aria-pressed={selectedBubble.bold}
@@ -351,7 +329,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </button>
                   <button
                     className={`style-toggle-btn ${selectedBubble.italic ? "active" : ""}`}
-                    onClick={() => handleStyleChange("italic", !selectedBubble.italic)}
+                    onClick={() => updateBubbleField("italic", !selectedBubble.italic)}
                     data-tooltip="Italic"
                     aria-label="Italic"
                     aria-pressed={selectedBubble.italic}
@@ -368,7 +346,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                 <div className="align-buttons-group">
                   <button
                     className={`align-btn ${selectedBubble.alignment === "left" ? "active" : ""}`}
-                    onClick={() => handleStyleChange("alignment", "left")}
+                    onClick={() => updateBubbleField("alignment", "left")}
                     data-tooltip="Align Left"
                     aria-label="Align left"
                     aria-pressed={selectedBubble.alignment === "left"}
@@ -377,7 +355,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </button>
                   <button
                     className={`align-btn ${selectedBubble.alignment === "center" ? "active" : ""}`}
-                    onClick={() => handleStyleChange("alignment", "center")}
+                    onClick={() => updateBubbleField("alignment", "center")}
                     data-tooltip="Align Center"
                     aria-label="Align center"
                     aria-pressed={selectedBubble.alignment === "center"}
@@ -386,7 +364,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </button>
                   <button
                     className={`align-btn ${selectedBubble.alignment === "right" ? "active" : ""}`}
-                    onClick={() => handleStyleChange("alignment", "right")}
+                    onClick={() => updateBubbleField("alignment", "right")}
                     data-tooltip="Align Right"
                     aria-label="Align right"
                     aria-pressed={selectedBubble.alignment === "right"}
@@ -405,7 +383,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                   className="apple-color-picker"
                   value={colorDraft}
                   onChange={(e) => setColorDraft(e.target.value)}
-                  onBlur={() => handleStyleChange("color", colorDraft)}
+                  onBlur={() => updateBubbleField("color", colorDraft)}
                 />
                 <span className="color-hex-text">{colorDraft}</span>
               </div>
