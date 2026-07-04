@@ -100,6 +100,7 @@ class AppConfig:
     inpaint_mask_dilation: int = 2
     inpaint_use_textbox_only: bool = True
     inpaint_clip_to_bubble: bool = True
+    setup_completed: bool = False
 
     @property
     def DETECT_MODEL(self) -> str:
@@ -217,6 +218,7 @@ class AppConfig:
             "inpaint_mask_dilation": "inpaint_mask_dilation",
             "inpaint_use_textbox_only": "inpaint_use_textbox_only",
             "inpaint_clip_to_bubble": "inpaint_clip_to_bubble",
+            "setup_completed": "setup_completed",
         },
     )
 
@@ -252,6 +254,9 @@ class AppConfig:
             if field_name == "confidence_threshold" and value == 0.30:
                 value = 0.45
             setattr(self, field_name, value)
+
+        if "setup_completed" not in data:
+            self.setup_completed = True
 
         logger.info("Settings loaded from %s", SETTINGS_FILE_PATH)
 

@@ -10,6 +10,7 @@ import type {
   ExportResultDto,
   JobStatusDto,
   LoadProjectResultDto,
+  ModelStatusDto,
   TranslationModelsDto,
   vibeCleanerApi,
 } from "../types/api";
@@ -165,6 +166,14 @@ export const tauriClient: vibeCleanerApi = {
 
   async updateSettings(settings: SettingsDto): Promise<SettingsDto> {
     return callTauri<SettingsDto>("update_settings", { settings });
+  },
+
+  async getModelStatus(): Promise<ModelStatusDto> {
+    return callTauri<ModelStatusDto>("get_model_status");
+  },
+
+  async downloadRequiredModels(): Promise<JobStatusDto> {
+    return callTauri<JobStatusDto>("download_required_models");
   },
 
   async getTranslationModels(provider: string, apiKey: string, baseUrl: string): Promise<TranslationModelsDto> {

@@ -4,7 +4,8 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from modules.config import config, OLLAMA_API_URL
-from core import logger, translation_service
+from core import job_manager, logger, translation_service
+from services.model_requirements import download_required_models, get_model_status
 
 router = APIRouter()
 
@@ -46,6 +47,7 @@ class SettingsSchema(BaseModel):
     inpaint_mask_dilation: int
     inpaint_use_textbox_only: bool
     inpaint_clip_to_bubble: bool
+    setup_completed: bool = False
 
 @router.get("/api/settings")
 def get_settings():
@@ -87,6 +89,7 @@ def get_settings():
         "inpaint_mask_dilation": config.inpaint_mask_dilation,
         "inpaint_use_textbox_only": config.inpaint_use_textbox_only,
         "inpaint_clip_to_bubble": config.inpaint_clip_to_bubble,
+        "setup_completed": config.setup_completed,
     }
 
 @router.post("/api/settings")
@@ -130,6 +133,7 @@ def update_settings(settings: SettingsSchema):
     config.inpaint_mask_dilation = settings.inpaint_mask_dilation
     config.inpaint_use_textbox_only = settings.inpaint_use_textbox_only
     config.inpaint_clip_to_bubble = settings.inpaint_clip_to_bubble
+    config.setup_completed = settings.setup_completed
 
     # Persist and apply the prompt override before rebuilding the translator so
     # the newly-created provider instance receives the current prompt.
@@ -272,3 +276,18 @@ def get_translation_models(req: ModelListRequest):
     except Exception as e:
         logger.warning("Failed to list models for provider=%s: %s", provider, e)
         return {"provider": provider, "models": [], "error": "모델 목록을 불러오지 못했습니다."}
+
+
+@router.get("/api/models/status")
+def get_models_status():
+    return get_model_status(config)
+
+
+@router.post("/api/models/download")
+def download_models():
+    return job_manager.start(
+        kind="download_models",
+        page_idx=-1,
+        key="download_models",
+        worker=lambda job: download_required_models(config, job),
+    )

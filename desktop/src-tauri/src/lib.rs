@@ -1054,6 +1054,16 @@ async fn update_settings(
 }
 
 #[tauri::command]
+async fn get_model_status(port_state: tauri::State<'_, PortState>) -> Result<serde_json::Value, String> {
+    forward_get(port_state.0, "/api/models/status").await
+}
+
+#[tauri::command]
+async fn download_required_models(port_state: tauri::State<'_, PortState>) -> Result<serde_json::Value, String> {
+    forward_post(port_state.0, "/api/models/download", &serde_json::json!({})).await
+}
+
+#[tauri::command]
 async fn get_translation_models(
     port_state: tauri::State<'_, PortState>,
     provider: String,
@@ -1141,6 +1151,8 @@ pub fn run() {
             export_pages,
             get_settings,
             update_settings,
+            get_model_status,
+            download_required_models,
             get_translation_models
         ])
         .build(tauri::generate_context!());

@@ -42,6 +42,7 @@ const DEFAULT_SETTINGS: Settings = {
   inpaint_mask_dilation: 2,
   inpaint_use_textbox_only: true,
   inpaint_clip_to_bubble: true,
+  setup_completed: true,
 };
 
 export function useAppSettings() {
@@ -59,8 +60,10 @@ export function useAppSettings() {
     try {
       const saved = await api.updateSettings(updated);
       setSettings(saved);
+      return saved;
     } catch (e) {
       console.error("Failed to auto-save settings", e);
+      return undefined;
     }
   }, [setSettings]);
 

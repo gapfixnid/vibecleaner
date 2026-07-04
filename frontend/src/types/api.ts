@@ -77,6 +77,24 @@ export interface TranslationModelsDto {
   error?: string;
 }
 
+export interface ModelRequirementDto {
+  id: string;
+  category: string;
+  label: string;
+  downloaded: boolean;
+  files: string[];
+  path: string;
+}
+
+export interface ModelStatusDto {
+  setup_completed: boolean;
+  required: ModelRequirementDto[];
+  missing: ModelRequirementDto[];
+  required_count: number;
+  missing_count: number;
+  all_ready: boolean;
+}
+
 export interface vibeCleanerApi {
   importImages(paths?: string[]): Promise<ProjectDto>;
   importDirectory(directory: string): Promise<ProjectDto>;
@@ -112,6 +130,8 @@ export interface vibeCleanerApi {
   exportPages(options: ExportOptionsDto): Promise<ExportResultDto>;
   getSettings(): Promise<SettingsDto>;
   updateSettings(settings: SettingsDto): Promise<SettingsDto>;
+  getModelStatus(): Promise<ModelStatusDto>;
+  downloadRequiredModels(): Promise<JobStatusDto>;
   getTranslationModels(provider: string, apiKey: string, baseUrl: string): Promise<TranslationModelsDto>;
 }
 

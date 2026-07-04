@@ -38,6 +38,7 @@ export interface SettingsDto {
   inpaint_mask_dilation: number;
   inpaint_use_textbox_only: boolean;
   inpaint_clip_to_bubble: boolean;
+  setup_completed: boolean;
 }
 
 export interface PageDto {

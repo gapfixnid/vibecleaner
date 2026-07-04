@@ -4,6 +4,7 @@ import { Toolbar } from "./components/Toolbar";
 import { Canvas } from "./components/Canvas";
 import { Inspector } from "./components/Inspector";
 import { SettingsModal } from "./components/SettingsModal";
+import { InitialSetupModal } from "./components/InitialSetupModal";
 
 import { CustomDialog } from "./components/CustomDialog";
 import { AboutModal } from "./components/AboutModal";
@@ -252,6 +253,12 @@ function App() {
         setTheme={setTheme}
         themes={themes}
         t={t}
+      />
+
+      <InitialSetupModal
+        isOpen={!backendError && settings.setup_completed === false}
+        settings={settings}
+        onComplete={setSettings}
       />
 
       <CustomDialog options={dialog} onClose={closeDialog} t={t} />

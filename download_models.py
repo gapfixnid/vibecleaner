@@ -2,6 +2,7 @@
 import os
 import sys
 import logging
+import argparse
 
 # Ensure current directory and backend directory are in search path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -10,6 +11,8 @@ sys.path.append(os.path.join(current_dir, "backend"))
 
 from modules.logging_config import configure_logging
 from modules.utils.download import ModelDownloader, ModelID
+from modules.config import config
+from services.model_requirements import get_required_model_ids
 from app.version import APP_NAME
 
 configure_logging()
@@ -21,32 +24,54 @@ MINIMAL_MODEL_IDS = [
 ]
 
 ALL_CORE_MODEL_IDS = [
+    ModelID.RTDETR_V2_ONNX,
     ModelID.RTDETR_INT8_ONNX,
     ModelID.MANGA_OCR_MOBILE_ONNX,
     ModelID.PPOCR_V5_DET_MOBILE,
     ModelID.PPOCR_V5_REC_MOBILE,
     ModelID.PPOCR_V5_REC_EN_MOBILE,
+    ModelID.PPOCR_V5_REC_KOREAN_MOBILE,
     ModelID.PPOCR_V4_CLS,
+    ModelID.LAMA_ONNX,
 ]
 
 
-def get_model_ids(profile: str = "all") -> list[ModelID]:
-    return MINIMAL_MODEL_IDS if profile == "minimal" else ALL_CORE_MODEL_IDS
+def get_model_ids(profile: str = "current", settings=None) -> list[ModelID]:
+    if profile == "minimal":
+        return MINIMAL_MODEL_IDS
+    if profile == "all":
+        return ALL_CORE_MODEL_IDS
+    return get_required_model_ids(settings or config)
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=f"Download {APP_NAME} AI model files.")
+    parser.add_argument(
+        "--profile",
+        choices=["current", "minimal", "all"],
+        default="current",
+        help="Model set to download. current uses the saved app settings.",
+    )
+    parser.add_argument("--minimal", action="store_true", help="Legacy alias for --profile minimal.")
+    parser.add_argument("--all", action="store_true", help="Legacy alias for --profile all.")
+    return parser.parse_args(argv)
 
 
 def main():
+    args = parse_args(sys.argv[1:])
+    profile = "minimal" if args.minimal else "all" if args.all else args.profile
+
     print("==================================================")
     print(f" {APP_NAME} AI Models Downloader")
     print("==================================================")
-    print("Required models to download:")
-    print(" 1. RT-DETR-v2 Text & Bubble Detector (INT8 ONNX)")
-    print(" 2. Manga OCR Mobile Japanese Recognition (ONNX)")
-    print(" 3. PaddleOCR v5 Multilingual Detector (ONNX)")
-    print(" 4. PaddleOCR v5 Chinese/Korean/English Recognition (ONNX)")
+    print(f"Profile: {profile}")
     print("==================================================")
 
-    # Core models needed for standard operations
-    core_models = get_model_ids("minimal" if "--minimal" in sys.argv else "all")
+    core_models = get_model_ids(profile)
+    print("Required models to download:")
+    for idx, model_id in enumerate(core_models, start=1):
+        print(f" {idx}. {model_id.value}")
+    print("==================================================")
 
     failed_models = []
     success_count = 0

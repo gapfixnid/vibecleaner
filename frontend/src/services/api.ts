@@ -9,6 +9,7 @@ import type {
   ActionResult,
   ExportResult,
   TranslationModelsResponse,
+  ModelStatus,
   LoadProjectResult,
 } from "../types";
 import { toBubbleInfo, toBubbleUpdateDto, toPagesResponse } from "./mappers";
@@ -29,6 +30,14 @@ export const getSettings = async (): Promise<Settings> => {
 export const updateSettings = async (settings: Settings): Promise<Settings> => {
   const updated = await api.updateSettings(settings);
   return updated as Settings;
+};
+
+export const getModelStatus = async (): Promise<ModelStatus> => {
+  return api.getModelStatus();
+};
+
+export const downloadRequiredModels = async (): Promise<JobStatus> => {
+  return api.downloadRequiredModels() as Promise<JobStatus>;
 };
 
 export const getPages = async (): Promise<PagesResponse> => {

@@ -8,6 +8,7 @@ export * from "./types/pipeline";
 export * from "./types/api";
 export * from "./types/domain";
 
+import type { ModelStatusDto } from "./types/api";
 import type { SettingsDto } from "./types/project";
 import type { BubbleInfo, PageInfo } from "./types/domain";
 
@@ -61,3 +62,5 @@ export interface TranslationModelsResponse {
   models: string[];
   error?: string;
 }
+
+export type ModelStatus = ModelStatusDto;

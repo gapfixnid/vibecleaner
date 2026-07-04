@@ -224,7 +224,23 @@ export type TranslationKey =
   | "settings.cleanTextboxOnly"
   | "settings.clipInpaintingMask"
   | "settings.maskTolerances"
-  | "settings.maskDilation";
+  | "settings.maskDilation"
+  | "setup.title"
+  | "setup.subtitle"
+  | "setup.languages"
+  | "setup.models"
+  | "setup.requiredModels"
+  | "setup.installed"
+  | "setup.required"
+  | "setup.modelsWillBeChecked"
+  | "setup.skip"
+  | "setup.saveAndContinue"
+  | "setup.saveAndDownload"
+  | "setup.saving"
+  | "setup.downloading"
+  | "setup.ready"
+  | "setup.saveFailed"
+  | "setup.downloadFailed";
 
 const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
   en: {
@@ -450,6 +466,22 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.clipInpaintingMask": "Clip Inpainting Mask to speech bubble stroke edges",
     "settings.maskTolerances": "Mask tolerances",
     "settings.maskDilation": "Mask Dilation (Expansion)",
+    "setup.title": "Initial Setup",
+    "setup.subtitle": "Choose the balanced or fast pipeline profiles and prepare only the models this setup needs.",
+    "setup.languages": "Languages",
+    "setup.models": "Model Profiles",
+    "setup.requiredModels": "Required Models",
+    "setup.installed": "Installed",
+    "setup.required": "Required",
+    "setup.modelsWillBeChecked": "Required models will be checked after saving this setup.",
+    "setup.skip": "Skip",
+    "setup.saveAndContinue": "Save and Continue",
+    "setup.saveAndDownload": "Save and Download",
+    "setup.saving": "Saving setup...",
+    "setup.downloading": "Downloading required models...",
+    "setup.ready": "Models are ready.",
+    "setup.saveFailed": "Failed to save the initial setup.",
+    "setup.downloadFailed": "Failed to download required models. Check your network connection and try again.",
   },
   ko: {
     "app.title": "VibeCleaner",
@@ -674,6 +706,22 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.clipInpaintingMask": "인페인팅 마스크를 말풍선 테두리 안쪽으로 제한",
     "settings.maskTolerances": "마스크 허용값",
     "settings.maskDilation": "마스크 확장",
+    "setup.title": "초기 설정",
+    "setup.subtitle": "균형 또는 고속 파이프라인을 선택하고 이 설정에 필요한 모델만 준비합니다.",
+    "setup.languages": "언어",
+    "setup.models": "모델 프로필",
+    "setup.requiredModels": "필요한 모델",
+    "setup.installed": "설치됨",
+    "setup.required": "필요",
+    "setup.modelsWillBeChecked": "설정을 저장한 뒤 필요한 모델을 확인합니다.",
+    "setup.skip": "건너뛰기",
+    "setup.saveAndContinue": "저장하고 시작",
+    "setup.saveAndDownload": "저장하고 다운로드",
+    "setup.saving": "초기 설정 저장 중...",
+    "setup.downloading": "필요한 모델 다운로드 중...",
+    "setup.ready": "모델 준비 완료",
+    "setup.saveFailed": "초기 설정 저장에 실패했습니다.",
+    "setup.downloadFailed": "필요한 모델을 다운로드하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요.",
   },
 };
 
