@@ -772,7 +772,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           value={localSettings.ocr_engine}
                           onChange={(v) => handleAutoSave("ocr_engine", v)}
                           options={[
-                            { value: "high_precision", label: t("settings.ocrEngineHighPrecision") },
                             { value: "balanced", label: t("settings.ocrEngineBalanced") },
                             { value: "fast", label: t("settings.ocrEngineFast") },
                           ]}
@@ -892,7 +891,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           value={localSettings.inpaint_engine}
                           onChange={(v) => handleAutoSave("inpaint_engine", v)}
                           options={[
-                            { value: "aot", label: t("settings.inpaintingEngineHighPrecision") },
                             { value: "lama", label: t("settings.inpaintingEngineBalanced") },
                             { value: "opencv", label: t("settings.inpaintingEngineFast") },
                           ]}

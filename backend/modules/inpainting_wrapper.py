@@ -15,25 +15,15 @@ class HybridInpainter:
                     return False
         self.settings = DummySettings()
         self.lama_model = None
-        self.aot_model = None
 
     def _resolve_engine_name(self) -> str:
         requested = str(getattr(config, "inpaint_engine", "lama") or "lama").strip().lower()
         if requested in {"opencv", "fast", "speed", "telea"}:
             return "opencv"
-        if requested in {"aot", "high_precision", "high-quality", "high_quality", "quality"}:
-            return "aot"
         return "lama"
 
     def _get_deep_model(self, engine_name: str):
         device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
-        if engine_name == "aot":
-            if self.aot_model is None:
-                import logging
-                logging.info("Initializing AOT inpainting model...")
-                from modules.inpainting.aot import AOT
-                self.aot_model = AOT(device=device, backend="onnx")
-            return self.aot_model
         if self.lama_model is None:
             import logging
             logging.info("Initializing LaMa inpainting model...")

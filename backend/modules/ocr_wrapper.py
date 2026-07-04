@@ -34,10 +34,6 @@ class LocalOCR:
             return "manga_ocr"
         if requested in {"ppocr", "paddleocr", "paddle_ocr", "fast", "speed"}:
             return "ppocr"
-        if requested in {"high_precision", "high-quality", "high_quality", "quality"}:
-            if self.lang in ["Japanese", "日本語", "ja"]:
-                return "manga_ocr"
-            return "ppocr"
         if requested in {"balanced", "standard", "auto"}:
             if self.lang in ["Japanese", "日本語", "ja"]:
                 return "manga_ocr"

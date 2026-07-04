@@ -245,8 +245,10 @@ class AppConfig:
                 value = "google"
             if field_name == "detect_model" and value == "Small (INT8) [기본값]":
                 value = "High Precision (FP32)"
-            if field_name == "ocr_engine" and value == "auto":
+            if field_name == "ocr_engine" and value in {"auto", "high_precision", "high-quality", "high_quality", "quality"}:
                 value = "balanced"
+            if field_name == "inpaint_engine" and value in {"aot", "high_precision", "high-quality", "high_quality", "quality"}:
+                value = "lama"
             if field_name == "confidence_threshold" and value == 0.30:
                 value = 0.45
             setattr(self, field_name, value)

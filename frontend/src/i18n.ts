@@ -204,7 +204,6 @@ export type TranslationKey =
   | "settings.ocrEngineAuto"
   | "settings.ocrEngineManga"
   | "settings.ocrEnginePpocr"
-  | "settings.ocrEngineHighPrecision"
   | "settings.ocrEngineBalanced"
   | "settings.ocrEngineFast"
   | "settings.ocrPadding"
@@ -220,7 +219,6 @@ export type TranslationKey =
   | "settings.lineMergeSensitivity"
   | "settings.inpaintingOptions"
   | "settings.inpaintingEngine"
-  | "settings.inpaintingEngineHighPrecision"
   | "settings.inpaintingEngineBalanced"
   | "settings.inpaintingEngineFast"
   | "settings.cleanTextboxOnly"
@@ -431,8 +429,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.ocrEngineAuto": "Auto by source language",
     "settings.ocrEngineManga": "Manga OCR Mobile",
     "settings.ocrEnginePpocr": "PPOCR v5",
-    "settings.ocrEngineHighPrecision": "High Precision - Language-tuned OCR",
-    "settings.ocrEngineBalanced": "Balanced - Auto by source language",
+    "settings.ocrEngineBalanced": "Balanced - automatic OCR by source language",
     "settings.ocrEngineFast": "Fast - PPOCR v5 Mobile",
     "settings.ocrPadding": "Crop Padding",
     "settings.ocrCropScale": "Crop Scale",
@@ -447,7 +444,6 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.lineMergeSensitivity": "Line Merge Sensitivity",
     "settings.inpaintingOptions": "Inpainting Options",
     "settings.inpaintingEngine": "Inpainting Engine",
-    "settings.inpaintingEngineHighPrecision": "High Precision - AOT ONNX",
     "settings.inpaintingEngineBalanced": "Balanced - LaMa Manga ONNX",
     "settings.inpaintingEngineFast": "Fast - OpenCV Telea",
     "settings.cleanTextboxOnly": "Clean Text Box Areas Only (Recommended)",
@@ -657,8 +653,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.ocrEngineAuto": "원본 언어에 맞춰 자동 선택",
     "settings.ocrEngineManga": "Manga OCR Mobile",
     "settings.ocrEnginePpocr": "PPOCR v5",
-    "settings.ocrEngineHighPrecision": "고정밀 - 언어별 고품질 OCR",
-    "settings.ocrEngineBalanced": "균형 - 원본 언어에 맞춰 자동 선택",
+    "settings.ocrEngineBalanced": "균형 - 원본 언어 기준 자동 OCR",
     "settings.ocrEngineFast": "고속 - PPOCR v5 Mobile",
     "settings.ocrPadding": "Crop 여백",
     "settings.ocrCropScale": "Crop 배율",
@@ -673,7 +668,6 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.lineMergeSensitivity": "줄 병합 감도",
     "settings.inpaintingOptions": "인페인팅 옵션",
     "settings.inpaintingEngine": "인페인팅 엔진",
-    "settings.inpaintingEngineHighPrecision": "고정밀 - AOT ONNX",
     "settings.inpaintingEngineBalanced": "균형 - LaMa Manga ONNX",
     "settings.inpaintingEngineFast": "고속 - OpenCV Telea",
     "settings.cleanTextboxOnly": "텍스트 박스 영역만 지우기(권장)",
