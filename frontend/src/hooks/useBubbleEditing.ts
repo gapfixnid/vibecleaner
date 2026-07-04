@@ -7,6 +7,24 @@ interface UseBubbleEditingOptions {
   onUpdateBubble: (updated: BubbleInfo) => void;
 }
 
+export function hasBubbleTextEdits(
+  selectedBubble: Pick<BubbleInfo, "text" | "translated"> | null,
+  origText: string,
+  transText: string,
+) {
+  if (!selectedBubble) return false;
+  return origText !== (selectedBubble.text || "") || transText !== (selectedBubble.translated || "");
+}
+
+export function shouldUpdateBubbleField(
+  selectedBubble: BubbleInfo | null,
+  key: keyof BubbleInfo,
+  value: BubbleInfo[keyof BubbleInfo],
+) {
+  if (!selectedBubble) return false;
+  return !Object.is(selectedBubble[key], value);
+}
+
 export function useBubbleEditing({
   selectedBubble,
   settings,
@@ -39,8 +57,7 @@ export function useBubbleEditing({
 
   const updateBubbleField = useCallback(
     (key: keyof BubbleInfo, value: BubbleInfo[keyof BubbleInfo]) => {
-      if (!selectedBubble) return;
-      if (Object.is(selectedBubble[key], value)) return;
+      if (!selectedBubble || !shouldUpdateBubbleField(selectedBubble, key, value)) return;
       onUpdateBubble({
         ...selectedBubble,
         [key]: value,
@@ -51,7 +68,7 @@ export function useBubbleEditing({
 
   const saveTextEdits = useCallback(() => {
     if (!selectedBubble) return;
-    if (origText === (selectedBubble.text || "") && transText === (selectedBubble.translated || "")) {
+    if (!hasBubbleTextEdits(selectedBubble, origText, transText)) {
       return;
     }
     onUpdateBubble({

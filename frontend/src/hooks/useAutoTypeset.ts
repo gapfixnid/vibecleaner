@@ -18,6 +18,15 @@ interface UseAutoTypesetDeps {
   selectPage: (idx: number, options?: { deferActivation?: number }) => void;
 }
 
+export function sortAutoTypesetPageIds(pageIds: number[]) {
+  return [...pageIds].sort((a, b) => a - b);
+}
+
+export function resolveAutoTypesetDisplayIndex(sortedPageIds: number[], activeIdx: number) {
+  if (sortedPageIds.length === 0) return null;
+  return sortedPageIds.includes(activeIdx) ? activeIdx : sortedPageIds[0];
+}
+
 export function useAutoTypeset({
   pages,
   selectedPageIds,
@@ -67,11 +76,12 @@ export function useAutoTypeset({
   ]);
 
   const handleTranslatePages = useCallback(async (pageIds: number[]) => {
-    const sorted = [...pageIds].sort((a, b) => a - b);
+    const sorted = sortAutoTypesetPageIds(pageIds);
     const total = sorted.length;
     if (total === 0) return;
     const activeIdx = currentIndexRef.current;
-    const displayIdx = sorted.includes(activeIdx) ? activeIdx : sorted[0];
+    const displayIdx = resolveAutoTypesetDisplayIndex(sorted, activeIdx);
+    if (displayIdx == null) return;
 
     await runTask(
       `Translating ${total} pages...`,
