@@ -56,6 +56,17 @@ assert.equal(english("export.successTitle"), "Export Successful");
 const fallback = createTranslator("ko");
 assert.equal(fallback("missing.key"), "missing.key");
 
+assert.equal(
+  createTranslator("ko"),
+  createTranslator("ko"),
+  "translator function should be stable for the same language",
+);
+assert.equal(
+  createTranslator("unsupported"),
+  createTranslator("en"),
+  "unsupported language should reuse the English translator",
+);
+
 function walkTsFiles(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   return entries.flatMap((entry) => {

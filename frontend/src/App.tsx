@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
 import { Canvas } from "./components/Canvas";
@@ -36,7 +36,7 @@ function App() {
   const markDirty = useCallback(() => setIsDirty(true), []);
   const markClean = useCallback(() => setIsDirty(false), []);
   const { settings, setSettings, handleSaveSettings } = useAppSettings();
-  const t = createTranslator(settings.ui_language);
+  const t = useMemo(() => createTranslator(settings.ui_language), [settings.ui_language]);
 
   const {
     isProcessing,

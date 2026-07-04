@@ -570,18 +570,25 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
   },
 };
 
+const translatorCache = new Map<UiLanguage, (key: string) => string>();
+
 export function normalizeUiLanguage(value: unknown): UiLanguage {
   return value === "ko" ? "ko" : "en";
 }
 
 export function createTranslator(value: unknown) {
   const language = normalizeUiLanguage(value);
-  return (key: string): string => {
+  const cached = translatorCache.get(language);
+  if (cached) return cached;
+
+  const translator = (key: string): string => {
     if (isTranslationKey(key)) {
       return translations[language][key] ?? translations.en[key];
     }
     return key;
   };
+  translatorCache.set(language, translator);
+  return translator;
 }
 
 function isTranslationKey(key: string): key is TranslationKey {
