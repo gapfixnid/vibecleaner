@@ -1,0 +1,65 @@
+import type { BubbleInfo, PageInfo, PagesResponse } from "../types";
+import type { BubbleDto } from "../types/bubble";
+import type { PageDto, ProjectDto } from "../types/project";
+
+function hasInpaintedPreview(page: PageDto): boolean {
+  return page.has_inpaint ?? (
+    page.status === "success" ||
+    page.status === "warning" ||
+    page.status === "ready_for_review" ||
+    page.status === "has_warnings"
+  );
+}
+
+export function toPageInfo(page: PageDto): PageInfo {
+  return {
+    page_id: page.id,
+    index: page.index,
+    file_path: page.file_path,
+    filename: page.filename,
+    width: page.width,
+    height: page.height,
+    bubble_count: page.bubble_count ?? 0,
+    translated_count: page.translated_count ?? 0,
+    has_inpaint: hasInpaintedPreview(page),
+    status: page.status,
+    problems: page.problems ?? [],
+  };
+}
+
+export function toPagesResponse(project: ProjectDto): PagesResponse {
+  return {
+    pages: project.pages.map(toPageInfo),
+    current_index: project.pages.findIndex((page) => page.id === project.current_page_id),
+  };
+}
+
+export function toBubbleInfo(bubble: BubbleDto): BubbleInfo {
+  return {
+    id: parseInt(bubble.id.replace("bubble_", "")) || 0,
+    x: bubble.bubbleBox.x,
+    y: bubble.bubbleBox.y,
+    width: bubble.bubbleBox.width,
+    height: bubble.bubbleBox.height,
+    text: bubble.text,
+    translated: bubble.translated,
+    font_family: bubble.style.font_family,
+    font_size: bubble.style.font_size,
+    computed_font_size: bubble.style.computed_font_size || 12,
+    bold: bubble.style.bold,
+    italic: bubble.style.italic,
+    color: bubble.style.color,
+    alignment: bubble.style.alignment,
+    text_class: bubble.text_class || "",
+    status: bubble.status,
+    problems: bubble.problems ?? [],
+    edited: Boolean(bubble.edited),
+    lines: bubble.layout.lines.map((line) => ({
+      text: line.text,
+      x: line.x,
+      y: line.y,
+      width: line.width,
+      height: line.height,
+    })),
+  };
+}

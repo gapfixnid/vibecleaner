@@ -10,9 +10,8 @@ import type {
   ExportResult,
   TranslationModelsResponse,
   LoadProjectResult,
-  PageInfo,
-  BubbleInfo,
 } from "../types";
+import { toBubbleInfo, toPagesResponse } from "./mappers";
 
 let BACKEND_URL = "http://127.0.0.1:8000";
 
@@ -34,60 +33,12 @@ export const updateSettings = async (settings: Settings): Promise<Settings> => {
 
 export const getPages = async (): Promise<PagesResponse> => {
   const project = await api.getProject();
-  const pages: PageInfo[] = project.pages.map((p) => ({
-    page_id: p.id,
-    index: p.index,
-    file_path: p.file_path,
-    filename: p.filename,
-    width: p.width,
-    height: p.height,
-    bubble_count: p.bubble_count ?? 0,
-    translated_count: p.translated_count ?? 0,
-    has_inpaint: p.has_inpaint ?? (
-      p.status === "success" ||
-      p.status === "warning" ||
-      p.status === "ready_for_review" ||
-      p.status === "has_warnings"
-    ),
-    status: p.status,
-    problems: p.problems ?? [],
-  }));
-  return {
-    pages,
-    current_index: project.pages.findIndex((p) => p.id === project.current_page_id),
-  };
+  return toPagesResponse(project);
 };
 
 export const getBubbles = async (pageId: string): Promise<BubblesResponse> => {
   const page = await api.getPage(pageId);
-  const bubbles: BubbleInfo[] = page.bubbles.map((b) => ({
-    id: parseInt(b.id.replace("bubble_", "")) || 0,
-    x: b.bubbleBox.x,
-    y: b.bubbleBox.y,
-    width: b.bubbleBox.width,
-    height: b.bubbleBox.height,
-    text: b.text,
-    translated: b.translated,
-    font_family: b.style.font_family,
-    font_size: b.style.font_size,
-    computed_font_size: b.style.computed_font_size || 12,
-    bold: b.style.bold,
-    italic: b.style.italic,
-    color: b.style.color,
-    alignment: b.style.alignment,
-    text_class: b.text_class || "",
-    status: b.status,
-    problems: b.problems ?? [],
-    edited: Boolean(b.edited),
-    lines: b.layout.lines.map((l) => ({
-      text: l.text,
-      x: l.x,
-      y: l.y,
-      width: l.width,
-      height: l.height,
-    })),
-  }));
-  return { bubbles };
+  return { bubbles: page.bubbles.map(toBubbleInfo) };
 };
 
 export const selectPage = async (idx: number, pageId?: string): Promise<ActionResult> => {
