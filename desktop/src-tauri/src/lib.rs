@@ -368,6 +368,7 @@ async fn get_page(
             let text = b.get("text").and_then(|v| v.as_str()).unwrap_or("");
             let translated = b.get("translated").and_then(|v| v.as_str()).unwrap_or("");
             let font_family = b.get("font_family").and_then(|v| v.as_str()).unwrap_or("");
+            let computed_font_family = b.get("computed_font_family").and_then(|v| v.as_str()).unwrap_or("");
             let font_size = b.get("font_size").and_then(|v| v.as_i64()).unwrap_or(0);
             let computed_font_size = b.get("computed_font_size").and_then(|v| v.as_i64()).unwrap_or(12);
             let bold = b.get("bold").and_then(|v| v.as_bool()).unwrap_or(false);
@@ -392,6 +393,7 @@ async fn get_page(
                 "status": status,
                 "style": {
                     "font_family": font_family,
+                    "computed_font_family": computed_font_family,
                     "font_size": font_size,
                     "computed_font_size": computed_font_size,
                     "bold": bold,

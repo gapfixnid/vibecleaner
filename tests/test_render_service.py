@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 from PySide6.QtCore import QRectF
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +20,8 @@ class FakeRenderer:
         self.font_rect = None
         self.layout_rect = None
         self.font_family = "not-called"
+        self.mask_rect = None
+        self.mask_shape = None
 
     def find_optimal_font_size(self, text, rect, font_family=None):
         self.font_rect = QRectF(rect)
@@ -32,12 +35,21 @@ class FakeRenderer:
             line_layouts=[],
         )
 
+    def find_optimal_font_size_for_mask(self, text, rect, mask, font_family=None):
+        self.mask_rect = QRectF(rect)
+        self.mask_shape = mask.shape
+        self.font_family = font_family
+        return SimpleNamespace(
+            font=SimpleNamespace(pointSizeF=lambda: 18.0, family=lambda: "Resolved Font"),
+            line_layouts=[],
+        )
+
     def make_ellipse_mask(self, width, height, inset=0):
-        raise AssertionError("layout_box rendering should not build a bubble mask")
+        return np.ones((height, width), dtype=np.uint8)
 
 
 class RenderServiceTests(unittest.TestCase):
-    def test_layout_box_is_used_as_text_render_rect(self):
+    def test_layout_box_is_used_as_mask_render_rect(self):
         renderer = FakeRenderer()
         service = RenderService(renderer=renderer)
         bubble = TextBubble(
@@ -49,8 +61,8 @@ class RenderServiceTests(unittest.TestCase):
 
         service.get_layout_for_bubble("translated", bubble, image=None, font_family="Test")
 
-        self.assertEqual(renderer.font_rect, QRectF(20, 12, 40, 24))
-        self.assertEqual(renderer.layout_rect, QRectF(20, 12, 40, 24))
+        self.assertEqual(renderer.mask_rect, QRectF(20, 12, 40, 24))
+        self.assertEqual(renderer.mask_shape, (24, 40))
 
     def test_auto_font_selection_reaches_renderer_when_no_font_family_is_requested(self):
         renderer = FakeRenderer()

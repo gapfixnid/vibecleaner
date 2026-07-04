@@ -37,7 +37,7 @@ export function CanvasBubbleTextOverlay({ bubbles, selectedBubbleId }: CanvasBub
                     top: `${top}px`,
                     width: `${line.width}px`,
                     height: `${line.height}px`,
-                    fontFamily: bubble.font_family || "var(--font-family)",
+                    fontFamily: bubble.font_family || bubble.computed_font_family || "var(--font-family)",
                     fontSize: `${bubble.font_size === 0 ? bubble.computed_font_size : bubble.font_size}px`,
                     fontWeight: bubble.bold ? "bold" : "normal",
                     fontStyle: bubble.italic ? "italic" : "normal",

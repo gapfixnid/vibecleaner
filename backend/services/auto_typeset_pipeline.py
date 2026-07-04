@@ -139,7 +139,7 @@ def _bubbles_from_analysis(
             layout_box=_rect_from_xyxy(bd.layout_box),
             text_class=bd.text_class,
         )
-        tb.font_family = "Pretendard Variable"
+        tb.font_family = ""
         tb.font_size = 0
         tb.color = _color_to_hex(bd.font_color)
         tb.alignment = layout_plan.alignment

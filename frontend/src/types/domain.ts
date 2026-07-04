@@ -17,6 +17,7 @@ export interface BubbleInfo {
   text: string;
   translated: string;
   font_family: string;
+  computed_font_family: string;
   font_size: number;
   computed_font_size: number;
   bold: boolean;
@@ -39,6 +40,7 @@ export interface BubbleUpdate {
   text: string;
   translated: string;
   font_family: string;
+  computed_font_family?: string;
   font_size: number;
   computed_font_size: number;
   bold: boolean;

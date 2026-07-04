@@ -119,8 +119,10 @@ def _compute_bubble_layout(bubble: TextBubble, image) -> dict:
         image=image,
         font_family=bubble.font_family or None,
     )
+    computed_font_family = layout.font.family() if hasattr(layout.font, "family") else ""
     return {
         "font_size": bubble.font_size if bubble.font_size > 0 else int(layout.font.pointSizeF()),
+        "font_family": computed_font_family,
         "lines": [
             {
                 "text": line.text,
@@ -176,6 +178,7 @@ def get_bubbles_response(page_id: str):
             "translated": bubble.translated,
             "font_family": bubble.font_family,
             "font_size": bubble.font_size,
+            "computed_font_family": cached_layout.get("font_family", ""),
             "computed_font_size": cached_layout["font_size"],
             "bold": bubble.bold,
             "italic": bubble.italic,

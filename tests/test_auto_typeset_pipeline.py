@@ -200,6 +200,50 @@ class AutoTypesetPipelineTests(unittest.TestCase):
         self.assertIsNotNone(bubbles[0].layout_box)
         self.assertEqual(bubbles[0].layout_box, QRectF(8, 9, 16, 16))
 
+    def test_bubbles_from_analysis_leaves_font_family_on_auto(self):
+        image = np.zeros((40, 40, 3), dtype=np.uint8)
+        bubble_data = BubbleData(
+            bubble_box=(2, 3, 30, 31),
+            text_box=(4, 5, 28, 29),
+            layout_box=(8, 9, 24, 25),
+            text="hello",
+            text_class="text_bubble",
+        )
+
+        with (
+            patch.object(
+                pipeline_module.page_analysis_service,
+                "analyze",
+                return_value=SimpleNamespace(
+                    reading_order=SimpleNamespace(direction="ltr"),
+                    writing_mode="horizontal",
+                ),
+            ),
+            patch.object(
+                pipeline_module.bubble_analysis_service,
+                "analyze",
+                return_value=BubbleAnalysisResult(
+                    bubbles=[bubble_data],
+                    reading_order="LTR",
+                    writing_mode="horizontal",
+                ),
+            ),
+            patch.object(
+                pipeline_module.layout_planner_service,
+                "plan",
+                return_value=SimpleNamespace(alignment="center"),
+            ),
+        ):
+            bubbles = pipeline_module._bubbles_from_analysis(
+                image,
+                blocks=[],
+                source_lang="Japanese",
+                target_lang="Korean",
+            )
+
+        self.assertEqual(len(bubbles), 1)
+        self.assertEqual(bubbles[0].font_family, "")
+
     def test_merge_overlapping_bubbles_preserves_cjk_lines_without_spaces(self):
         first = TextBubble(
             id=1,

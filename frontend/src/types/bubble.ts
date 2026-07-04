@@ -2,6 +2,7 @@ import type { Rect } from "./common";
 
 export interface TextStyleDto {
   font_family: string;
+  computed_font_family?: string;
   font_size: number;
   bold: boolean;
   italic: boolean;
