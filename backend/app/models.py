@@ -12,6 +12,7 @@ class TextBubble:
     text: str = ""
     translated: str = ""
     text_box: Optional[QRectF] = None
+    layout_box: Optional[QRectF] = None
     text_class: str = ""
     font_family: str = ""
     font_size: int = 0
@@ -66,6 +67,9 @@ class TextBubble:
         text_box = self._rect_to_project_list(self.text_box)
         if text_box is not None:
             data["text_box"] = text_box
+        layout_box = self._rect_to_project_list(self.layout_box)
+        if layout_box is not None:
+            data["layout_box"] = layout_box
         if self.text_class:
             data["text_class"] = self.text_class
         return data
@@ -80,6 +84,7 @@ class TextBubble:
             text=data.get("text", ""),
             translated=data.get("translated", ""),
             text_box=cls._rect_from_project_list(data.get("text_box")),
+            layout_box=cls._rect_from_project_list(data.get("layout_box")),
             text_class=data.get("text_class", ""),
             font_family=style.get("font_family", data.get("font_family", "")),
             font_size=style.get("font_size", data.get("font_size", 0)),
@@ -99,6 +104,7 @@ class TextBubble:
             text=self.text,
             translated=self.translated,
             text_box=QRectF(self.text_box) if self.text_box is not None else None,
+            layout_box=QRectF(self.layout_box) if self.layout_box is not None else None,
             text_class=self.text_class,
             font_family=self.font_family,
             font_size=self.font_size,

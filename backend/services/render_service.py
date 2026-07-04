@@ -35,13 +35,25 @@ class RenderService:
             app = QApplication.instance()
             font_family = cast(QApplication, app).font().family() if app else "Segoe UI"
 
+        layout_rect = self._text_layout_rect(bubble)
+        if bubble.layout_box is not None:
+            font, lines, render_width = self.renderer.find_optimal_font_size(text, layout_rect, font_family=font_family)
+            alignment = getattr(bubble, 'alignment', 'center') or 'center'
+            return self.renderer.layout_lines_in_rect(lines, layout_rect, font, render_width, alignment=alignment)
+
         mask = self._build_bubble_layout_mask(bubble, image)
         if mask is not None:
             return self.renderer.find_optimal_font_size_for_mask(text, bubble.box, mask, font_family=font_family)
 
-        font, lines, render_width = self.renderer.find_optimal_font_size(text, bubble.box, font_family=font_family)
+        font, lines, render_width = self.renderer.find_optimal_font_size(text, layout_rect, font_family=font_family)
         alignment = getattr(bubble, 'alignment', 'center') or 'center'
-        return self.renderer.layout_lines_in_rect(lines, bubble.box, font, render_width, alignment=alignment)
+        return self.renderer.layout_lines_in_rect(lines, layout_rect, font, render_width, alignment=alignment)
+
+    def _text_layout_rect(self, bubble: TextBubble) -> QRectF:
+        rect = bubble.layout_box if bubble.layout_box is not None else bubble.box
+        if rect.width() <= 1 or rect.height() <= 1:
+            return bubble.box
+        return rect
 
     def _build_bubble_layout_mask(self, bubble: TextBubble, image: np.ndarray | None) -> np.ndarray | None:
         if bubble.text_class == "text_free":

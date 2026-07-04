@@ -36,6 +36,17 @@ class BubbleUpdateSchema(BaseModel):
     alignment: str
 
 
+def _rect_response(rect: QRectF | None) -> dict | None:
+    if rect is None:
+        return None
+    return {
+        "x": rect.x(),
+        "y": rect.y(),
+        "width": rect.width(),
+        "height": rect.height(),
+    }
+
+
 def _get_page_by_id(page_id: str):
     for page in state.pages:
         if page.page_id == page_id:
@@ -76,6 +87,7 @@ def _ensure_project_revision(start_revision: int) -> None:
 def _layout_cache_key(bubble: TextBubble) -> tuple:
     box = bubble.box
     text_box = bubble.text_box
+    layout_box = bubble.layout_box
     return (
         bubble.id,
         round(box.x(), 2),
@@ -83,6 +95,12 @@ def _layout_cache_key(bubble: TextBubble) -> tuple:
         round(box.width(), 2),
         round(box.height(), 2),
         tuple(round(v, 2) for v in bubble.source_xyxy()) if text_box is not None else None,
+        (
+            round(layout_box.x(), 2),
+            round(layout_box.y(), 2),
+            round(layout_box.width(), 2),
+            round(layout_box.height(), 2),
+        ) if layout_box is not None else None,
         bubble.text,
         bubble.translated,
         bubble.font_family,
@@ -152,6 +170,8 @@ def get_bubbles_response(page_id: str):
             "y": bubble.box.y(),
             "width": bubble.box.width(),
             "height": bubble.box.height(),
+            "text_box": _rect_response(bubble.text_box),
+            "layout_box": _rect_response(bubble.layout_box),
             "text": bubble.text,
             "translated": bubble.translated,
             "font_family": bubble.font_family,
@@ -193,6 +213,7 @@ def update_bubbles_response(page_id: str, bubbles: List[BubbleUpdateSchema]):
         for b_schema in bubbles:
             existing = next((eb for eb in page.bubbles if eb.id == b_schema.id), None)
             text_box = existing.text_box if existing else None
+            layout_box = existing.layout_box if existing else None
             text_class = existing.text_class if existing else "text_bubble"
             edited = bool(existing.edited) if existing else True
             problems = list(existing.problems) if existing else []
@@ -219,6 +240,7 @@ def update_bubbles_response(page_id: str, bubbles: List[BubbleUpdateSchema]):
                 text=b_schema.text,
                 translated=b_schema.translated,
                 text_box=text_box,
+                layout_box=layout_box,
                 text_class=text_class,
                 font_family=b_schema.font_family,
                 font_size=b_schema.font_size,

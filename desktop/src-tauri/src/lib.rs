@@ -356,6 +356,15 @@ async fn get_page(
             let y = b.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
             let w = b.get("width").and_then(|v| v.as_f64()).unwrap_or(0.0);
             let h = b.get("height").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let bubble_box = serde_json::json!({ "x": x, "y": y, "width": w, "height": h });
+            let text_box = b.get("text_box")
+                .filter(|v| v.is_object())
+                .cloned()
+                .unwrap_or_else(|| bubble_box.clone());
+            let layout_box = b.get("layout_box")
+                .filter(|v| v.is_object())
+                .cloned()
+                .unwrap_or_else(|| text_box.clone());
             let text = b.get("text").and_then(|v| v.as_str()).unwrap_or("");
             let translated = b.get("translated").and_then(|v| v.as_str()).unwrap_or("");
             let font_family = b.get("font_family").and_then(|v| v.as_str()).unwrap_or("");
@@ -375,9 +384,9 @@ async fn get_page(
 
             serde_json::json!({
                 "id": format!("bubble_{}", id),
-                "bubbleBox": { "x": x, "y": y, "width": w, "height": h },
-                "textBox": { "x": x, "y": y, "width": w, "height": h },
-                "layoutBox": { "x": x, "y": y, "width": w, "height": h },
+                "bubbleBox": bubble_box,
+                "textBox": text_box,
+                "layoutBox": layout_box,
                 "text": text,
                 "translated": translated,
                 "status": status,

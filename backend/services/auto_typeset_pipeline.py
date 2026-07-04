@@ -136,6 +136,7 @@ def _bubbles_from_analysis(
             text=bd.text,
             translated="",
             text_box=text_rect,
+            layout_box=_rect_from_xyxy(bd.layout_box),
             text_class=bd.text_class,
         )
         tb.font_family = "Pretendard Variable"
@@ -198,6 +199,17 @@ def _merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float =
                         ai.text_box = QRectF(tx1, ty1, tx2 - tx1, ty2 - ty1)
                     elif ajt is not None:
                         ai.text_box = QRectF(ajt)
+
+                    ail = ai.layout_box
+                    ajl = aj.layout_box
+                    if ail is not None and ajl is not None:
+                        lx1 = min(ail.x(), ajl.x())
+                        ly1 = min(ail.y(), ajl.y())
+                        lx2 = max(ail.x() + ail.width(), ajl.x() + ajl.width())
+                        ly2 = max(ail.y() + ail.height(), ajl.y() + ajl.height())
+                        ai.layout_box = QRectF(lx1, ly1, lx2 - lx1, ly2 - ly1)
+                    elif ajl is not None:
+                        ai.layout_box = QRectF(ajl)
 
                     merged_text = _join_merged_text([ai.text, aj.text])
                     if merged_text:
