@@ -232,12 +232,11 @@ class BubbleAnalysisService:
                 dist = cv2.distanceTransform(binary, cv2.DIST_L2, 5)
 
                 # Find the point farthest from any edge
-                _, _, _, max_loc = cv2.minMaxLoc(dist)
-                max_dist = max_loc[0]
+                _, max_dist, _, max_loc = cv2.minMaxLoc(dist)
 
                 if max_dist > 5:
                     # Create inscribed circle/rectangle at the farthest point
-                    cx, cy = max_loc[1]
+                    cx, cy = max_loc
                     radius = int(max_dist * 0.8)  # Safety margin
 
                     # Calculate inscribed rectangle
@@ -252,8 +251,8 @@ class BubbleAnalysisService:
 
                     layout_x1 = x1 + ins_x1 + padding_x
                     layout_y1 = y1 + ins_y1 + padding_y
-                    layout_x2 = x2 + ins_x2 - padding_x
-                    layout_y2 = y2 + ins_y2 - padding_y
+                    layout_x2 = x1 + ins_x2 - padding_x
+                    layout_y2 = y1 + ins_y2 - padding_y
 
                     return (layout_x1, layout_y1, layout_x2, layout_y2)
             except Exception:
