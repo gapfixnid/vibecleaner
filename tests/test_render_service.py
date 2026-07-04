@@ -49,7 +49,7 @@ class FakeRenderer:
 
 
 class RenderServiceTests(unittest.TestCase):
-    def test_layout_box_is_used_as_mask_render_rect(self):
+    def test_text_bubble_uses_full_bubble_box_for_mask_layout(self):
         renderer = FakeRenderer()
         service = RenderService(renderer=renderer)
         bubble = TextBubble(
@@ -57,12 +57,13 @@ class RenderServiceTests(unittest.TestCase):
             box=QRectF(0, 0, 100, 80),
             layout_box=QRectF(20, 12, 40, 24),
             text="hello",
+            text_class="text_bubble",
         )
 
         service.get_layout_for_bubble("translated", bubble, image=None, font_family="Test")
 
-        self.assertEqual(renderer.mask_rect, QRectF(20, 12, 40, 24))
-        self.assertEqual(renderer.mask_shape, (24, 40))
+        self.assertEqual(renderer.mask_rect, QRectF(0, 0, 100, 80))
+        self.assertEqual(renderer.mask_shape, (80, 100))
 
     def test_auto_font_selection_reaches_renderer_when_no_font_family_is_requested(self):
         renderer = FakeRenderer()

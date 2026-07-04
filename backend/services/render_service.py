@@ -34,10 +34,7 @@ class RenderService:
         layout_rect = self._text_layout_rect(bubble)
         mask = self._build_bubble_layout_mask(bubble, image)
         if mask is not None:
-            if layout_rect != bubble.box:
-                mask = self._crop_mask_to_rect(mask, bubble.box, layout_rect)
-            if mask is not None:
-                return self.renderer.find_optimal_font_size_for_mask(text, layout_rect, mask, font_family=font_family)
+            return self.renderer.find_optimal_font_size_for_mask(text, bubble.box, mask, font_family=font_family)
 
         font, lines, render_width = self.renderer.find_optimal_font_size(text, layout_rect, font_family=font_family)
         alignment = getattr(bubble, 'alignment', 'center') or 'center'
@@ -48,18 +45,6 @@ class RenderService:
         if rect.width() <= 1 or rect.height() <= 1:
             return bubble.box
         return rect
-
-    def _crop_mask_to_rect(self, mask: np.ndarray, source_rect: QRectF, target_rect: QRectF) -> np.ndarray | None:
-        x1 = max(0, int(round(target_rect.x() - source_rect.x())))
-        y1 = max(0, int(round(target_rect.y() - source_rect.y())))
-        x2 = min(mask.shape[1], int(round(target_rect.x() + target_rect.width() - source_rect.x())))
-        y2 = min(mask.shape[0], int(round(target_rect.y() + target_rect.height() - source_rect.y())))
-        if x2 <= x1 or y2 <= y1:
-            return None
-        cropped = mask[y1:y2, x1:x2]
-        if cropped.size == 0 or not bool(np.asarray(cropped).any()):
-            return None
-        return cropped
 
     def _build_bubble_layout_mask(self, bubble: TextBubble, image: np.ndarray | None) -> np.ndarray | None:
         if bubble.text_class == "text_free":
