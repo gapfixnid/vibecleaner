@@ -62,6 +62,11 @@ class AppConfig:
     translation_supports_vision: bool = False
     translation_cache_enabled: bool = True
     translation_cache_mode: str = "text_with_context"
+    translation_max_retries: int = 2
+    translation_retry_backoff_seconds: int = 2
+    translation_llm_temperature: float = 0.1
+    translation_llm_top_p: float = 0.95
+    translation_llm_max_tokens: int = 4096
     system_prompt: str = ""
 
     # -- Languages ----------------------------------------------------------
@@ -139,6 +144,11 @@ class AppConfig:
             "translation_supports_vision": "translation_supports_vision",
             "translation_cache_enabled": "translation_cache_enabled",
             "translation_cache_mode": "translation_cache_mode",
+            "translation_max_retries": "translation_max_retries",
+            "translation_retry_backoff_seconds": "translation_retry_backoff_seconds",
+            "translation_llm_temperature": "translation_llm_temperature",
+            "translation_llm_top_p": "translation_llm_top_p",
+            "translation_llm_max_tokens": "translation_llm_max_tokens",
             "system_prompt": "system_prompt",
             "ui_language": "ui_language",
             "source_language": "source_language",

@@ -110,11 +110,16 @@ class TranslationService:
     def _build_configured_translator(self) -> BaseTranslator:
         provider = (config.translation_provider or "google").lower()
         if provider == "google":
-            return GoogleTranslatorWrapper()
+            return GoogleTranslatorWrapper(
+                max_retries=int(config.translation_max_retries),
+                retry_backoff_seconds=int(config.translation_retry_backoff_seconds),
+            )
         elif provider == "deepl":
             return DeepLTranslatorWrapper(
                 api_key=config.translation_api_key,
-                timeout_seconds=int(config.translation_timeout_seconds)
+                timeout_seconds=int(config.translation_timeout_seconds),
+                max_retries=int(config.translation_max_retries),
+                retry_backoff_seconds=int(config.translation_retry_backoff_seconds),
             )
         elif provider == "openai":
             return OpenAITranslatorWrapper(
@@ -122,6 +127,11 @@ class TranslationService:
                 model=config.translation_model or "gpt-4o-mini",
                 timeout_seconds=int(config.translation_timeout_seconds),
                 supports_vision=bool(config.translation_supports_vision),
+                temperature=float(config.translation_llm_temperature),
+                top_p=float(config.translation_llm_top_p),
+                max_tokens=int(config.translation_llm_max_tokens),
+                max_retries=int(config.translation_max_retries),
+                retry_backoff_seconds=int(config.translation_retry_backoff_seconds),
             )
         elif provider == "claude":
             return ClaudeTranslatorWrapper(
@@ -129,18 +139,25 @@ class TranslationService:
                 model=config.translation_model or "claude-3-5-sonnet-20241022",
                 timeout_seconds=int(config.translation_timeout_seconds),
                 supports_vision=bool(config.translation_supports_vision),
+                temperature=float(config.translation_llm_temperature),
+                top_p=float(config.translation_llm_top_p),
+                max_tokens=int(config.translation_llm_max_tokens),
             )
         elif provider == "papago":
             return PapagoTranslatorWrapper(
                 client_id=config.translation_api_base_url,
                 client_secret=config.translation_api_key,
-                timeout_seconds=int(config.translation_timeout_seconds)
+                timeout_seconds=int(config.translation_timeout_seconds),
+                max_retries=int(config.translation_max_retries),
+                retry_backoff_seconds=int(config.translation_retry_backoff_seconds),
             )
         elif provider == "baidu":
             return BaiduTranslatorWrapper(
                 app_id=config.translation_api_base_url,
                 secret_key=config.translation_api_key,
-                timeout_seconds=int(config.translation_timeout_seconds)
+                timeout_seconds=int(config.translation_timeout_seconds),
+                max_retries=int(config.translation_max_retries),
+                retry_backoff_seconds=int(config.translation_retry_backoff_seconds),
             )
         elif provider in {"openai_compatible", "openai-compatible", "llamacpp", "llama.cpp", "lmstudio", "lm_studio"}:
             return OpenAICompatibleTranslator(
@@ -149,11 +166,21 @@ class TranslationService:
                 api_key=config.translation_api_key,
                 timeout_seconds=int(config.translation_timeout_seconds),
                 supports_vision=bool(config.translation_supports_vision),
+                temperature=float(config.translation_llm_temperature),
+                top_p=float(config.translation_llm_top_p),
+                max_tokens=int(config.translation_llm_max_tokens),
+                max_retries=int(config.translation_max_retries),
+                retry_backoff_seconds=int(config.translation_retry_backoff_seconds),
             )
         return OllamaTranslator(
             api_url=OLLAMA_API_URL,
             model=config.translation_model or "llama3",
             supports_vision=bool(config.translation_supports_vision),
+            temperature=float(config.translation_llm_temperature),
+            top_p=float(config.translation_llm_top_p),
+            max_tokens=int(config.translation_llm_max_tokens),
+            max_retries=int(config.translation_max_retries),
+            retry_backoff_seconds=int(config.translation_retry_backoff_seconds),
         )
 
     @property

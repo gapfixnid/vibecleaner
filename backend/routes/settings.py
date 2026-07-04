@@ -16,6 +16,13 @@ class SettingsSchema(BaseModel):
     translation_api_key_configured: bool = False
     translation_timeout_seconds: int
     translation_supports_vision: bool
+    translation_cache_enabled: bool = True
+    translation_cache_mode: str = "text_with_context"
+    translation_max_retries: int = 2
+    translation_retry_backoff_seconds: int = 2
+    translation_llm_temperature: float = 0.1
+    translation_llm_top_p: float = 0.95
+    translation_llm_max_tokens: int = 4096
     ui_language: str = "en"
     source_language: str
     target_language: str
@@ -41,6 +48,13 @@ def get_settings():
         "translation_api_key_configured": bool(config.translation_api_key),
         "translation_timeout_seconds": config.translation_timeout_seconds,
         "translation_supports_vision": config.translation_supports_vision,
+        "translation_cache_enabled": config.translation_cache_enabled,
+        "translation_cache_mode": config.translation_cache_mode,
+        "translation_max_retries": config.translation_max_retries,
+        "translation_retry_backoff_seconds": config.translation_retry_backoff_seconds,
+        "translation_llm_temperature": config.translation_llm_temperature,
+        "translation_llm_top_p": config.translation_llm_top_p,
+        "translation_llm_max_tokens": config.translation_llm_max_tokens,
         "ui_language": config.ui_language,
         "source_language": config.source_language,
         "target_language": config.target_language,
@@ -68,6 +82,13 @@ def update_settings(settings: SettingsSchema):
         config.translation_api_key = ""
     config.translation_timeout_seconds = settings.translation_timeout_seconds
     config.translation_supports_vision = settings.translation_supports_vision
+    config.translation_cache_enabled = settings.translation_cache_enabled
+    config.translation_cache_mode = settings.translation_cache_mode
+    config.translation_max_retries = settings.translation_max_retries
+    config.translation_retry_backoff_seconds = settings.translation_retry_backoff_seconds
+    config.translation_llm_temperature = settings.translation_llm_temperature
+    config.translation_llm_top_p = settings.translation_llm_top_p
+    config.translation_llm_max_tokens = settings.translation_llm_max_tokens
     config.ui_language = settings.ui_language
     config.source_language = settings.source_language
     config.target_language = settings.target_language

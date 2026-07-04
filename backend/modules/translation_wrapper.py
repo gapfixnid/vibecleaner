@@ -30,12 +30,22 @@ class OpenAICompatibleTranslator(BaseTranslator):
         api_key: str = "",
         timeout_seconds: int = OLLAMA_REQUEST_TIMEOUT_SECONDS,
         supports_vision: bool = False,
+        temperature: float = 0.1,
+        top_p: float = 0.95,
+        max_tokens: int = 4096,
+        max_retries: int = 2,
+        retry_backoff_seconds: int = 2,
     ):
         self.api_url = api_url.rstrip("/")
         self.model = model
         self.api_key = api_key
         self.timeout_seconds = timeout_seconds
         self.supports_vision = supports_vision
+        self.temperature = temperature
+        self.top_p = top_p
+        self.max_tokens = max_tokens
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
         self.is_online = None
         self.installed_models: list[str] = []
         self.system_prompt_override = None
@@ -148,7 +158,7 @@ Requirements:
             blocks, source_lang, target_lang, image, active_model
         )
 
-        max_retries = 2
+        max_retries = max(0, int(self.max_retries))
         for attempt in range(max_retries + 1):
             try:
                 response = requests.post(
@@ -209,7 +219,7 @@ Requirements:
                 )
 
             if attempt < max_retries:
-                time.sleep(2.0)
+                time.sleep(max(0, int(self.retry_backoff_seconds)))
 
         raise RuntimeError(self.last_error or "Translation failed after multiple attempts.")
 
@@ -263,8 +273,9 @@ Requirements:
                 },
                 {"role": "user", "content": user_content},
             ],
-            "temperature": 0.1,
-            "top_p": 0.95,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "max_tokens": self.max_tokens,
         }
 
     def _image_to_data_url(self, image: np.ndarray) -> str | None:
@@ -331,13 +342,28 @@ Requirements:
 
 
 class OllamaTranslator(OpenAICompatibleTranslator):
-    def __init__(self, api_url: str = "http://127.0.0.1:11434", model: str = "llama3", supports_vision: bool = True):
+    def __init__(
+        self,
+        api_url: str = "http://127.0.0.1:11434",
+        model: str = "llama3",
+        supports_vision: bool = True,
+        temperature: float = 0.1,
+        top_p: float = 0.95,
+        max_tokens: int = 4096,
+        max_retries: int = 2,
+        retry_backoff_seconds: int = 2,
+    ):
         super().__init__(
             api_url=api_url,
             model=model,
             api_key="ollama",
             timeout_seconds=OLLAMA_REQUEST_TIMEOUT_SECONDS,
             supports_vision=supports_vision,
+            temperature=temperature,
+            top_p=top_p,
+            max_tokens=max_tokens,
+            max_retries=max_retries,
+            retry_backoff_seconds=retry_backoff_seconds,
         )
 
     @property
@@ -368,10 +394,12 @@ class OllamaTranslator(OpenAICompatibleTranslator):
 
 
 class GoogleTranslatorWrapper(BaseTranslator):
-    def __init__(self):
+    def __init__(self, max_retries: int = 2, retry_backoff_seconds: int = 2):
         self.model = "google"
         self.is_online = True
         self.last_error = None
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def check_connection(self) -> bool:
         return True
@@ -416,11 +444,17 @@ class GoogleTranslatorWrapper(BaseTranslator):
                     if not cleaned_text:
                         block.translation = ""
                         continue
-                    try:
-                        block.translation = translator.translate(cleaned_text)
-                    except Exception as block_err:
-                        logger.warning("Failed to translate block '%s': %s", cleaned_text, block_err)
-                        block.translation = block.text
+                    for attempt in range(max(0, int(self.max_retries)) + 1):
+                        try:
+                            block.translation = translator.translate(cleaned_text)
+                            break
+                        except Exception as block_err:
+                            self.last_error = str(block_err)
+                            if attempt < max(0, int(self.max_retries)):
+                                time.sleep(max(0, int(self.retry_backoff_seconds)))
+                                continue
+                            logger.warning("Failed to translate block '%s': %s", cleaned_text, block_err)
+                            block.translation = block.text
                 else:
                     block.translation = ""
             self.last_error = None
@@ -434,12 +468,20 @@ class GoogleTranslatorWrapper(BaseTranslator):
 
 
 class DeepLTranslatorWrapper(BaseTranslator):
-    def __init__(self, api_key: str = "", timeout_seconds: int = 30):
+    def __init__(
+        self,
+        api_key: str = "",
+        timeout_seconds: int = 30,
+        max_retries: int = 2,
+        retry_backoff_seconds: int = 2,
+    ):
         self.api_key = api_key
         self.timeout_seconds = timeout_seconds
         self.model = "deepl"
         self.is_online = None
         self.last_error = None
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def check_connection(self) -> bool:
         if not self.api_key:
@@ -518,22 +560,25 @@ class DeepLTranslatorWrapper(BaseTranslator):
                 "source_lang": from_code,
                 "target_lang": to_code,
             }
-            res = requests.post(
-                url, json=payload, headers=headers, timeout=self.timeout_seconds
-            )
-            if res.status_code == 200:
-                translations = res.json().get("translations", [])
-                trans_idx = 0
-                for block in blocks:
-                    if block.text.strip():
-                        block.translation = translations[trans_idx].get("text", "")
-                        trans_idx += 1
-                    else:
-                        block.translation = ""
-                self.last_error = None
-                return blocks
-            self.last_error = f"HTTP {res.status_code}: {res.text}"
-            logger.error("DeepL translation failed: %s", self.last_error)
+            for attempt in range(max(0, int(self.max_retries)) + 1):
+                res = requests.post(
+                    url, json=payload, headers=headers, timeout=self.timeout_seconds
+                )
+                if res.status_code == 200:
+                    translations = res.json().get("translations", [])
+                    trans_idx = 0
+                    for block in blocks:
+                        if block.text.strip():
+                            block.translation = translations[trans_idx].get("text", "")
+                            trans_idx += 1
+                        else:
+                            block.translation = ""
+                    self.last_error = None
+                    return blocks
+                self.last_error = f"HTTP {res.status_code}: {res.text}"
+                logger.error("DeepL translation failed: %s", self.last_error)
+                if attempt < max(0, int(self.max_retries)):
+                    time.sleep(max(0, int(self.retry_backoff_seconds)))
         except Exception as e:
             self.last_error = str(e)
             logger.exception("DeepL translation exception")
@@ -545,7 +590,16 @@ class DeepLTranslatorWrapper(BaseTranslator):
 
 class OpenAITranslatorWrapper(OpenAICompatibleTranslator):
     def __init__(
-        self, api_key: str = "", model: str = "gpt-4o-mini", timeout_seconds: int = 30, supports_vision: bool = True
+        self,
+        api_key: str = "",
+        model: str = "gpt-4o-mini",
+        timeout_seconds: int = 30,
+        supports_vision: bool = True,
+        temperature: float = 0.1,
+        top_p: float = 0.95,
+        max_tokens: int = 4096,
+        max_retries: int = 2,
+        retry_backoff_seconds: int = 2,
     ):
         super().__init__(
             api_url="https://api.openai.com/v1",
@@ -553,6 +607,11 @@ class OpenAITranslatorWrapper(OpenAICompatibleTranslator):
             api_key=api_key,
             timeout_seconds=timeout_seconds,
             supports_vision=supports_vision,
+            temperature=temperature,
+            top_p=top_p,
+            max_tokens=max_tokens,
+            max_retries=max_retries,
+            retry_backoff_seconds=retry_backoff_seconds,
         )
 
 
@@ -563,6 +622,9 @@ class ClaudeTranslatorWrapper(BaseTranslator):
         model: str = "claude-3-5-sonnet-20241022",
         timeout_seconds: int = 45,
         supports_vision: bool = True,
+        temperature: float = 0.1,
+        top_p: float = 0.95,
+        max_tokens: int = 4096,
     ):
         self.api_key = api_key
         self.model = model
@@ -572,6 +634,9 @@ class ClaudeTranslatorWrapper(BaseTranslator):
         self.is_online = None
         self.last_error = None
         self.system_prompt_override = None
+        self.temperature = temperature
+        self.top_p = top_p
+        self.max_tokens = max_tokens
 
     def check_connection(self) -> bool:
         if not self.api_key:
@@ -610,12 +675,13 @@ class ClaudeTranslatorWrapper(BaseTranslator):
 
         payload = {
             "model": self.model,
-            "max_tokens": 4096,
+            "max_tokens": self.max_tokens,
             "system": system_prompt,
             "messages": [
                 {"role": "user", "content": f"Translate this JSON:\n{raw_text_json}"}
             ],
-            "temperature": 0.1,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
         }
 
         try:
@@ -645,7 +711,12 @@ class ClaudeTranslatorWrapper(BaseTranslator):
 
 class PapagoTranslatorWrapper(BaseTranslator):
     def __init__(
-        self, client_id: str = "", client_secret: str = "", timeout_seconds: int = 15
+        self,
+        client_id: str = "",
+        client_secret: str = "",
+        timeout_seconds: int = 15,
+        max_retries: int = 2,
+        retry_backoff_seconds: int = 2,
     ):
         self.client_id = client_id
         self.client_secret = client_secret
@@ -653,6 +724,8 @@ class PapagoTranslatorWrapper(BaseTranslator):
         self.model = "papago"
         self.is_online = None
         self.last_error = None
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def check_connection(self) -> bool:
         if not self.client_id or not self.client_secret:
@@ -704,21 +777,25 @@ class PapagoTranslatorWrapper(BaseTranslator):
                     continue
                 cleaned_text = block.text.replace("\n", " ").strip()
                 data = {"source": from_code, "target": to_code, "text": cleaned_text}
-                res = requests.post(
-                    url, data=data, headers=headers, timeout=self.timeout_seconds
-                )
-                if res.status_code == 200:
-                    translated = (
-                        res.json()
-                        .get("message", {})
-                        .get("result", {})
-                        .get("translatedText", "")
+                for attempt in range(max(0, int(self.max_retries)) + 1):
+                    res = requests.post(
+                        url, data=data, headers=headers, timeout=self.timeout_seconds
                     )
-                    block.translation = translated
-                else:
+                    if res.status_code == 200:
+                        translated = (
+                            res.json()
+                            .get("message", {})
+                            .get("result", {})
+                            .get("translatedText", "")
+                        )
+                        block.translation = translated
+                        break
                     self.last_error = f"HTTP {res.status_code}: {res.text}"
                     logger.error("Papago API failed on text block: %s", self.last_error)
-                    block.translation = block.text
+                    if attempt < max(0, int(self.max_retries)):
+                        time.sleep(max(0, int(self.retry_backoff_seconds)))
+                    else:
+                        block.translation = block.text
             self.last_error = None
             return blocks
         except Exception as e:
@@ -731,7 +808,12 @@ class PapagoTranslatorWrapper(BaseTranslator):
 
 class BaiduTranslatorWrapper(BaseTranslator):
     def __init__(
-        self, app_id: str = "", secret_key: str = "", timeout_seconds: int = 15
+        self,
+        app_id: str = "",
+        secret_key: str = "",
+        timeout_seconds: int = 15,
+        max_retries: int = 2,
+        retry_backoff_seconds: int = 2,
     ):
         self.app_id = app_id
         self.secret_key = secret_key
@@ -739,6 +821,8 @@ class BaiduTranslatorWrapper(BaseTranslator):
         self.model = "baidu"
         self.is_online = None
         self.last_error = None
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def check_connection(self) -> bool:
         if not self.app_id or not self.secret_key:
@@ -799,22 +883,26 @@ class BaiduTranslatorWrapper(BaseTranslator):
                     "salt": salt,
                     "sign": sign,
                 }
-                res = requests.get(url, params=params, timeout=self.timeout_seconds)
-                if res.status_code == 200:
-                    result = res.json()
-                    trans_result = result.get("trans_result", [])
-                    if trans_result:
-                        block.translation = trans_result[0].get("dst", "")
-                    elif result.get("error_code"):
-                        self.last_error = f"Baidu error {result.get('error_code')}: {result.get('error_msg')}"
-                        logger.error("Baidu API error: %s", self.last_error)
-                        block.translation = block.text
-                    else:
-                        block.translation = block.text
-                else:
+                for attempt in range(max(0, int(self.max_retries)) + 1):
+                    res = requests.get(url, params=params, timeout=self.timeout_seconds)
+                    if res.status_code == 200:
+                        result = res.json()
+                        trans_result = result.get("trans_result", [])
+                        if trans_result:
+                            block.translation = trans_result[0].get("dst", "")
+                        elif result.get("error_code"):
+                            self.last_error = f"Baidu error {result.get('error_code')}: {result.get('error_msg')}"
+                            logger.error("Baidu API error: %s", self.last_error)
+                            block.translation = block.text
+                        else:
+                            block.translation = block.text
+                        break
                     self.last_error = f"HTTP {res.status_code}"
                     logger.error("Baidu API HTTP error: %s", self.last_error)
-                    block.translation = block.text
+                    if attempt < max(0, int(self.max_retries)):
+                        time.sleep(max(0, int(self.retry_backoff_seconds)))
+                    else:
+                        block.translation = block.text
             self.last_error = None
             return blocks
         except Exception as e:

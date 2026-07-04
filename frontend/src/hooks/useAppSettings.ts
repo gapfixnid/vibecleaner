@@ -1,6 +1,7 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 import * as api from "../services/api";
 import { getStoredUiLanguage, rememberUiLanguage } from "../i18n";
+import { DEFAULT_TRANSLATION_OPTIONS } from "../translationSettings";
 import type { Settings } from "../types";
 
 const DEFAULT_SETTINGS: Settings = {
@@ -9,8 +10,15 @@ const DEFAULT_SETTINGS: Settings = {
   translation_api_base_url: "",
   translation_api_key: "",
   translation_api_key_configured: false,
-  translation_timeout_seconds: 90,
+  translation_timeout_seconds: DEFAULT_TRANSLATION_OPTIONS.timeoutSeconds,
   translation_supports_vision: false,
+  translation_cache_enabled: DEFAULT_TRANSLATION_OPTIONS.cacheEnabled,
+  translation_cache_mode: DEFAULT_TRANSLATION_OPTIONS.cacheMode,
+  translation_max_retries: DEFAULT_TRANSLATION_OPTIONS.maxRetries,
+  translation_retry_backoff_seconds: DEFAULT_TRANSLATION_OPTIONS.retryBackoffSeconds,
+  translation_llm_temperature: DEFAULT_TRANSLATION_OPTIONS.temperature,
+  translation_llm_top_p: DEFAULT_TRANSLATION_OPTIONS.topP,
+  translation_llm_max_tokens: DEFAULT_TRANSLATION_OPTIONS.maxTokens,
   ui_language: getStoredUiLanguage(),
   source_language: "Japanese",
   target_language: "Korean",

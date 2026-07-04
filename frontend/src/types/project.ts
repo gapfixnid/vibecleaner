@@ -8,6 +8,13 @@ export interface SettingsDto {
   translation_api_key_configured: boolean;
   translation_timeout_seconds: number;
   translation_supports_vision: boolean;
+  translation_cache_enabled: boolean;
+  translation_cache_mode: string;
+  translation_max_retries: number;
+  translation_retry_backoff_seconds: number;
+  translation_llm_temperature: number;
+  translation_llm_top_p: number;
+  translation_llm_max_tokens: number;
   ui_language: string;
   source_language: string;
   target_language: string;

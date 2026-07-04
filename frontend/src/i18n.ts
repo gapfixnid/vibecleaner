@@ -146,6 +146,12 @@ export type TranslationKey =
   | "settings.uiLanguage"
   | "settings.connectionDefaults"
   | "settings.requestTimeout"
+  | "settings.retryCount"
+  | "settings.retryBackoff"
+  | "settings.translationCache"
+  | "settings.cacheMode"
+  | "settings.cacheModeContext"
+  | "settings.cacheModeTextOnly"
   | "settings.languages"
   | "settings.sourceLanguage"
   | "settings.targetLanguage"
@@ -180,6 +186,11 @@ export type TranslationKey =
   | "settings.visionContext"
   | "settings.systemPromptOverride"
   | "settings.systemPromptPlaceholder"
+  | "settings.llmOptions"
+  | "settings.temperature"
+  | "settings.topP"
+  | "settings.maxTokens"
+  | "settings.llmOptionsHelp"
   | "settings.recognitionRules"
   | "settings.tilingEnabled"
   | "settings.bubblesOnly"
@@ -336,6 +347,12 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.uiLanguage": "UI Language",
     "settings.connectionDefaults": "Connection Defaults",
     "settings.requestTimeout": "Request Timeout (sec)",
+    "settings.retryCount": "Retry Count",
+    "settings.retryBackoff": "Retry Delay",
+    "settings.translationCache": "Use Translation Cache",
+    "settings.cacheMode": "Cache Mode",
+    "settings.cacheModeContext": "Text + neighboring context",
+    "settings.cacheModeTextOnly": "Text only",
     "settings.languages": "Languages",
     "settings.sourceLanguage": "Source Language (OCR)",
     "settings.targetLanguage": "Target Language (Translation)",
@@ -370,6 +387,11 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.visionContext": "Send page image for visual context (turn off for text-only models, e.g. llama.cpp without mmproj)",
     "settings.systemPromptOverride": "System Prompt Override",
     "settings.systemPromptPlaceholder": "Enter custom context guidelines for the LLM translation engine...",
+    "settings.llmOptions": "LLM Generation Options",
+    "settings.temperature": "Temperature",
+    "settings.topP": "Top P",
+    "settings.maxTokens": "Max Output Tokens",
+    "settings.llmOptionsHelp": "Defaults favor stable comic dialogue and valid JSON output. Higher values can sound more varied but may be less consistent.",
     "settings.recognitionRules": "Recognition Rules",
     "settings.tilingEnabled": "Tiling Enabled (Increases detection quality for small bubbles)",
     "settings.bubblesOnly": "Speech Bubbles Only (Ignore free-floating sfx text)",
@@ -525,6 +547,12 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.uiLanguage": "UI 언어",
     "settings.connectionDefaults": "연결 기본값",
     "settings.requestTimeout": "요청 제한 시간(초)",
+    "settings.retryCount": "재시도 횟수",
+    "settings.retryBackoff": "재시도 대기",
+    "settings.translationCache": "번역 캐시 사용",
+    "settings.cacheMode": "캐시 방식",
+    "settings.cacheModeContext": "텍스트 + 주변 문맥",
+    "settings.cacheModeTextOnly": "텍스트만",
     "settings.languages": "언어",
     "settings.sourceLanguage": "원본 언어(OCR)",
     "settings.targetLanguage": "대상 언어(번역)",
@@ -559,6 +587,11 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.visionContext": "시각적 문맥을 위해 페이지 이미지를 함께 전송합니다(text-only 모델, 예: mmproj 없는 llama.cpp는 끄세요).",
     "settings.systemPromptOverride": "시스템 프롬프트 재정의",
     "settings.systemPromptPlaceholder": "LLM 번역 엔진에 전달할 커스텀 문맥 지침을 입력하세요...",
+    "settings.llmOptions": "LLM 생성 옵션",
+    "settings.temperature": "Temperature",
+    "settings.topP": "Top P",
+    "settings.maxTokens": "최대 출력 토큰",
+    "settings.llmOptionsHelp": "기본값은 안정적인 만화 대사와 올바른 JSON 출력을 우선합니다. 값을 높이면 표현은 다양해질 수 있지만 일관성은 낮아질 수 있습니다.",
     "settings.recognitionRules": "인식 규칙",
     "settings.tilingEnabled": "타일링 활성화(작은 말풍선 감지 품질 향상)",
     "settings.bubblesOnly": "말풍선만 처리(떠 있는 효과음 텍스트 무시)",

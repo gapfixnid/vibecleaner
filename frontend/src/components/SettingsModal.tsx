@@ -11,6 +11,10 @@ import {
   HelpCircle
 } from "lucide-react";
 import * as api from "../services/api";
+import {
+  LLM_TRANSLATION_PROVIDERS,
+  getTranslationProviderCapabilities,
+} from "../translationSettings";
 import type { Settings } from "../types";
 import type { ThemeMeta } from "../themes";
 import { NumberStepper } from "./NumberStepper";
@@ -49,7 +53,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setLocalSettings({ ...settings });
   }, [settings, isOpen]);
 
-  const LLM_PROVIDERS = ["openai", "claude", "ollama", "openai_compatible"];
+  const LLM_PROVIDERS: string[] = [...LLM_TRANSLATION_PROVIDERS];
+  const providerCapabilities = getTranslationProviderCapabilities(localSettings.translation_provider);
   const providerNeedsKey = (p: string) => p === "openai" || p === "claude";
 
   // Fetch the live model list for the current LLM provider using the entered
@@ -112,14 +117,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleChange = (key: keyof Settings, value: any) => {
+  const handleChange = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setLocalSettings((prev) => ({
       ...prev,
       [key]: value,
     }));
   };
 
-  const handleAutoSave = (key: keyof Settings, value: any) => {
+  const handleAutoSave = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     const updated = {
       ...localSettings,
       [key]: value,
@@ -133,6 +138,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       e.currentTarget.blur();
     }
   };
+
+  const renderRangeControl = (
+    key: keyof Settings,
+    label: string,
+    value: number,
+    min: number,
+    max: number,
+    step: number,
+  ) => (
+    <div className="form-row-group stack">
+      <div className="flex-space-between">
+        <label className="pref-label">{label}</label>
+        <span className="pref-value-pill">{value}</span>
+      </div>
+      <input
+        type="range"
+        className="pref-range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => handleAutoSave(key, Number(e.target.value))}
+      />
+    </div>
+  );
 
   // Shared model picker for LLM providers: shows the live model list once
   // available, with loading / error / key-needed states. When allowManual is
@@ -337,6 +367,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         />
                       </div>
                     </div>
+                    <div className="form-row-group">
+                      <label className="pref-label">{t("settings.retryCount")}</label>
+                      <div className="pref-control-right">
+                        <NumberStepper
+                          label={t("settings.retryCount")}
+                          value={localSettings.translation_max_retries}
+                          min={0}
+                          max={8}
+                          step={1}
+                          onChange={(v) => handleAutoSave("translation_max_retries", v)}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-row-group">
+                      <label className="pref-label">{t("settings.retryBackoff")}</label>
+                      <div className="pref-control-right">
+                        <NumberStepper
+                          label={t("settings.retryBackoff")}
+                          value={localSettings.translation_retry_backoff_seconds}
+                          min={0}
+                          max={30}
+                          step={1}
+                          unit="s"
+                          onChange={(v) => handleAutoSave("translation_retry_backoff_seconds", v)}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-row-group checkbox-row">
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={localSettings.translation_cache_enabled}
+                          onChange={(e) => handleAutoSave("translation_cache_enabled", e.target.checked)}
+                        />
+                        <span>{t("settings.translationCache")}</span>
+                      </label>
+                    </div>
+                    {localSettings.translation_cache_enabled && (
+                      <div className="form-row-group">
+                        <label className="pref-label">{t("settings.cacheMode")}</label>
+                        <div className="pref-control-right">
+                          <AppleSelect
+                            value={localSettings.translation_cache_mode}
+                            onChange={(v) => handleAutoSave("translation_cache_mode", v)}
+                            options={[
+                              { value: "text_with_context", label: t("settings.cacheModeContext") },
+                              { value: "text_only", label: t("settings.cacheModeTextOnly") },
+                            ]}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -570,7 +652,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
 
                     {/* VISION (Applicable to LLMs) */}
-                    {["ollama", "openai_compatible", "openai", "claude"].includes(localSettings.translation_provider) && (
+                    {providerCapabilities.visionContext && (
                       <div className="form-row-group stack" style={{ marginTop: "12px", borderTop: "1px solid var(--border-color)", paddingTop: "12px" }}>
                         <label className="checkbox-label">
                           <input
@@ -584,7 +666,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
 
                     {/* SYSTEM PROMPT (Applicable to LLMs) */}
-                    {["ollama", "openai_compatible", "openai", "claude"].includes(localSettings.translation_provider) && (
+                    {providerCapabilities.systemPrompt && (
                       <div className="form-row-group stack" style={{ marginTop: "12px", borderTop: "1px solid var(--border-color)", paddingTop: "12px" }}>
                         <label className="pref-label">{t("settings.systemPromptOverride")}</label>
                         <textarea
@@ -597,6 +679,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                     )}
                   </div>
+
+                  {providerCapabilities.llmOptions && (
+                    <>
+                      <div className="section-title-label">{t("settings.llmOptions")}</div>
+                      <div className="settings-card">
+                        {renderRangeControl(
+                          "translation_llm_temperature",
+                          t("settings.temperature"),
+                          localSettings.translation_llm_temperature,
+                          0,
+                          1,
+                          0.05
+                        )}
+                        {renderRangeControl(
+                          "translation_llm_top_p",
+                          t("settings.topP"),
+                          localSettings.translation_llm_top_p,
+                          0.1,
+                          1,
+                          0.05
+                        )}
+                        <div className="form-row-group">
+                          <label className="pref-label">{t("settings.maxTokens")}</label>
+                          <div className="pref-control-right">
+                            <NumberStepper
+                              label={t("settings.maxTokens")}
+                              value={localSettings.translation_llm_max_tokens}
+                              min={512}
+                              max={16384}
+                              step={256}
+                              onChange={(v) => handleAutoSave("translation_llm_max_tokens", v)}
+                            />
+                          </div>
+                        </div>
+                        <p className="model-hint">{t("settings.llmOptionsHelp")}</p>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -1177,6 +1297,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           font-size: 10px;
           color: var(--text-tertiary);
           margin-top: 2px;
+        }
+
+        .pref-value-pill {
+          min-width: 44px;
+          padding: 2px 7px;
+          border-radius: 6px;
+          background: var(--bg-panel);
+          color: var(--text-secondary);
+          border: 1px solid var(--border-color);
+          font-size: 11px;
+          font-variant-numeric: tabular-nums;
+          text-align: center;
+        }
+
+        .pref-range {
+          width: 100%;
+          accent-color: var(--accent-primary);
         }
 
         .spin {
