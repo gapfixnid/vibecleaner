@@ -26,6 +26,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
         originals = {
             "detect_model": settings_route.config.detect_model,
             "ocr_engine": getattr(settings_route.config, "ocr_engine", "auto"),
+            "inpaint_engine": getattr(settings_route.config, "inpaint_engine", "lama"),
             "ocr_crop_scale": getattr(settings_route.config, "ocr_crop_scale", 1.0),
             "text_direction_override": getattr(settings_route.config, "text_direction_override", "auto"),
             "adaptive_binarization": settings_route.config.adaptive_binarization,
@@ -37,6 +38,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
         }
         settings_route.config.detect_model = "Small (INT8)"
         settings_route.config.ocr_engine = "ppocr"
+        settings_route.config.inpaint_engine = "opencv"
         settings_route.config.ocr_crop_scale = 1.25
         settings_route.config.text_direction_override = "horizontal"
         settings_route.config.adaptive_binarization = False
@@ -49,6 +51,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
 
         self.assertEqual(payload["detect_model"], "Small (INT8)")
         self.assertEqual(payload["ocr_engine"], "ppocr")
+        self.assertEqual(payload["inpaint_engine"], "opencv")
         self.assertEqual(payload["ocr_crop_scale"], 1.25)
         self.assertEqual(payload["text_direction_override"], "horizontal")
         self.assertFalse(payload["adaptive_binarization"])
@@ -79,6 +82,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
             **current,
             "detect_model": "Small (INT8)",
             "ocr_engine": "manga_ocr",
+            "inpaint_engine": "opencv",
             "ocr_crop_scale": 1.75,
             "text_direction_override": "vertical",
             "adaptive_binarization": True,
@@ -96,11 +100,13 @@ class SettingsUiLanguageTest(unittest.TestCase):
 
         self.assertEqual(settings_route.config.detect_model, "Small (INT8)")
         self.assertEqual(settings_route.config.ocr_engine, "manga_ocr")
+        self.assertEqual(settings_route.config.inpaint_engine, "opencv")
         self.assertEqual(settings_route.config.ocr_crop_scale, 1.75)
         self.assertEqual(settings_route.config.text_direction_override, "vertical")
         self.assertTrue(settings_route.config.adaptive_binarization)
         self.assertEqual(settings_route.config.adaptive_binarization_strength, 2.75)
         self.assertEqual(response["ocr_engine"], "manga_ocr")
+        self.assertEqual(response["inpaint_engine"], "opencv")
 
 
 if __name__ == "__main__":

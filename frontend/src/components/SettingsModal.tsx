@@ -772,9 +772,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           value={localSettings.ocr_engine}
                           onChange={(v) => handleAutoSave("ocr_engine", v)}
                           options={[
-                            { value: "auto", label: t("settings.ocrEngineAuto") },
-                            { value: "manga_ocr", label: t("settings.ocrEngineManga") },
-                            { value: "ppocr", label: t("settings.ocrEnginePpocr") },
+                            { value: "high_precision", label: t("settings.ocrEngineHighPrecision") },
+                            { value: "balanced", label: t("settings.ocrEngineBalanced") },
+                            { value: "fast", label: t("settings.ocrEngineFast") },
                           ]}
                         />
                       </div>
@@ -885,6 +885,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="settings-section">
                   <div className="section-title-label">{t("settings.inpaintingOptions")}</div>
                   <div className="settings-card">
+                    <div className="form-row-group">
+                      <label className="pref-label">{t("settings.inpaintingEngine")}</label>
+                      <div className="pref-control-right">
+                        <AppleSelect
+                          value={localSettings.inpaint_engine}
+                          onChange={(v) => handleAutoSave("inpaint_engine", v)}
+                          options={[
+                            { value: "aot", label: t("settings.inpaintingEngineHighPrecision") },
+                            { value: "lama", label: t("settings.inpaintingEngineBalanced") },
+                            { value: "opencv", label: t("settings.inpaintingEngineFast") },
+                          ]}
+                        />
+                      </div>
+                    </div>
+
                     <div className="form-row-group checkbox-row">
                       <label className="checkbox-label">
                         <input

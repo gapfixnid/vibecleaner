@@ -81,7 +81,7 @@ class AppConfig:
     bubbles_only: bool = False
 
     # -- OCR ----------------------------------------------------------------
-    ocr_engine: str = "auto"
+    ocr_engine: str = "balanced"
     ocr_padding: int = 8
     ocr_crop_scale: float = 1.5
     line_merge_sensitivity: float = 1.2
@@ -96,6 +96,7 @@ class AppConfig:
     default_font_size: float = 18.0
 
     # -- Inpainting ---------------------------------------------------------
+    inpaint_engine: str = "lama"
     inpaint_mask_dilation: int = 2
     inpaint_use_textbox_only: bool = True
     inpaint_clip_to_bubble: bool = True
@@ -212,6 +213,7 @@ class AppConfig:
             "min_font_size": "min_font_size",
             "max_font_size": "max_font_size",
             "default_font_size": "default_font_size",
+            "inpaint_engine": "inpaint_engine",
             "inpaint_mask_dilation": "inpaint_mask_dilation",
             "inpaint_use_textbox_only": "inpaint_use_textbox_only",
             "inpaint_clip_to_bubble": "inpaint_clip_to_bubble",
@@ -243,6 +245,8 @@ class AppConfig:
                 value = "google"
             if field_name == "detect_model" and value == "Small (INT8) [기본값]":
                 value = "High Precision (FP32)"
+            if field_name == "ocr_engine" and value == "auto":
+                value = "balanced"
             if field_name == "confidence_threshold" and value == 0.30:
                 value = 0.45
             setattr(self, field_name, value)

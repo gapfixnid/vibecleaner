@@ -30,7 +30,7 @@ class SettingsSchema(BaseModel):
     detect_model: str
     confidence_threshold: float
     tiling_enabled: bool
-    ocr_engine: str = "auto"
+    ocr_engine: str = "balanced"
     ocr_padding: int = 8
     ocr_crop_scale: float = 1.5
     line_merge_sensitivity: float = 1.2
@@ -42,6 +42,7 @@ class SettingsSchema(BaseModel):
     min_font_size: float
     max_font_size: float
     default_font_size: float
+    inpaint_engine: str = "lama"
     inpaint_mask_dilation: int
     inpaint_use_textbox_only: bool
     inpaint_clip_to_bubble: bool
@@ -82,6 +83,7 @@ def get_settings():
         "min_font_size": config.min_font_size,
         "max_font_size": config.max_font_size,
         "default_font_size": config.default_font_size,
+        "inpaint_engine": config.inpaint_engine,
         "inpaint_mask_dilation": config.inpaint_mask_dilation,
         "inpaint_use_textbox_only": config.inpaint_use_textbox_only,
         "inpaint_clip_to_bubble": config.inpaint_clip_to_bubble,
@@ -124,6 +126,7 @@ def update_settings(settings: SettingsSchema):
     config.min_font_size = settings.min_font_size
     config.max_font_size = settings.max_font_size
     config.default_font_size = settings.default_font_size
+    config.inpaint_engine = settings.inpaint_engine
     config.inpaint_mask_dilation = settings.inpaint_mask_dilation
     config.inpaint_use_textbox_only = settings.inpaint_use_textbox_only
     config.inpaint_clip_to_bubble = settings.inpaint_clip_to_bubble

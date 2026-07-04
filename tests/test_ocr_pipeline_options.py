@@ -52,6 +52,20 @@ class OcrPipelineOptionsTests(unittest.TestCase):
 
         self.assertEqual(block.text, "ppocr:ch")
 
+    def test_fast_ocr_profile_uses_ppocr_even_for_japanese(self):
+        cfg = AppConfig(ocr_engine="fast")
+        block = TextBlock([1, 1, 10, 10])
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+
+        with (
+            patch("modules.config.config", cfg),
+            patch("modules.ocr_wrapper.MangaOCRMobileONNXEngine", FakeMangaEngine),
+            patch("modules.ocr_wrapper.PPOCRv5Engine", FakePPOCREngine),
+        ):
+            LocalOCR(lang="Japanese").recognize_text(image, [block])
+
+        self.assertEqual(block.text, "ppocr:ch")
+
     def test_adaptive_binarization_strength_controls_clahe_clip_limit(self):
         cfg = AppConfig(adaptive_binarization_strength=3.25)
         crop = np.full((12, 12, 3), 128, dtype=np.uint8)

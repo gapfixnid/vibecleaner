@@ -32,7 +32,15 @@ class LocalOCR:
         requested = str(getattr(config, "ocr_engine", "auto") or "auto").strip().lower()
         if requested in {"manga_ocr", "manga-ocr", "manga", "manga_ocr_mobile"}:
             return "manga_ocr"
-        if requested in {"ppocr", "paddleocr", "paddle_ocr"}:
+        if requested in {"ppocr", "paddleocr", "paddle_ocr", "fast", "speed"}:
+            return "ppocr"
+        if requested in {"high_precision", "high-quality", "high_quality", "quality"}:
+            if self.lang in ["Japanese", "日本語", "ja"]:
+                return "manga_ocr"
+            return "ppocr"
+        if requested in {"balanced", "standard", "auto"}:
+            if self.lang in ["Japanese", "日本語", "ja"]:
+                return "manga_ocr"
             return "ppocr"
         if self.lang in ["Japanese", "日本語", "ja"]:
             return "manga_ocr"

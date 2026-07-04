@@ -34,6 +34,7 @@ export interface SettingsDto {
   min_font_size: number;
   max_font_size: number;
   default_font_size: number;
+  inpaint_engine: string;
   inpaint_mask_dilation: number;
   inpaint_use_textbox_only: boolean;
   inpaint_clip_to_bubble: boolean;

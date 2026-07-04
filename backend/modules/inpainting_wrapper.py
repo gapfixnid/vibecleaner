@@ -15,6 +15,31 @@ class HybridInpainter:
                     return False
         self.settings = DummySettings()
         self.lama_model = None
+        self.aot_model = None
+
+    def _resolve_engine_name(self) -> str:
+        requested = str(getattr(config, "inpaint_engine", "lama") or "lama").strip().lower()
+        if requested in {"opencv", "fast", "speed", "telea"}:
+            return "opencv"
+        if requested in {"aot", "high_precision", "high-quality", "high_quality", "quality"}:
+            return "aot"
+        return "lama"
+
+    def _get_deep_model(self, engine_name: str):
+        device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
+        if engine_name == "aot":
+            if self.aot_model is None:
+                import logging
+                logging.info("Initializing AOT inpainting model...")
+                from modules.inpainting.aot import AOT
+                self.aot_model = AOT(device=device, backend="onnx")
+            return self.aot_model
+        if self.lama_model is None:
+            import logging
+            logging.info("Initializing LaMa inpainting model...")
+            from modules.inpainting.lama import LaMa
+            self.lama_model = LaMa(device=device, backend="onnx")
+        return self.lama_model
 
     def inpaint(
         self,
@@ -24,17 +49,11 @@ class HybridInpainter:
         protect_edges: bool = False,
     ) -> np.ndarray:
         """
-        Clears text areas using LaMa deep learning model on text stroke masks.
+        Clears text areas using the configured inpainting engine on text stroke masks.
         """
         inpainted = image.copy()
         h, w = image.shape[:2]
-        
-        if self.lama_model is None:
-            import logging
-            logging.info("Initializing LaMa inpainting model...")
-            from modules.inpainting.lama import LaMa
-            device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
-            self.lama_model = LaMa(device=device, backend="onnx")
+        engine_name = self._resolve_engine_name()
         
         for index, box in enumerate(boxes):
             x1, y1, x2, y2 = [int(v) for v in box]
@@ -119,23 +138,23 @@ class HybridInpainter:
                         clip[local_y1:local_y2, local_x1:local_x2] = 255
                         mask = cv2.bitwise_and(mask, clip)
                 
-                # --- LAMA DEEP LEARNING INPAINTING ---
-                try:
-                    from modules.inpainting.schema import Config as LaMaConfig
-                    # Convert BGR crop to RGB for LaMa model
-                    crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                    # Run LaMa model
-                    inpainted_rgb = self.lama_model(crop_rgb, mask, config=LaMaConfig())
-                    # Convert back to BGR
-                    # LaMa output dtype 보정
-                    if inpainted_rgb.dtype != np.uint8:
-                        inpainted_rgb = np.clip(inpainted_rgb, 0, 255).astype(np.uint8)
-                        
-                    inpainted_crop = cv2.cvtColor(inpainted_rgb, cv2.COLOR_RGB2BGR)
-                except Exception:
-                    import logging
-                    logging.exception("LaMa inpainting failed; falling back to Telea CV2 inpainting")
+                if engine_name == "opencv":
                     inpainted_crop = cv2.inpaint(crop, mask, 3, cv2.INPAINT_TELEA)
+                else:
+                    try:
+                        from modules.inpainting.schema import Config as InpaintConfig
+                        # Convert BGR crop to RGB for the deep inpainting models.
+                        crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                        model = self._get_deep_model(engine_name)
+                        inpainted_rgb = model(crop_rgb, mask, config=InpaintConfig())
+                        if inpainted_rgb.dtype != np.uint8:
+                            inpainted_rgb = np.clip(inpainted_rgb, 0, 255).astype(np.uint8)
+
+                        inpainted_crop = cv2.cvtColor(inpainted_rgb, cv2.COLOR_RGB2BGR)
+                    except Exception:
+                        import logging
+                        logging.exception("%s inpainting failed; falling back to Telea CV2 inpainting", engine_name)
+                        inpainted_crop = cv2.inpaint(crop, mask, 3, cv2.INPAINT_TELEA)
 
                 inpainted[y1:y2, x1:x2] = inpainted_crop
             else:
