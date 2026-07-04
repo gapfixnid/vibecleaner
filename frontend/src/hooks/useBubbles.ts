@@ -15,6 +15,7 @@ interface UseBubblesDeps {
   markDirty: () => void;
   /** Called when translated count may have changed so sidebar dots refresh. */
   onPageTranslationChanged?: () => void;
+  t?: (key: string) => string;
 }
 
 function toBubbleUpdate(b: BubbleInfo): BubbleUpdate {
@@ -44,7 +45,7 @@ function translationStatusChanged(oldB: BubbleInfo | undefined, newB: BubbleInfo
 }
 
 /** Owns bubble list state, selection, and all bubble-level operations. */
-export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, showError, markDirty, onPageTranslationChanged }: UseBubblesDeps) {
+export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, showError, markDirty, onPageTranslationChanged, t = (key) => key }: UseBubblesDeps) {
   const [bubbles, setBubbles] = useState<BubbleInfo[]>([]);
   const [selectedBubbleId, setSelectedBubbleId] = useState<number | null>(null);
   const bubbleRequestSeq = useRef(0);
@@ -76,11 +77,11 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
         // Verify the pageId still exists in the current page list.
         const currentPageId = getPageId(pageIdx);
         if (requestId === bubbleRequestSeq.current && pageIdx === currentIndexRef.current && currentPageId === pageId) {
-          showError("말풍선 로드 실패", "현재 페이지의 말풍선 정보를 불러오지 못했습니다.");
+          showError(t("bubbles.loadFailedTitle"), t("bubbles.loadFailedMessage"));
         }
       }
     },
-    [currentIndexRef, getPageId, showError]
+    [currentIndexRef, getPageId, showError, t]
   );
 
   /** Called by usePages when a page becomes active: clear then load. */
@@ -131,7 +132,7 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
       } catch (e) {
         console.error("Failed to update bubble", e);
         setBubbles(prev); // rollback optimistic change
-        showError("저장 실패", "말풍선 변경 사항을 저장하지 못했습니다.");
+        showError(t("bubbles.saveFailedTitle"), t("bubbles.saveFailedMessage"));
         return;
       }
       await fetchBubblesForPage(idx);
@@ -140,7 +141,7 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
         onPageTranslationChanged?.();
       }
     },
-    [currentIndexRef, syncBubblesToBackend, fetchBubblesForPage, showError, onPageTranslationChanged]
+    [currentIndexRef, syncBubblesToBackend, fetchBubblesForPage, showError, onPageTranslationChanged, t]
   );
 
   const handleUpdateBubbles = useCallback(
@@ -153,12 +154,12 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
       } catch (e) {
         console.error("Failed to update bubbles", e);
         setBubbles(prev); // rollback optimistic change
-        showError("저장 실패", "말풍선 변경 사항을 저장하지 못했습니다.");
+        showError(t("bubbles.saveFailedTitle"), t("bubbles.saveFailedMessage"));
         return;
       }
       await fetchBubblesForPage(idx);
     },
-    [currentIndexRef, syncBubblesToBackend, fetchBubblesForPage, showError]
+    [currentIndexRef, syncBubblesToBackend, fetchBubblesForPage, showError, t]
   );
 
   const handleReOcrBubble = useCallback(
@@ -167,16 +168,16 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
       const pageId = getPageId(idx);
       if (!pageId) return;
       await runTask(
-        "Re-running OCR...",
+        t("bubbles.reRunningOcr"),
         async () => {
           await syncBubblesToBackend();
           await api.reOcrBubble(pageId, bubbleId);
           await fetchBubblesForPage(idx);
         },
-        { errorTitle: "OCR Failed" }
+        { errorTitle: t("bubbles.ocrFailed") }
       );
     },
-    [currentIndexRef, getPageId, runTask, syncBubblesToBackend, fetchBubblesForPage]
+    [currentIndexRef, getPageId, runTask, syncBubblesToBackend, fetchBubblesForPage, t]
   );
 
   const handleReTranslateBubble = useCallback(
@@ -185,17 +186,17 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
       const pageId = getPageId(idx);
       if (!pageId) return;
       await runTask(
-        "Translating speech bubble...",
+        t("bubbles.translatingSpeechBubble"),
         async () => {
           await syncBubblesToBackend();
           const job = await api.translateBubble(pageId, bubbleId);
-          await waitForJob(job, "Translating speech bubble...");
+          await waitForJob(job, t("bubbles.translatingSpeechBubble"));
           await fetchBubblesForPage(idx);
         },
-        { errorTitle: "Translation Failed" }
+        { errorTitle: t("bubbles.translationFailed") }
       );
     },
-    [currentIndexRef, getPageId, runTask, waitForJob, syncBubblesToBackend, fetchBubblesForPage]
+    [currentIndexRef, getPageId, runTask, waitForJob, syncBubblesToBackend, fetchBubblesForPage, t]
   );
 
   const handleDeleteBubble = useCallback(
@@ -214,14 +215,14 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
         console.error("Failed to delete bubble", e);
         setBubbles(prev); // rollback
         setSelectedBubbleId(prevSelected);
-        showError("삭제 실패", "말풍선을 삭제하지 못했습니다.");
+        showError(t("bubbles.deleteFailedTitle"), t("bubbles.deleteFailedMessage"));
         return;
       }
       await fetchBubblesForPage(idx);
       // Deleting a bubble changes translated_count
       onPageTranslationChanged?.();
     },
-    [currentIndexRef, getPageId, syncBubblesToBackend, fetchBubblesForPage, showError, onPageTranslationChanged]
+    [currentIndexRef, getPageId, syncBubblesToBackend, fetchBubblesForPage, showError, onPageTranslationChanged, t]
   );
 
   return {

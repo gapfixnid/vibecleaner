@@ -22,9 +22,10 @@ export interface DialogOptions {
 interface CustomDialogProps {
   options: DialogOptions;
   onClose: () => void;
+  t?: (key: string) => string;
 }
 
-export const CustomDialog: React.FC<CustomDialogProps> = ({ options, onClose }) => {
+export const CustomDialog: React.FC<CustomDialogProps> = ({ options, onClose, t = (key) => key }) => {
   const boxRef = useRef<HTMLDivElement>(null);
 
   const handleConfirm = () => {
@@ -121,23 +122,23 @@ export const CustomDialog: React.FC<CustomDialogProps> = ({ options, onClose }) 
           {options.type === "confirm" ? (
             <>
               <button className="apple-button secondary" onClick={handleCancel}>
-                {options.cancelText || "Cancel"}
+                {options.cancelText || t("dialog.cancel")}
               </button>
               {options.onDeny && (
                 <button className="apple-button secondary" onClick={handleDeny}>
-                  {options.denyText || "Don't Save"}
+                  {options.denyText || t("dialog.dontSave")}
                 </button>
               )}
               <button 
                 className={`apple-button ${isDeleteConfirm ? "danger" : "primary"}`} 
                 onClick={handleConfirm}
               >
-                {options.confirmText || "Confirm"}
+                {options.confirmText || t("dialog.confirm")}
               </button>
             </>
           ) : (
             <button className="apple-button primary" onClick={handleConfirm}>
-              {options.confirmText || "OK"}
+              {options.confirmText || t("dialog.ok")}
             </button>
           )}
         </div>

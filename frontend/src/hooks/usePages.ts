@@ -21,6 +21,7 @@ interface UsePagesDeps {
   onPagesCleared: () => void;
   /** Mark the project dirty (duplicate / delete / reorder mutate pages). */
   markDirty: () => void;
+  t?: (key: string) => string;
 }
 
 /** Owns the page list, current index, and per-page cache-busting versions. */
@@ -32,6 +33,7 @@ export function usePages({
   onPageActivated,
   onPagesCleared,
   markDirty,
+  t = (key) => key,
 }: UsePagesDeps) {
   const [pages, setPages] = useState<PageInfo[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
@@ -68,10 +70,10 @@ export function usePages({
         }
       } catch (e) {
         console.error("Failed to fetch pages", e);
-        showError("페이지 로드 실패", "페이지 목록을 불러오지 못했습니다.");
+        showError(t("pages.loadFailedTitle"), t("pages.loadFailedMessage"));
       }
     },
-    [currentIndexRef, onPageActivated, onPagesCleared, showError]
+    [currentIndexRef, onPageActivated, onPagesCleared, showError, t]
   );
 
   const handleSelectPage = useCallback(
@@ -102,26 +104,26 @@ export function usePages({
         } else {
           onPagesCleared();
         }
-        showError("페이지 전환 실패", "선택한 페이지로 전환하지 못했습니다.");
+        showError(t("pages.switchFailedTitle"), t("pages.switchFailedMessage"));
       });
     },
-    [currentIndexRef, onPageActivated, onPagesCleared, pages, showError]
+    [currentIndexRef, onPageActivated, onPagesCleared, pages, showError, t]
   );
 
   const handleDuplicatePage = useCallback(
     async (idx: number) => {
       await runTask(
-        "Duplicating page...",
+        t("pages.duplicatingPage"),
         async () => {
           const pageId = pages[idx]?.page_id;
           const data = await api.duplicatePage(idx, pageId);
           await loadPagesFromServer(data.current_index);
           markDirty();
         },
-        { errorTitle: "Failed to Duplicate Page" }
+        { errorTitle: t("pages.failedToDuplicatePage") }
       );
     },
-    [runTask, loadPagesFromServer, markDirty, pages]
+    [runTask, loadPagesFromServer, markDirty, pages, t]
   );
 
   const handleDuplicatePages = useCallback(
@@ -129,7 +131,7 @@ export function usePages({
       if (indices.length === 0) return;
       const count = indices.length;
       await runTask(
-        count > 1 ? `Duplicating ${count} pages...` : "Duplicating page...",
+        count > 1 ? t("pages.duplicatingPages").replace("{count}", String(count)) : t("pages.duplicatingPage"),
         async () => {
           const pageIds = indices.map((i) => pages[i]?.page_id).filter(Boolean) as string[];
           if (count > 1) {
@@ -142,23 +144,23 @@ export function usePages({
           }
           markDirty();
         },
-        { errorTitle: "Failed to Duplicate Page" }
+        { errorTitle: t("pages.failedToDuplicatePage") }
       );
     },
-    [runTask, loadPagesFromServer, markDirty, pages]
+    [runTask, loadPagesFromServer, markDirty, pages, t]
   );
 
   const handleDeletePages = useCallback(
     (indices: number[]) => {
       const count = indices.length;
       showConfirm(
-        "Delete Page" + (count > 1 ? "s" : ""),
+        count > 1 ? t("pages.deletePagesTitle") : t("pages.deletePageTitle"),
         count > 1
-          ? `Are you sure you want to delete ${count} pages? This action cannot be undone.`
-          : "Are you sure you want to delete this page? This action cannot be undone.",
+          ? t("pages.deletePagesMessage").replace("{count}", String(count))
+          : t("pages.deletePageMessage"),
         async () => {
           await runTask(
-            count > 1 ? `Deleting ${count} pages...` : "Deleting page...",
+            count > 1 ? t("pages.deletingPages").replace("{count}", String(count)) : t("pages.deletingPage"),
             async () => {
               const pageIds = indices.map((i) => pages[i]?.page_id).filter(Boolean) as string[];
               if (count > 1) {
@@ -171,30 +173,30 @@ export function usePages({
               }
               markDirty();
             },
-            { errorTitle: "Failed to Delete Page" }
+            { errorTitle: t("pages.failedToDeletePage") }
           );
         },
-        "Delete",
-        "Cancel",
+        t("sidebar.delete"),
+        t("dialog.cancel"),
         true
       );
     },
-    [showConfirm, runTask, loadPagesFromServer, markDirty, pages]
+    [showConfirm, runTask, loadPagesFromServer, markDirty, pages, t]
   );
 
   const handleReorderPages = useCallback(
     async (fromIdx: number, toIdx: number) => {
       await runTask(
-        "Reordering pages...",
+        t("pages.reorderingPages"),
         async () => {
           const data = await api.reorderPages(fromIdx, toIdx);
           await loadPagesFromServer(data.current_index);
           markDirty();
         },
-        { errorTitle: "Failed to Reorder Pages" }
+        { errorTitle: t("pages.failedToReorderPages") }
       );
     },
-    [runTask, loadPagesFromServer, markDirty]
+    [runTask, loadPagesFromServer, markDirty, t]
   );
 
   return {

@@ -16,6 +16,7 @@ interface UseAutoTypesetDeps {
   fetchBubblesForPage: (pageIdx: number) => Promise<void>;
   setSelectedPageIds: Dispatch<SetStateAction<number[]>>;
   selectPage: (idx: number, options?: { deferActivation?: number }) => void;
+  t?: (key: string) => string;
 }
 
 export function sortAutoTypesetPageIds(pageIds: number[]) {
@@ -40,6 +41,7 @@ export function useAutoTypeset({
   fetchBubblesForPage,
   setSelectedPageIds,
   selectPage,
+  t = (key) => key,
 }: UseAutoTypesetDeps) {
   const selectedPageIdsRef = useRef<number[]>([]);
 
@@ -53,16 +55,16 @@ export function useAutoTypeset({
     const pageId = pages[idx]?.page_id;
     if (!pageId) return;
     await runTask(
-      "Translating page...",
+      t("task.translatingPage"),
       async () => {
         const job = await api.translateAll(pageId);
-        await waitForJob(job, "Translating page...");
+        await waitForJob(job, t("task.translatingPage"));
         setIsWaitingForImageReload(true);
         bumpPageVersion(idx);
         await loadPagesFromServer(idx, { skipPageActivation: true });
         await fetchBubblesForPage(idx);
       },
-      { errorTitle: "Translation Failed", keepBusyOnSuccess: true }
+      { errorTitle: t("task.translationFailed"), keepBusyOnSuccess: true }
     );
   }, [
     pages,
@@ -73,6 +75,7 @@ export function useAutoTypeset({
     bumpPageVersion,
     loadPagesFromServer,
     fetchBubblesForPage,
+    t,
   ]);
 
   const handleTranslatePages = useCallback(async (pageIds: number[]) => {
@@ -84,12 +87,12 @@ export function useAutoTypeset({
     if (displayIdx == null) return;
 
     await runTask(
-      `Translating ${total} pages...`,
+      t("task.translatingPages").replace("{count}", String(total)),
       async () => {
         await syncBubblesToBackend();
 
         const job = await api.translateBatch(sorted);
-        await waitForJob(job, `Translating ${total} page${total > 1 ? "s" : ""}...`, {
+        await waitForJob(job, t("task.translatingPages").replace("{count}", String(total)), {
           ignoreBackendMessage: true,
         });
 
@@ -101,7 +104,7 @@ export function useAutoTypeset({
         await loadPagesFromServer(displayIdx, { skipPageActivation: true });
         await fetchBubblesForPage(displayIdx);
       },
-      { errorTitle: "Multi-Page Translation Failed", keepBusyOnSuccess: true }
+      { errorTitle: t("task.multiPageTranslationFailed"), keepBusyOnSuccess: true }
     );
   }, [
     runTask,
@@ -114,6 +117,7 @@ export function useAutoTypeset({
     fetchBubblesForPage,
     setSelectedPageIds,
     selectPage,
+    t,
   ]);
 
   const handleTranslate = useCallback(async () => {

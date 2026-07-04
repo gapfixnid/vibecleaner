@@ -35,6 +35,8 @@ function App() {
   const [isDirty, setIsDirty] = useState(false);
   const markDirty = useCallback(() => setIsDirty(true), []);
   const markClean = useCallback(() => setIsDirty(false), []);
+  const { settings, setSettings, handleSaveSettings } = useAppSettings();
+  const t = createTranslator(settings.ui_language);
 
   const {
     isProcessing,
@@ -43,7 +45,7 @@ function App() {
     waitForJob,
     runTask,
     finishImageReload,
-  } = useProcessingTask(showError);
+  } = useProcessingTask(showError, t);
 
   // --- Domain hooks ---
   const workspacePages = useWorkspacePages({
@@ -52,6 +54,7 @@ function App() {
     showError,
     showConfirm,
     markDirty,
+    t,
   });
   const {
     activeBubble,
@@ -75,14 +78,13 @@ function App() {
     markDirty,
     markClean,
     getSelectedIndices,
+    t,
   });
 
   const { bubbles, selectedBubbleId, setSelectedBubbleId, syncBubblesToBackend } =
     bubblesApi;
 
   // --- Local UI state ---
-  const { settings, setSettings, handleSaveSettings } = useAppSettings();
-  const t = createTranslator(settings.ui_language);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const { theme, setTheme, themes } = useTheme();
@@ -108,6 +110,7 @@ function App() {
     fetchBubblesForPage: bubblesApi.fetchBubblesForPage,
     setSelectedPageIds,
     selectPage: pagesApi.handleSelectPage,
+    t,
   });
 
   const { handleExportPages } = usePageExport({
@@ -118,6 +121,7 @@ function App() {
     bumpPageVersion: pagesApi.bumpPageVersion,
     loadPagesFromServer,
     showAlert,
+    t,
   });
 
   const { backendError, isRetryingBackend, handleRetryBackend } = useBackendBootstrap({
@@ -152,6 +156,7 @@ function App() {
     deletePages: pagesApi.handleDeletePages,
     setSelectedPageIds,
     setSelectedBubbleId,
+    t,
   });
 
   useWindowCloseGuard(isDirty, guardUnsaved);
@@ -249,7 +254,7 @@ function App() {
         t={t}
       />
 
-      <CustomDialog options={dialog} onClose={closeDialog} />
+      <CustomDialog options={dialog} onClose={closeDialog} t={t} />
 
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
 

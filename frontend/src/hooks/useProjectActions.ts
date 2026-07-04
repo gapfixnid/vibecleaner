@@ -9,7 +9,8 @@ interface UseProjectActionsDeps {
     title: string,
     message: string,
     onSave: () => void,
-    onDiscard: () => void
+    onDiscard: () => void,
+    labels?: { save?: string; dontSave?: string; cancel?: string }
   ) => void;
   saveProject: () => Promise<boolean>;
   newProject: () => Promise<boolean>;
@@ -26,6 +27,7 @@ interface UseProjectActionsDeps {
   deletePages: (indices: number[]) => void;
   setSelectedPageIds: Dispatch<SetStateAction<number[]>>;
   setSelectedBubbleId: Dispatch<SetStateAction<number | null>>;
+  t?: (key: string) => string;
 }
 
 export function useProjectActions({
@@ -46,6 +48,7 @@ export function useProjectActions({
   deletePages,
   setSelectedPageIds,
   setSelectedBubbleId,
+  t = (key) => key,
 }: UseProjectActionsDeps) {
   const guardUnsaved = useCallback(
     (proceed: () => void) => {
@@ -54,16 +57,21 @@ export function useProjectActions({
         return;
       }
       showUnsavedPrompt(
-        "Unsaved Changes",
-        "You have unsaved changes. Do you want to save them before continuing?",
+        t("project.unsavedChanges"),
+        t("project.unsavedChangesMessage"),
         async () => {
           const saved = await saveProject();
           if (saved) proceed();
         },
-        () => proceed()
+        () => proceed(),
+        {
+          save: t("dialog.save"),
+          dontSave: t("dialog.dontSave"),
+          cancel: t("dialog.cancel"),
+        }
       );
     },
-    [isDirty, showUnsavedPrompt, saveProject]
+    [isDirty, showUnsavedPrompt, saveProject, t]
   );
 
   const handleNewProject = useCallback(() => {
@@ -115,16 +123,16 @@ export function useProjectActions({
       const pageId = pages[idx]?.page_id;
       if (!pageId) return;
       await runTask(
-        "Renaming page...",
+        t("project.renamingPage"),
         async () => {
           await api.renamePage(pageId, name);
           await loadPagesFromServer(currentIndexRef.current, { skipPageActivation: true });
           markDirty();
         },
-        { errorTitle: "Rename Failed" }
+        { errorTitle: t("project.renameFailed") }
       );
     },
-    [pages, runTask, loadPagesFromServer, currentIndexRef, markDirty]
+    [pages, runTask, loadPagesFromServer, currentIndexRef, markDirty, t]
   );
 
   return {

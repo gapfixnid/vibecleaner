@@ -58,6 +58,74 @@ export type TranslationKey =
   | "inspector.category"
   | "inspector.reviewStatus"
   | "inspector.unknown"
+  | "dialog.cancel"
+  | "dialog.confirm"
+  | "dialog.ok"
+  | "dialog.save"
+  | "dialog.dontSave"
+  | "project.unsavedChanges"
+  | "project.unsavedChangesMessage"
+  | "project.success"
+  | "project.projectSaved"
+  | "project.loadingSelectedImages"
+  | "project.selectMangaImagesTitle"
+  | "project.mangaImagesFilter"
+  | "project.allFilesFilter"
+  | "project.failedToOpenFiles"
+  | "project.creatingNewProject"
+  | "project.failedToCreateNewProject"
+  | "project.loadingProject"
+  | "project.openProjectTitle"
+  | "project.projectFilter"
+  | "project.legacyJsonProjectFilter"
+  | "project.failedToLoadProject"
+  | "project.savingProject"
+  | "project.saveProjectTitle"
+  | "project.failedToSaveProject"
+  | "project.renamingPage"
+  | "project.renameFailed"
+  | "pages.loadFailedTitle"
+  | "pages.loadFailedMessage"
+  | "pages.switchFailedTitle"
+  | "pages.switchFailedMessage"
+  | "pages.duplicatingPage"
+  | "pages.duplicatingPages"
+  | "pages.failedToDuplicatePage"
+  | "pages.deletePageTitle"
+  | "pages.deletePagesTitle"
+  | "pages.deletePageMessage"
+  | "pages.deletePagesMessage"
+  | "pages.deletingPage"
+  | "pages.deletingPages"
+  | "pages.failedToDeletePage"
+  | "pages.reorderingPages"
+  | "pages.failedToReorderPages"
+  | "bubbles.loadFailedTitle"
+  | "bubbles.loadFailedMessage"
+  | "bubbles.saveFailedTitle"
+  | "bubbles.saveFailedMessage"
+  | "bubbles.reRunningOcr"
+  | "bubbles.ocrFailed"
+  | "bubbles.translatingSpeechBubble"
+  | "bubbles.translationFailed"
+  | "bubbles.deleteFailedTitle"
+  | "bubbles.deleteFailedMessage"
+  | "task.translationFailed"
+  | "task.multiPageTranslationFailed"
+  | "task.translatingPage"
+  | "task.translatingPages"
+  | "task.failed"
+  | "export.cleaningBeforeExport"
+  | "export.pageImageTitle"
+  | "export.pngImageFilter"
+  | "export.jpegImageFilter"
+  | "export.webpImageFilter"
+  | "export.exportingPage"
+  | "export.exportingPages"
+  | "export.successTitle"
+  | "export.successSingleMessage"
+  | "export.successMultiMessage"
+  | "export.failedTitle"
   | "settings.preferences"
   | "settings.general"
   | "settings.translation"
@@ -180,6 +248,74 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "inspector.category": "Category",
     "inspector.reviewStatus": "Review Status",
     "inspector.unknown": "unknown",
+    "dialog.cancel": "Cancel",
+    "dialog.confirm": "Confirm",
+    "dialog.ok": "OK",
+    "dialog.save": "Save",
+    "dialog.dontSave": "Don't Save",
+    "project.unsavedChanges": "Unsaved Changes",
+    "project.unsavedChangesMessage": "You have unsaved changes. Do you want to save them before continuing?",
+    "project.success": "Success",
+    "project.projectSaved": "Project saved successfully!",
+    "project.loadingSelectedImages": "Loading selected images...",
+    "project.selectMangaImagesTitle": "Select Manga Images to Load",
+    "project.mangaImagesFilter": "Manga Images",
+    "project.allFilesFilter": "All Files",
+    "project.failedToOpenFiles": "Failed to Open Files",
+    "project.creatingNewProject": "Creating new project...",
+    "project.failedToCreateNewProject": "Failed to Create New Project",
+    "project.loadingProject": "Loading project...",
+    "project.openProjectTitle": "Open {appName} Project",
+    "project.projectFilter": "{appName} Project",
+    "project.legacyJsonProjectFilter": "Legacy JSON Project",
+    "project.failedToLoadProject": "Failed to Load Project",
+    "project.savingProject": "Saving project...",
+    "project.saveProjectTitle": "Save {appName} Project",
+    "project.failedToSaveProject": "Failed to Save Project",
+    "project.renamingPage": "Renaming page...",
+    "project.renameFailed": "Rename Failed",
+    "pages.loadFailedTitle": "Page Load Failed",
+    "pages.loadFailedMessage": "Failed to load the page list.",
+    "pages.switchFailedTitle": "Page Switch Failed",
+    "pages.switchFailedMessage": "Could not switch to the selected page.",
+    "pages.duplicatingPage": "Duplicating page...",
+    "pages.duplicatingPages": "Duplicating {count} pages...",
+    "pages.failedToDuplicatePage": "Failed to Duplicate Page",
+    "pages.deletePageTitle": "Delete Page",
+    "pages.deletePagesTitle": "Delete Pages",
+    "pages.deletePageMessage": "Are you sure you want to delete this page? This action cannot be undone.",
+    "pages.deletePagesMessage": "Are you sure you want to delete {count} pages? This action cannot be undone.",
+    "pages.deletingPage": "Deleting page...",
+    "pages.deletingPages": "Deleting {count} pages...",
+    "pages.failedToDeletePage": "Failed to Delete Page",
+    "pages.reorderingPages": "Reordering pages...",
+    "pages.failedToReorderPages": "Failed to Reorder Pages",
+    "bubbles.loadFailedTitle": "Bubble Load Failed",
+    "bubbles.loadFailedMessage": "Failed to load speech bubbles for the current page.",
+    "bubbles.saveFailedTitle": "Save Failed",
+    "bubbles.saveFailedMessage": "Failed to save speech bubble changes.",
+    "bubbles.reRunningOcr": "Re-running OCR...",
+    "bubbles.ocrFailed": "OCR Failed",
+    "bubbles.translatingSpeechBubble": "Translating speech bubble...",
+    "bubbles.translationFailed": "Translation Failed",
+    "bubbles.deleteFailedTitle": "Delete Failed",
+    "bubbles.deleteFailedMessage": "Failed to delete the speech bubble.",
+    "task.translationFailed": "Translation Failed",
+    "task.multiPageTranslationFailed": "Multi-Page Translation Failed",
+    "task.translatingPage": "Translating page...",
+    "task.translatingPages": "Translating {count} pages...",
+    "task.failed": "Task Failed",
+    "export.cleaningBeforeExport": "Cleaning page before export...",
+    "export.pageImageTitle": "Export Page Image",
+    "export.pngImageFilter": "PNG Image",
+    "export.jpegImageFilter": "JPEG Image",
+    "export.webpImageFilter": "WebP Image",
+    "export.exportingPage": "Exporting page...",
+    "export.exportingPages": "Exporting {count} pages...",
+    "export.successTitle": "Export Successful",
+    "export.successSingleMessage": "Successfully saved to:\n{path}",
+    "export.successMultiMessage": "Saved {count} images to:\n{path}",
+    "export.failedTitle": "Export Failed",
     "settings.preferences": "Preferences",
     "settings.general": "General",
     "settings.translation": "Translation",
@@ -301,6 +437,74 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "inspector.category": "분류",
     "inspector.reviewStatus": "검토 상태",
     "inspector.unknown": "알 수 없음",
+    "dialog.cancel": "취소",
+    "dialog.confirm": "확인",
+    "dialog.ok": "확인",
+    "dialog.save": "저장",
+    "dialog.dontSave": "저장 안 함",
+    "project.unsavedChanges": "저장되지 않은 변경사항",
+    "project.unsavedChangesMessage": "저장되지 않은 변경사항이 있습니다. 계속하기 전에 저장할까요?",
+    "project.success": "완료",
+    "project.projectSaved": "프로젝트가 저장되었습니다.",
+    "project.loadingSelectedImages": "선택한 이미지 불러오는 중...",
+    "project.selectMangaImagesTitle": "불러올 만화 이미지 선택",
+    "project.mangaImagesFilter": "만화 이미지",
+    "project.allFilesFilter": "모든 파일",
+    "project.failedToOpenFiles": "파일 열기 실패",
+    "project.creatingNewProject": "새 프로젝트 만드는 중...",
+    "project.failedToCreateNewProject": "새 프로젝트 생성 실패",
+    "project.loadingProject": "프로젝트 불러오는 중...",
+    "project.openProjectTitle": "{appName} 프로젝트 열기",
+    "project.projectFilter": "{appName} 프로젝트",
+    "project.legacyJsonProjectFilter": "레거시 JSON 프로젝트",
+    "project.failedToLoadProject": "프로젝트 불러오기 실패",
+    "project.savingProject": "프로젝트 저장 중...",
+    "project.saveProjectTitle": "{appName} 프로젝트 저장",
+    "project.failedToSaveProject": "프로젝트 저장 실패",
+    "project.renamingPage": "페이지 이름 변경 중...",
+    "project.renameFailed": "이름 변경 실패",
+    "pages.loadFailedTitle": "페이지 로드 실패",
+    "pages.loadFailedMessage": "페이지 목록을 불러오지 못했습니다.",
+    "pages.switchFailedTitle": "페이지 전환 실패",
+    "pages.switchFailedMessage": "선택한 페이지로 전환하지 못했습니다.",
+    "pages.duplicatingPage": "페이지 복제 중...",
+    "pages.duplicatingPages": "{count}개 페이지 복제 중...",
+    "pages.failedToDuplicatePage": "페이지 복제 실패",
+    "pages.deletePageTitle": "페이지 삭제",
+    "pages.deletePagesTitle": "페이지들 삭제",
+    "pages.deletePageMessage": "이 페이지를 삭제할까요? 이 작업은 되돌릴 수 없습니다.",
+    "pages.deletePagesMessage": "{count}개 페이지를 삭제할까요? 이 작업은 되돌릴 수 없습니다.",
+    "pages.deletingPage": "페이지 삭제 중...",
+    "pages.deletingPages": "{count}개 페이지 삭제 중...",
+    "pages.failedToDeletePage": "페이지 삭제 실패",
+    "pages.reorderingPages": "페이지 순서 변경 중...",
+    "pages.failedToReorderPages": "페이지 순서 변경 실패",
+    "bubbles.loadFailedTitle": "말풍선 로드 실패",
+    "bubbles.loadFailedMessage": "현재 페이지의 말풍선 정보를 불러오지 못했습니다.",
+    "bubbles.saveFailedTitle": "저장 실패",
+    "bubbles.saveFailedMessage": "말풍선 변경 사항을 저장하지 못했습니다.",
+    "bubbles.reRunningOcr": "OCR 다시 실행 중...",
+    "bubbles.ocrFailed": "OCR 실패",
+    "bubbles.translatingSpeechBubble": "말풍선 번역 중...",
+    "bubbles.translationFailed": "번역 실패",
+    "bubbles.deleteFailedTitle": "삭제 실패",
+    "bubbles.deleteFailedMessage": "말풍선을 삭제하지 못했습니다.",
+    "task.translationFailed": "번역 실패",
+    "task.multiPageTranslationFailed": "여러 페이지 번역 실패",
+    "task.translatingPage": "페이지 번역 중...",
+    "task.translatingPages": "{count}개 페이지 번역 중...",
+    "task.failed": "작업 실패",
+    "export.cleaningBeforeExport": "내보내기 전 페이지 정리 중...",
+    "export.pageImageTitle": "페이지 이미지 내보내기",
+    "export.pngImageFilter": "PNG 이미지",
+    "export.jpegImageFilter": "JPEG 이미지",
+    "export.webpImageFilter": "WebP 이미지",
+    "export.exportingPage": "페이지 내보내는 중...",
+    "export.exportingPages": "{count}개 페이지 내보내는 중...",
+    "export.successTitle": "내보내기 완료",
+    "export.successSingleMessage": "저장 위치:\n{path}",
+    "export.successMultiMessage": "{count}개 이미지를 저장했습니다:\n{path}",
+    "export.failedTitle": "내보내기 실패",
     "settings.preferences": "환경설정",
     "settings.general": "일반",
     "settings.translation": "번역",

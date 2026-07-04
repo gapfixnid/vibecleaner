@@ -59,7 +59,7 @@ const CANCELLED = "__job_cancelled__";
  * - `waitForJob`: polls a backend job to completion with a timeout, an unmount
  *   guard, and cancellation support.
  */
-export function useProcessingTask(showError: ShowError) {
+export function useProcessingTask(showError: ShowError, t: (key: string) => string = (key) => key) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isWaitingForImageReload, setIsWaitingForImageReload] = useState(false);
 
@@ -135,12 +135,12 @@ export function useProcessingTask(showError: ShowError) {
           if (busy) setIsProcessing(false);
           return undefined;
         }
-        showError(options?.errorTitle || "Task Failed", err?.response?.data?.detail || err?.message || String(e));
+        showError(options?.errorTitle || t("task.failed"), err?.response?.data?.detail || err?.message || String(e));
         if (busy) setIsProcessing(false);
         return undefined;
       }
     },
-    [showError]
+    [showError, t]
   );
 
   /** Called when the canvas finishes (re)loading an image after a busy task. */

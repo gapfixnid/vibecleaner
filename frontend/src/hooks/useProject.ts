@@ -21,6 +21,7 @@ interface UseProjectDeps {
   markClean: () => void;
   /** Returns the current sidebar multi-selection (page indices) for persistence. */
   getSelectedIndices: () => number[];
+  t?: (key: string) => string;
 }
 
 /** Owns file open / project new / load / save flows and the current project path. */
@@ -31,6 +32,7 @@ export function useProject({
   markDirty,
   markClean,
   getSelectedIndices,
+  t = (key) => key,
 }: UseProjectDeps) {
   // Path of the currently-open .vibe project (null = unsaved/new project).
   // Used so "Save Project" writes back to the same file without re-prompting.
@@ -39,13 +41,13 @@ export function useProject({
   const handleOpenFiles = useCallback(async (): Promise<OpenFilesResult | undefined> => {
     let result: OpenFilesResult | undefined;
     await runTask(
-      "Loading selected images...",
+      t("project.loadingSelectedImages"),
       async () => {
         const files = await desktop.selectMultipleFiles({
-          title: "Select Manga Images to Load",
+          title: t("project.selectMangaImagesTitle"),
           filters: [
-            ["Manga Images", ["png", "jpg", "jpeg", "webp", "bmp"]],
-            ["All Files", ["*"]],
+            [t("project.mangaImagesFilter"), ["png", "jpg", "jpeg", "webp", "bmp"]],
+            [t("project.allFilesFilter"), ["*"]],
           ],
         });
         if (!files || files.length === 0) return; // Cancelled
@@ -64,16 +66,16 @@ export function useProject({
         // Importing images mutates the project.
         if (addedCount > 0) markDirty();
       },
-      { errorTitle: "Failed to Open Files", skipBusy: true }
+      { errorTitle: t("project.failedToOpenFiles"), skipBusy: true }
     );
     return result;
-  }, [runTask, loadPagesFromServer, markDirty]);
+  }, [runTask, loadPagesFromServer, markDirty, t]);
 
   /** Reset to an empty project. Returns true on success. */
   const handleNewProject = useCallback(async (): Promise<boolean> => {
     let ok = false;
     await runTask(
-      "Creating new project...",
+      t("project.creatingNewProject"),
       async () => {
         await api.newProject();
         await loadPagesFromServer(-1);
@@ -81,24 +83,24 @@ export function useProject({
         markClean();
         ok = true;
       },
-      { errorTitle: "Failed to Create New Project", skipBusy: true }
+      { errorTitle: t("project.failedToCreateNewProject"), skipBusy: true }
     );
     return ok;
-  }, [runTask, loadPagesFromServer, markClean]);
+  }, [runTask, loadPagesFromServer, markClean, t]);
 
   /** Open an existing project. Returns the restored sidebar selection
    *  (page indices) on success, or null on cancel/error. */
   const handleLoadProject = useCallback(async (): Promise<number[] | null> => {
     let restoredSelection: number[] | null = null;
     await runTask(
-      "Loading project...",
+      t("project.loadingProject"),
       async () => {
         const file = await desktop.selectFile({
-          title: `Open ${APP_NAME} Project`,
+          title: t("project.openProjectTitle").replace("{appName}", APP_NAME),
           filters: [
-            [`${APP_NAME} Project`, ["vibe"]],
-            ["Legacy JSON Project", ["json"]],
-            ["All Files", ["*"]],
+            [t("project.projectFilter").replace("{appName}", APP_NAME), ["vibe"]],
+            [t("project.legacyJsonProjectFilter"), ["json"]],
+            [t("project.allFilesFilter"), ["*"]],
           ],
         });
         if (!file) return; // Cancelled
@@ -114,24 +116,24 @@ export function useProject({
         markClean();
         restoredSelection = selected;
       },
-      { errorTitle: "Failed to Load Project", skipBusy: true }
+      { errorTitle: t("project.failedToLoadProject"), skipBusy: true }
     );
     return restoredSelection;
-  }, [runTask, loadPagesFromServer, markClean]);
+  }, [runTask, loadPagesFromServer, markClean, t]);
 
   /** Save the project. Saves to the known path if set, otherwise prompts.
    *  Returns true if the project was actually written (false on cancel/error). */
   const handleSaveProject = useCallback(async (): Promise<boolean> => {
     let saved = false;
     await runTask(
-      "Saving project...",
+      t("project.savingProject"),
       async () => {
         let file = currentProjectPath;
         if (!file) {
           file = await desktop.saveFile({
-            title: `Save ${APP_NAME} Project`,
+            title: t("project.saveProjectTitle").replace("{appName}", APP_NAME),
             defaultExt: ".vibe",
-            filters: [[`${APP_NAME} Project`, ["vibe"]]],
+            filters: [[t("project.projectFilter").replace("{appName}", APP_NAME), ["vibe"]]],
           });
         }
         if (!file) return; // Cancelled
@@ -140,12 +142,12 @@ export function useProject({
         setCurrentProjectPath(file);
         markClean();
         saved = true;
-        showAlert("success", "Success", "Project saved successfully!");
+        showAlert("success", t("project.success"), t("project.projectSaved"));
       },
-      { errorTitle: "Failed to Save Project", skipBusy: true }
+      { errorTitle: t("project.failedToSaveProject"), skipBusy: true }
     );
     return saved;
-  }, [runTask, showAlert, currentProjectPath, markClean, getSelectedIndices]);
+  }, [runTask, showAlert, currentProjectPath, markClean, getSelectedIndices, t]);
 
   return {
     currentProjectPath,

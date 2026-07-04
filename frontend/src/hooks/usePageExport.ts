@@ -12,6 +12,7 @@ interface UsePageExportDeps {
   bumpPageVersion: (idx: number) => void;
   loadPagesFromServer: (selectIndex?: number, options?: { skipPageActivation?: boolean }) => Promise<void>;
   showAlert: (type: "success" | "error" | "warning" | "info", title: string, message: string) => void;
+  t?: (key: string) => string;
 }
 
 function deriveExportBaseName(filename: string | undefined, idx: number): string {
@@ -29,6 +30,7 @@ export function usePageExport({
   bumpPageVersion,
   loadPagesFromServer,
   showAlert,
+  t = (key) => key,
 }: UsePageExportDeps) {
   const exportPageToPath = useCallback(
     async (idx: number, savePath: string) => {
@@ -36,7 +38,7 @@ export function usePageExport({
       if (!pageId) throw new Error("Page ID not found");
       if (!pages[idx]?.has_inpaint) {
         const job = await api.inpaint(pageId);
-        await waitForJob(job, "Cleaning page before export...");
+        await waitForJob(job, t("export.cleaningBeforeExport"));
         bumpPageVersion(idx);
         await loadPagesFromServer(idx);
       }
@@ -45,7 +47,7 @@ export function usePageExport({
       formData.append("use_dialog", "false");
       return api.exportPage(pageId, formData);
     },
-    [pages, waitForJob, bumpPageVersion, loadPagesFromServer]
+    [pages, waitForJob, bumpPageVersion, loadPagesFromServer, t]
   );
 
   const handleExportPages = useCallback(
@@ -58,24 +60,24 @@ export function usePageExport({
       if (targets.length === 1) {
         const idx = targets[0];
         const file = await desktop.saveFile({
-          title: "Export Page Image",
+          title: t("export.pageImageTitle"),
           defaultExt: ".png",
           filters: [
-            ["PNG Image", ["png"]],
-            ["JPEG Image", ["jpg", "jpeg"]],
-            ["WebP Image", ["webp"]],
+            [t("export.pngImageFilter"), ["png"]],
+            [t("export.jpegImageFilter"), ["jpg", "jpeg"]],
+            [t("export.webpImageFilter"), ["webp"]],
           ],
         });
         if (!file) return;
         await runTask(
-          "Exporting page...",
+          t("export.exportingPage"),
           async () => {
             await syncBubblesToBackend(undefined, { silent: true });
             const data = await exportPageToPath(idx, file);
             if (data.status === "cancelled") return;
-            showAlert("success", "Export Successful", `Successfully saved to:\n${data.saved_path}`);
+            showAlert("success", t("export.successTitle"), t("export.successSingleMessage").replace("{path}", data.saved_path || ""));
           },
-          { errorTitle: "Export Failed" }
+          { errorTitle: t("export.failedTitle") }
         );
         return;
       }
@@ -83,7 +85,7 @@ export function usePageExport({
       const dir = await desktop.selectDirectory();
       if (!dir) return;
       await runTask(
-        `Exporting ${targets.length} pages...`,
+        t("export.exportingPages").replace("{count}", String(targets.length)),
         async () => {
           await syncBubblesToBackend(undefined, { silent: true });
           const usedNames = new Set<string>();
@@ -97,12 +99,12 @@ export function usePageExport({
             usedNames.add(name.toLowerCase());
             await exportPageToPath(idx, `${dir}/${name}`);
           }
-          showAlert("success", "Export Successful", `Saved ${targets.length} images to:\n${dir}`);
+          showAlert("success", t("export.successTitle"), t("export.successMultiMessage").replace("{count}", String(targets.length)).replace("{path}", dir));
         },
-        { errorTitle: "Export Failed" }
+        { errorTitle: t("export.failedTitle") }
       );
     },
-    [pages, runTask, syncBubblesToBackend, exportPageToPath, showAlert]
+    [pages, runTask, syncBubblesToBackend, exportPageToPath, showAlert, t]
   );
 
   return {

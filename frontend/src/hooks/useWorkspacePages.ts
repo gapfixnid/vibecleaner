@@ -19,6 +19,7 @@ interface UseWorkspacePagesDeps {
     destructive?: boolean
   ) => void;
   markDirty: () => void;
+  t?: (key: string) => string;
 }
 
 export function useWorkspacePages({
@@ -27,6 +28,7 @@ export function useWorkspacePages({
   showError,
   showConfirm,
   markDirty,
+  t = (key) => key,
 }: UseWorkspacePagesDeps) {
   const selectionRef = useRef<number[]>([]);
   const getSelectedIndices = useCallback(() => selectionRef.current, []);
@@ -43,6 +45,7 @@ export function useWorkspacePages({
     showError,
     markDirty,
     onPageTranslationChanged: () => onTranslationChangedRef.current?.(),
+    t,
   });
 
   const pagesApi = usePages({
@@ -53,6 +56,7 @@ export function useWorkspacePages({
     onPageActivated: bubblesApi.handlePageActivated,
     onPagesCleared: bubblesApi.clearBubbles,
     markDirty,
+    t,
   });
 
   const { pages, currentIndex, pageVersions, loadPagesFromServer } = pagesApi;

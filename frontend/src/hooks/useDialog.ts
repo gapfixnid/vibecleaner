@@ -39,7 +39,13 @@ export function useDialog() {
    *  - Cancel    → dismiss, no callback
    */
   const showUnsavedPrompt = useCallback(
-    (title: string, message: string, onSave: () => void, onDiscard: () => void) => {
+    (
+      title: string,
+      message: string,
+      onSave: () => void,
+      onDiscard: () => void,
+      labels?: { save?: string; dontSave?: string; cancel?: string }
+    ) => {
       setDialog({
         isOpen: true,
         type: "confirm",
@@ -47,9 +53,9 @@ export function useDialog() {
         message,
         onConfirm: onSave,
         onDeny: onDiscard,
-        confirmText: "Save",
-        denyText: "Don't Save",
-        cancelText: "Cancel",
+        confirmText: labels?.save,
+        denyText: labels?.dontSave,
+        cancelText: labels?.cancel,
       });
     },
     []
