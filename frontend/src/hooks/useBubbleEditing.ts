@@ -40,6 +40,7 @@ export function useBubbleEditing({
   const updateBubbleField = useCallback(
     (key: keyof BubbleInfo, value: BubbleInfo[keyof BubbleInfo]) => {
       if (!selectedBubble) return;
+      if (Object.is(selectedBubble[key], value)) return;
       onUpdateBubble({
         ...selectedBubble,
         [key]: value,
@@ -50,6 +51,9 @@ export function useBubbleEditing({
 
   const saveTextEdits = useCallback(() => {
     if (!selectedBubble) return;
+    if (origText === (selectedBubble.text || "") && transText === (selectedBubble.translated || "")) {
+      return;
+    }
     onUpdateBubble({
       ...selectedBubble,
       text: origText,
