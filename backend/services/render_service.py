@@ -31,10 +31,6 @@ class RenderService:
         image: np.ndarray | None = None,
         font_family: str | None = None,
     ) -> TextLayoutResult:
-        if font_family is None:
-            app = QApplication.instance()
-            font_family = cast(QApplication, app).font().family() if app else "Segoe UI"
-
         layout_rect = self._text_layout_rect(bubble)
         if bubble.layout_box is not None:
             font, lines, render_width = self.renderer.find_optimal_font_size(text, layout_rect, font_family=font_family)

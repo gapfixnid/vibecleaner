@@ -18,9 +18,11 @@ class FakeRenderer:
     def __init__(self):
         self.font_rect = None
         self.layout_rect = None
+        self.font_family = "not-called"
 
     def find_optimal_font_size(self, text, rect, font_family=None):
         self.font_rect = QRectF(rect)
+        self.font_family = font_family
         return SimpleNamespace(pointSizeF=lambda: 18.0), [text], rect.width()
 
     def layout_lines_in_rect(self, lines, rect, font, render_width, alignment="center"):
@@ -49,6 +51,20 @@ class RenderServiceTests(unittest.TestCase):
 
         self.assertEqual(renderer.font_rect, QRectF(20, 12, 40, 24))
         self.assertEqual(renderer.layout_rect, QRectF(20, 12, 40, 24))
+
+    def test_auto_font_selection_reaches_renderer_when_no_font_family_is_requested(self):
+        renderer = FakeRenderer()
+        service = RenderService(renderer=renderer)
+        bubble = TextBubble(
+            id=1,
+            box=QRectF(0, 0, 100, 80),
+            layout_box=QRectF(20, 12, 40, 24),
+            text="hello",
+        )
+
+        service.get_layout_for_bubble("translated", bubble, image=None, font_family=None)
+
+        self.assertIsNone(renderer.font_family)
 
 
 if __name__ == "__main__":
