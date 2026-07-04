@@ -11,6 +11,7 @@ interface ToolbarProps {
   onPreferences: () => void;
   onAbout: () => void;
   isDirty: boolean;
+  t?: (key: string) => string;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -19,6 +20,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onSaveProject,
   onPreferences,
   onAbout,
+  t = (key) => key,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -61,7 +63,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </span>
           <div className="app-title-stack" data-tauri-drag-region>
             <span className="logo-text" data-tauri-drag-region>{APP_NAME}</span>
-            <span className="toolbar-subtitle" data-tauri-drag-region>Image cleanup workspace</span>
+            <span className="toolbar-subtitle" data-tauri-drag-region>{t("toolbar.subtitle")}</span>
           </div>
         </div>
       </div>
@@ -73,8 +75,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <button
             type="button"
             className={`toolbar-action menu-toggle ${menuOpen ? "active" : ""}`}
-            data-tooltip="Menu"
-            aria-label="Menu"
+            data-tooltip={t("toolbar.menu")}
+            aria-label={t("toolbar.menu")}
             aria-haspopup="menu"
             aria-controls="toolbar-dropdown-menu"
             aria-expanded={menuOpen}
@@ -87,24 +89,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <div id="toolbar-dropdown-menu" className="toolbar-menu" role="menu">
               <button type="button" role="menuitem" onClick={runItem(onNewProject)}>
                 <FilePlus2 size={14} />
-                <span>New Project</span>
+                <span>{t("toolbar.newProject")}</span>
               </button>
               <button type="button" role="menuitem" onClick={runItem(onOpenProject)}>
                 <FolderOpen size={14} />
-                <span>Open Project</span>
+                <span>{t("toolbar.openProject")}</span>
               </button>
               <button type="button" role="menuitem" onClick={runItem(onSaveProject)}>
                 <Save size={14} />
-                <span>Save Project</span>
+                <span>{t("toolbar.saveProject")}</span>
               </button>
               <div className="toolbar-menu-separator" />
               <button type="button" role="menuitem" onClick={runItem(onPreferences)}>
                 <Settings size={14} />
-                <span>Preferences</span>
+                <span>{t("toolbar.preferences")}</span>
               </button>
               <button type="button" role="menuitem" onClick={runItem(onAbout)}>
                 <Info size={14} />
-                <span>About</span>
+                <span>{t("toolbar.about")}</span>
               </button>
             </div>
           )}

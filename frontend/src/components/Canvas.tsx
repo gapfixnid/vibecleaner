@@ -28,6 +28,7 @@ interface CanvasProps {
   selectedPageCount?: number;
   /** When true, page image is reloading — keep existing bubble overlay until new bubbles load. */
   isWaitingForImageReload?: boolean;
+  t?: (key: string) => string;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -48,6 +49,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   isMultiPageSelection,
   selectedPageCount,
   isWaitingForImageReload,
+  t,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -192,6 +194,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               isMultiPageSelection={isMultiPageSelection}
               selectedPageCount={selectedPageCount}
               onTranslate={onTranslate}
+              t={t}
             />
           </div>
         </div>

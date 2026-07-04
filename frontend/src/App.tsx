@@ -21,6 +21,7 @@ import { useAppChrome } from "./hooks/useAppChrome";
 import { useProjectActions } from "./hooks/useProjectActions";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useWorkspacePages } from "./hooks/useWorkspacePages";
+import { createTranslator } from "./i18n";
 
 function App() {
   // --- Cross-cutting concerns (dialog + processing) ---
@@ -81,6 +82,7 @@ function App() {
 
   // --- Local UI state ---
   const { settings, setSettings, handleSaveSettings } = useAppSettings();
+  const t = createTranslator(settings.ui_language);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const { theme, setTheme, themes } = useTheme();
@@ -178,6 +180,7 @@ function App() {
         onPreferences={() => setIsSettingsOpen(true)}
         onAbout={() => setIsAboutOpen(true)}
         isDirty={isDirty}
+        t={t}
       />
 
       <div className="main-workspace">
@@ -218,6 +221,7 @@ function App() {
           isMultiPageSelection={isMultiPageSelection}
           selectedPageCount={selectedPageIds.length}
           isWaitingForImageReload={isWaitingForImageReload}
+          t={t}
         />
 
         <Inspector
@@ -240,6 +244,7 @@ function App() {
         theme={theme}
         setTheme={setTheme}
         themes={themes}
+        t={t}
       />
 
       <CustomDialog options={dialog} onClose={closeDialog} />

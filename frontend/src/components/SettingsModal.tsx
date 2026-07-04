@@ -24,6 +24,7 @@ interface SettingsModalProps {
   theme: string;
   setTheme: (id: string) => void;
   themes: ThemeMeta[];
+  t?: (key: string) => string;
 }
 
 type TabType = "general" | "translation" | "detection" | "inpainting";
@@ -36,6 +37,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   theme,
   setTheme,
   themes,
+  t = (key) => key,
 }) => {
   const [localSettings, setLocalSettings] = useState<Settings>({ ...settings });
   const [providerModels, setProviderModels] = useState<string[]>([]);
@@ -142,16 +144,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return (
       <div className="form-row-group stack">
         <div className="flex-space-between">
-          <label className="pref-label">Model</label>
+          <label className="pref-label">{t("settings.model")}</label>
           <button type="button" className="refresh-btn" onClick={fetchProviderModels} disabled={isLoadingModels}>
             <RefreshCw size={11} className={isLoadingModels ? "spin" : ""} />
-            <span>Refresh</span>
+            <span>{t("settings.refresh")}</span>
           </button>
         </div>
         {needsKey && !localSettings.translation_api_key ? (
-          <p className="model-hint">Enter your API key to load models.</p>
+          <p className="model-hint">{t("settings.enterApiKeyToLoadModels")}</p>
         ) : isLoadingModels ? (
-          <p className="model-hint">Loading models…</p>
+          <p className="model-hint">{t("settings.loadingModels")}</p>
         ) : modelsError ? (
           <p className="model-error">{modelsError}</p>
         ) : providerModels.length > 0 ? (
@@ -159,7 +161,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             value={localSettings.translation_model}
             onChange={(v) => handleAutoSave("translation_model", v)}
             options={[
-              { value: "", label: "Select a model..." },
+              { value: "", label: t("settings.selectModel") },
               ...providerModels.map((m) => ({ value: m, label: m })),
               ...(localSettings.translation_model && !providerModels.includes(localSettings.translation_model)
                 ? [{ value: localSettings.translation_model, label: `${localSettings.translation_model} (saved)` }]
@@ -177,7 +179,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             onKeyDown={handleKeyDown}
           />
         ) : (
-          <p className="model-hint">No models found.</p>
+          <p className="model-hint">{t("settings.noModelsFound")}</p>
         )}
       </div>
     );
@@ -197,7 +199,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="Settings"
+        aria-label={t("toolbar.settings")}
         tabIndex={-1}
         ref={contentRef}
       >
@@ -205,7 +207,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Left Category Sidebar */}
         <div className="preferences-sidebar">
           <div className="sidebar-header-pref">
-            <h3>Preferences</h3>
+            <h3>{t("settings.preferences")}</h3>
           </div>
           <div className="sidebar-menu-pref">
             <button 
@@ -216,7 +218,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="btn-icon-wrapper general">
                 <Sliders size={14} />
               </div>
-              <span>General</span>
+              <span>{t("settings.general")}</span>
             </button>
             <button 
               type="button" 
@@ -226,7 +228,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="btn-icon-wrapper translation">
                 <Languages size={14} />
               </div>
-              <span>Translation</span>
+              <span>{t("settings.translation")}</span>
             </button>
             <button 
               type="button" 
@@ -236,7 +238,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="btn-icon-wrapper detection">
                 <Scan size={14} />
               </div>
-              <span>Detection</span>
+              <span>{t("settings.detection")}</span>
             </button>
             <button 
               type="button" 
@@ -246,7 +248,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="btn-icon-wrapper inpainting">
                 <Eraser size={14} />
               </div>
-              <span>Inpainting</span>
+              <span>{t("settings.inpainting")}</span>
             </button>
           </div>
         </div>
@@ -256,19 +258,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="preferences-header">
             <div className="header-info">
               <h2>
-                {activeTab === "general" && "General Settings"}
-                {activeTab === "translation" && "Translation Engine"}
-                {activeTab === "detection" && "Detection & OCR"}
-                {activeTab === "inpainting" && "Inpainting & Cleaning"}
+                {activeTab === "general" && t("settings.generalTitle")}
+                {activeTab === "translation" && t("settings.translationTitle")}
+                {activeTab === "detection" && t("settings.detectionTitle")}
+                {activeTab === "inpainting" && t("settings.inpaintingTitle")}
               </h2>
               <p className="header-desc">
-                {activeTab === "general" && "Manage general preferences, font size boundaries, and timeouts."}
-                {activeTab === "translation" && "Select from offline, local, or cloud API translation engines."}
-                {activeTab === "detection" && "Configure bubble detection models, threshold tolerances, and tiling settings."}
-                {activeTab === "inpainting" && "Tweak background LaMa inpainting mask boundaries and dilation."}
+                {activeTab === "general" && t("settings.generalDesc")}
+                {activeTab === "translation" && t("settings.translationDesc")}
+                {activeTab === "detection" && t("settings.detectionDesc")}
+                {activeTab === "inpainting" && t("settings.inpaintingDesc")}
               </p>
             </div>
-            <button type="button" className="close-btn-top" onClick={onClose} data-tooltip="Close" aria-label="Close settings">
+            <button type="button" className="close-btn-top" onClick={onClose} data-tooltip={t("settings.close")} aria-label={t("settings.close")}>
               <X size={14} />
             </button>
           </div>
@@ -278,12 +280,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* GENERAL TAB */}
               {activeTab === "general" && (
                 <div className="settings-section">
-                  <div className="section-title-label">Appearance</div>
+                  <div className="section-title-label">{t("settings.appearance")}</div>
                   <div className="settings-card">
+                    <div className="form-row-group">
+                      <label className="pref-label">{t("settings.uiLanguage")}</label>
+                      <div className="pref-control-right">
+                        <AppleSelect
+                          value={localSettings.ui_language}
+                          onChange={(v) => handleAutoSave("ui_language", v)}
+                          options={[
+                            { value: "en", label: "English" },
+                            { value: "ko", label: "한국어" },
+                          ]}
+                        />
+                      </div>
+                    </div>
                     <div
                       className="theme-swatch-grid"
                       role="radiogroup"
-                      aria-label="Theme"
+                      aria-label={t("settings.theme")}
                     >
                       {themes.map((t) => (
                         <button
@@ -307,13 +322,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
 
-                  <div className="section-title-label">Connection Defaults</div>
+                  <div className="section-title-label">{t("settings.connectionDefaults")}</div>
                   <div className="settings-card">
                     <div className="form-row-group">
-                      <label className="pref-label">Request Timeout (sec)</label>
+                      <label className="pref-label">{t("settings.requestTimeout")}</label>
                       <div className="pref-control-right">
                         <NumberStepper
-                          label="Request timeout in seconds"
+                          label={t("settings.requestTimeout")}
                           value={localSettings.translation_timeout_seconds}
                           min={10}
                           max={300}
@@ -329,10 +344,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* TRANSLATION TAB */}
               {activeTab === "translation" && (
                 <div className="settings-section">
-                  <div className="section-title-label">Languages</div>
+                  <div className="section-title-label">{t("settings.languages")}</div>
                   <div className="settings-card">
                     <div className="form-row-group">
-                      <label className="pref-label">Source Language (OCR)</label>
+                      <label className="pref-label">{t("settings.sourceLanguage")}</label>
                       <div className="pref-control-right">
                         <AppleSelect
                           value={localSettings.source_language}
@@ -347,7 +362,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                     </div>
                     <div className="form-row-group">
-                      <label className="pref-label">Target Language (Translation)</label>
+                      <label className="pref-label">{t("settings.targetLanguage")}</label>
                       <div className="pref-control-right">
                         <AppleSelect
                           value={localSettings.target_language}
@@ -363,10 +378,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="section-title-label">Active Provider</div>
+                  <div className="section-title-label">{t("settings.activeProvider")}</div>
                   <div className="settings-card">
                     <div className="form-row-group">
-                      <label className="pref-label">Translation Provider</label>
+                      <label className="pref-label">{t("settings.translationProvider")}</label>
                       <div className="pref-control-right">
                         <AppleSelect
                           value={localSettings.translation_provider}
@@ -387,7 +402,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   {/* Provider Specific Configuration Card */}
-                  <div className="section-title-label">Provider Credentials & Config</div>
+                  <div className="section-title-label">{t("settings.providerConfig")}</div>
                   <div className="settings-card">
                     {/* GOOGLE WEB */}
                     {localSettings.translation_provider === "google" && (

@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS: Settings = {
   translation_api_key_configured: false,
   translation_timeout_seconds: 90,
   translation_supports_vision: false,
+  ui_language: "en",
   source_language: "Japanese",
   target_language: "Korean",
   system_prompt: "",

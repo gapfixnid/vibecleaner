@@ -65,6 +65,7 @@ class AppConfig:
     system_prompt: str = ""
 
     # -- Languages ----------------------------------------------------------
+    ui_language: str = "en"
     source_language: str = "Japanese"
     target_language: str = "Korean"
 
@@ -139,6 +140,7 @@ class AppConfig:
             "translation_cache_enabled": "translation_cache_enabled",
             "translation_cache_mode": "translation_cache_mode",
             "system_prompt": "system_prompt",
+            "ui_language": "ui_language",
             "source_language": "source_language",
             "target_language": "target_language",
             "detect_model": "detect_model",
@@ -266,7 +268,7 @@ def __getattr__(name: str) -> Any:
                 "TRANSLATION_TIMEOUT_SECONDS", "TRANSLATION_SUPPORTS_VISION",
                 "TRANSLATION_CACHE_ENABLED", "TRANSLATION_CACHE_MODE",
                 "SYSTEM_PROMPT",
-                "SOURCE_LANGUAGE", "TARGET_LANGUAGE",
+                "UI_LANGUAGE", "SOURCE_LANGUAGE", "TARGET_LANGUAGE",
                 "DETECT_MODEL", "CONFIDENCE_THRESHOLD",
                 "TILING_ENABLED", "BUBBLES_ONLY",
                 "OCR_PADDING", "LINE_MERGE_SENSITIVITY",

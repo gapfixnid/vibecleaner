@@ -16,6 +16,7 @@ class SettingsSchema(BaseModel):
     translation_api_key_configured: bool = False
     translation_timeout_seconds: int
     translation_supports_vision: bool
+    ui_language: str = "en"
     source_language: str
     target_language: str
     system_prompt: str
@@ -40,6 +41,7 @@ def get_settings():
         "translation_api_key_configured": bool(config.translation_api_key),
         "translation_timeout_seconds": config.translation_timeout_seconds,
         "translation_supports_vision": config.translation_supports_vision,
+        "ui_language": config.ui_language,
         "source_language": config.source_language,
         "target_language": config.target_language,
         "system_prompt": translation_service.system_prompt or config.system_prompt,
@@ -66,6 +68,7 @@ def update_settings(settings: SettingsSchema):
         config.translation_api_key = ""
     config.translation_timeout_seconds = settings.translation_timeout_seconds
     config.translation_supports_vision = settings.translation_supports_vision
+    config.ui_language = settings.ui_language
     config.source_language = settings.source_language
     config.target_language = settings.target_language
     config.system_prompt = settings.system_prompt

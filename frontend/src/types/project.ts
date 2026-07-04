@@ -8,6 +8,7 @@ export interface SettingsDto {
   translation_api_key_configured: boolean;
   translation_timeout_seconds: number;
   translation_supports_vision: boolean;
+  ui_language: string;
   source_language: string;
   target_language: string;
   system_prompt: string;
