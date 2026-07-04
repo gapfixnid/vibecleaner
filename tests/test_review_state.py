@@ -51,6 +51,33 @@ class ReviewStateTests(unittest.TestCase):
         self.assertEqual(derive_bubble_status(page.bubbles[0]), "ok")
         self.assertEqual(derive_page_status(page), "ready_for_review")
 
+    def test_page_review_state_survives_project_roundtrip(self):
+        page = MangaPage(
+            file_path="sample.png",
+            cv_image=None,
+            status="has_warnings",
+            problems=["layout overflow"],
+            bubbles=[
+                TextBubble(
+                    id=1,
+                    box=QRectF(0, 0, 10, 10),
+                    text="hello",
+                    translated="안녕",
+                    status="needs_review",
+                    problems=["manual check"],
+                    edited=True,
+                )
+            ],
+        )
+
+        restored = MangaPage.from_project_dict(page.to_project_dict(), cv_image=None)
+
+        self.assertEqual(restored.status, "has_warnings")
+        self.assertEqual(restored.problems, ["layout overflow"])
+        self.assertEqual(restored.bubbles[0].status, "needs_review")
+        self.assertEqual(restored.bubbles[0].problems, ["manual check"])
+        self.assertTrue(restored.bubbles[0].edited)
+
 
 if __name__ == "__main__":
     unittest.main()
