@@ -46,8 +46,7 @@ frontend/dist/
 src-tauri/target/
 artifacts/
 
-# Tests & Test Samples
-tests/
+# Test Samples
 *pysp*
 
 # CodeGraphCache
