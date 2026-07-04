@@ -17,6 +17,7 @@ interface InspectorStyleSectionProps {
   setFontSizeDraft: Dispatch<SetStateAction<number>>;
   setColorDraft: Dispatch<SetStateAction<string>>;
   updateBubbleField: (key: keyof BubbleInfo, value: BubbleInfo[keyof BubbleInfo]) => void;
+  t?: (key: string) => string;
 }
 
 export function InspectorStyleSection({
@@ -27,13 +28,14 @@ export function InspectorStyleSection({
   setFontSizeDraft,
   setColorDraft,
   updateBubbleField,
+  t = (key) => key,
 }: InspectorStyleSectionProps) {
   return (
     <div className="section-panel">
-      <div className="section-title-simple">Typography & Design</div>
+      <div className="section-title-simple">{t("inspector.typographyDesign")}</div>
 
       <div className="form-row">
-        <label className="form-label">Font Family</label>
+        <label className="form-label">{t("inspector.fontFamily")}</label>
         <div className="form-control-right">
           <div className="select-wrapper">
             <select
@@ -52,7 +54,7 @@ export function InspectorStyleSection({
       </div>
 
       <div className="form-row size-row">
-        <label className="form-label">Font Size</label>
+        <label className="form-label">{t("inspector.fontSize")}</label>
         <div className="form-control-right font-size-controls" style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px" }}>
           <input
             type="range"
@@ -72,14 +74,14 @@ export function InspectorStyleSection({
       </div>
 
       <div className="form-row">
-        <label className="form-label">Font Style</label>
+        <label className="form-label">{t("inspector.fontStyle")}</label>
         <div className="form-control-right">
           <div className="style-buttons-group">
             <button
               className={`style-toggle-btn ${selectedBubble.bold ? "active" : ""}`}
               onClick={() => updateBubbleField("bold", !selectedBubble.bold)}
-              data-tooltip="Bold"
-              aria-label="Bold"
+              data-tooltip={t("inspector.bold")}
+              aria-label={t("inspector.bold")}
               aria-pressed={selectedBubble.bold}
             >
               <Bold size={13} />
@@ -87,8 +89,8 @@ export function InspectorStyleSection({
             <button
               className={`style-toggle-btn ${selectedBubble.italic ? "active" : ""}`}
               onClick={() => updateBubbleField("italic", !selectedBubble.italic)}
-              data-tooltip="Italic"
-              aria-label="Italic"
+              data-tooltip={t("inspector.italic")}
+              aria-label={t("inspector.italic")}
               aria-pressed={selectedBubble.italic}
             >
               <Italic size={13} />
@@ -98,14 +100,14 @@ export function InspectorStyleSection({
       </div>
 
       <div className="form-row">
-        <label className="form-label">Alignment</label>
+        <label className="form-label">{t("inspector.alignment")}</label>
         <div className="form-control-right">
           <div className="align-buttons-group">
             <button
               className={`align-btn ${selectedBubble.alignment === "left" ? "active" : ""}`}
               onClick={() => updateBubbleField("alignment", "left")}
-              data-tooltip="Align Left"
-              aria-label="Align left"
+              data-tooltip={t("inspector.alignLeft")}
+              aria-label={t("inspector.alignLeft")}
               aria-pressed={selectedBubble.alignment === "left"}
             >
               <AlignLeft size={13} />
@@ -113,8 +115,8 @@ export function InspectorStyleSection({
             <button
               className={`align-btn ${selectedBubble.alignment === "center" ? "active" : ""}`}
               onClick={() => updateBubbleField("alignment", "center")}
-              data-tooltip="Align Center"
-              aria-label="Align center"
+              data-tooltip={t("inspector.alignCenter")}
+              aria-label={t("inspector.alignCenter")}
               aria-pressed={selectedBubble.alignment === "center"}
             >
               <AlignCenter size={13} />
@@ -122,8 +124,8 @@ export function InspectorStyleSection({
             <button
               className={`align-btn ${selectedBubble.alignment === "right" ? "active" : ""}`}
               onClick={() => updateBubbleField("alignment", "right")}
-              data-tooltip="Align Right"
-              aria-label="Align right"
+              data-tooltip={t("inspector.alignRight")}
+              aria-label={t("inspector.alignRight")}
               aria-pressed={selectedBubble.alignment === "right"}
             >
               <AlignRight size={13} />
@@ -133,7 +135,7 @@ export function InspectorStyleSection({
       </div>
 
       <div className="form-row">
-        <label className="form-label">Text Color</label>
+        <label className="form-label">{t("inspector.textColor")}</label>
         <div className="form-control-right color-picker-row">
           <input
             type="color"
@@ -147,7 +149,7 @@ export function InspectorStyleSection({
       </div>
 
       <div className="form-row border-top-row">
-        <label className="form-label">Category</label>
+        <label className="form-label">{t("inspector.category")}</label>
         <div className="form-control-right text-right">
           <span className="text-class-badge">{selectedBubble.text_class || "unknown"}</span>
         </div>

@@ -408,24 +408,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {localSettings.translation_provider === "google" && (
                       <div className="provider-info-block">
                         <HelpCircle className="info-icon" size={16} />
-                        <p>Google Translate uses a public web-scraping translator API. No credential setup is required. Requires an active internet connection.</p>
+                        <p>{t("settings.googleProviderInfo")}</p>
                       </div>
                     )}
 
                     {/* DEEPL */}
                     {localSettings.translation_provider === "deepl" && (
                       <div className="form-row-group stack">
-                        <label className="pref-label">DeepL API Authentication Key</label>
+                        <label className="pref-label">{t("settings.deeplApiKey")}</label>
                         <input
                           type="password"
                           className="apple-input-text full text-left"
-                          placeholder="Paste your DeepL API key here..."
+                          placeholder={t("settings.deeplApiKeyPlaceholder")}
                           value={localSettings.translation_api_key}
                           onChange={(e) => handleChange("translation_api_key", e.target.value)}
                           onBlur={() => onSave(localSettings)}
                           onKeyDown={handleKeyDown}
                         />
-                        <span className="pref-help-text">Free API Keys typically end with <code>:fx</code>.</span>
+                        <span className="pref-help-text">{t("settings.deeplApiKeyHelp")}</span>
                       </div>
                     )}
 
@@ -433,7 +433,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {localSettings.translation_provider === "openai" && (
                       <>
                         <div className="form-row-group stack">
-                          <label className="pref-label">OpenAI API Key</label>
+                          <label className="pref-label">{t("settings.openaiApiKey")}</label>
                           <input
                             type="password"
                             className="apple-input-text full text-left"
@@ -452,7 +452,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {localSettings.translation_provider === "claude" && (
                       <>
                         <div className="form-row-group stack">
-                          <label className="pref-label">Anthropic Claude API Key</label>
+                          <label className="pref-label">{t("settings.claudeApiKey")}</label>
                           <input
                             type="password"
                             className="apple-input-text full text-left"
@@ -471,11 +471,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {localSettings.translation_provider === "papago" && (
                       <>
                         <div className="form-row-group stack">
-                          <label className="pref-label">Papago Client ID</label>
+                          <label className="pref-label">{t("settings.papagoClientId")}</label>
                           <input
                             type="text"
                             className="apple-input-text full text-left"
-                            placeholder="Naver Cloud Platform Client ID..."
+                            placeholder={t("settings.papagoClientIdPlaceholder")}
                             value={localSettings.translation_api_base_url}
                             onChange={(e) => handleChange("translation_api_base_url", e.target.value)}
                             onBlur={() => onSave(localSettings)}
@@ -483,11 +483,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           />
                         </div>
                         <div className="form-row-group stack">
-                          <label className="pref-label">Papago Client Secret</label>
+                          <label className="pref-label">{t("settings.papagoClientSecret")}</label>
                           <input
                             type="password"
                             className="apple-input-text full text-left"
-                            placeholder="Naver Cloud Platform Client Secret..."
+                            placeholder={t("settings.papagoClientSecretPlaceholder")}
                             value={localSettings.translation_api_key}
                             onChange={(e) => handleChange("translation_api_key", e.target.value)}
                             onBlur={() => onSave(localSettings)}
@@ -501,11 +501,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {localSettings.translation_provider === "baidu" && (
                       <>
                         <div className="form-row-group stack">
-                          <label className="pref-label">Baidu APP ID</label>
+                          <label className="pref-label">{t("settings.baiduAppId")}</label>
                           <input
                             type="text"
                             className="apple-input-text full text-left"
-                            placeholder="Baidu Translation Portal APP ID..."
+                            placeholder={t("settings.baiduAppIdPlaceholder")}
                             value={localSettings.translation_api_base_url}
                             onChange={(e) => handleChange("translation_api_base_url", e.target.value)}
                             onBlur={() => onSave(localSettings)}
@@ -513,11 +513,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           />
                         </div>
                         <div className="form-row-group stack">
-                          <label className="pref-label">Baidu Secret Key</label>
+                          <label className="pref-label">{t("settings.baiduSecretKey")}</label>
                           <input
                             type="password"
                             className="apple-input-text full text-left"
-                            placeholder="Baidu Translation Portal Secret Key..."
+                            placeholder={t("settings.baiduSecretKeyPlaceholder")}
                             value={localSettings.translation_api_key}
                             onChange={(e) => handleChange("translation_api_key", e.target.value)}
                             onBlur={() => onSave(localSettings)}
@@ -532,7 +532,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <>
                         <div className="provider-info-block">
                           <HelpCircle className="info-icon" size={16} />
-                          <p>Connects to your local Ollama daemon at http://127.0.0.1:11434. Make sure Ollama is running, then pick a model below.</p>
+                          <p>{t("settings.ollamaProviderInfo")}</p>
                         </div>
                         {renderModelSelector()}
                       </>
@@ -542,7 +542,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {localSettings.translation_provider === "openai_compatible" && (
                       <>
                         <div className="form-row-group stack">
-                          <label className="pref-label">API Base URL</label>
+                          <label className="pref-label">{t("settings.apiBaseUrl")}</label>
                           <input
                             type="text"
                             className="apple-input-text full text-left"
@@ -555,11 +555,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
                         {renderModelSelector(true)}
                         <div className="form-row-group stack">
-                          <label className="pref-label">API Key (Optional)</label>
+                          <label className="pref-label">{t("settings.apiKeyOptional")}</label>
                           <input
                             type="password"
                             className="apple-input-text full text-left"
-                            placeholder="Optional custom LLM API key..."
+                            placeholder={t("settings.optionalApiKeyPlaceholder")}
                             value={localSettings.translation_api_key}
                             onChange={(e) => handleChange("translation_api_key", e.target.value)}
                             onBlur={() => onSave(localSettings)}
@@ -578,7 +578,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             checked={localSettings.translation_supports_vision}
                             onChange={(e) => handleAutoSave("translation_supports_vision", e.target.checked)}
                           />
-                          <span>Send page image for visual context (turn off for text-only models, e.g. llama.cpp without mmproj)</span>
+                          <span>{t("settings.visionContext")}</span>
                         </label>
                       </div>
                     )}
@@ -586,13 +586,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {/* SYSTEM PROMPT (Applicable to LLMs) */}
                     {["ollama", "openai_compatible", "openai", "claude"].includes(localSettings.translation_provider) && (
                       <div className="form-row-group stack" style={{ marginTop: "12px", borderTop: "1px solid var(--border-color)", paddingTop: "12px" }}>
-                        <label className="pref-label">System Prompt Override</label>
+                        <label className="pref-label">{t("settings.systemPromptOverride")}</label>
                         <textarea
                           className="apple-textarea-pref"
                           value={localSettings.system_prompt}
                           onChange={(e) => handleChange("system_prompt", e.target.value)}
                           onBlur={() => onSave(localSettings)}
-                          placeholder="Enter custom context guidelines for the LLM translation engine..."
+                          placeholder={t("settings.systemPromptPlaceholder")}
                         />
                       </div>
                     )}
@@ -603,7 +603,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* DETECTION TAB */}
               {activeTab === "detection" && (
                 <div className="settings-section">
-                  <div className="section-title-label">Recognition Rules</div>
+                  <div className="section-title-label">{t("settings.recognitionRules")}</div>
                   <div className="settings-card">
                     <div className="form-row-group checkbox-row">
                       <label className="checkbox-label">
@@ -612,7 +612,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           checked={localSettings.tiling_enabled}
                           onChange={(e) => handleAutoSave("tiling_enabled", e.target.checked)}
                         />
-                        <span>Tiling Enabled (Increases detection quality for small bubbles)</span>
+                        <span>{t("settings.tilingEnabled")}</span>
                       </label>
                     </div>
 
@@ -623,15 +623,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           checked={localSettings.bubbles_only}
                           onChange={(e) => handleAutoSave("bubbles_only", e.target.checked)}
                         />
-                        <span>Speech Bubbles Only (Ignore free-floating sfx text)</span>
+                        <span>{t("settings.bubblesOnly")}</span>
                       </label>
                     </div>
                   </div>
 
-                  <div className="section-title-label">Confidence Tolerances</div>
+                  <div className="section-title-label">{t("settings.confidenceTolerances")}</div>
                   <div className="settings-card">
                     <div className="form-row-group">
-                      <label className="pref-label">Confidence Threshold</label>
+                      <label className="pref-label">{t("settings.confidenceThreshold")}</label>
                       <div className="pref-control-right flex-align">
                         <input
                           type="range"
@@ -652,7 +652,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* INPAINTING TAB */}
               {activeTab === "inpainting" && (
                 <div className="settings-section">
-                  <div className="section-title-label">Inpainting Options</div>
+                  <div className="section-title-label">{t("settings.inpaintingOptions")}</div>
                   <div className="settings-card">
                     <div className="form-row-group checkbox-row">
                       <label className="checkbox-label">
@@ -661,7 +661,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           checked={localSettings.inpaint_use_textbox_only}
                           onChange={(e) => handleAutoSave("inpaint_use_textbox_only", e.target.checked)}
                         />
-                        <span>Clean Text Box Areas Only (Recommended)</span>
+                        <span>{t("settings.cleanTextboxOnly")}</span>
                       </label>
                     </div>
 
@@ -672,15 +672,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           checked={localSettings.inpaint_clip_to_bubble}
                           onChange={(e) => handleAutoSave("inpaint_clip_to_bubble", e.target.checked)}
                         />
-                        <span>Clip Inpainting Mask to speech bubble stroke edges</span>
+                        <span>{t("settings.clipInpaintingMask")}</span>
                       </label>
                     </div>
                   </div>
 
-                  <div className="section-title-label">Mask tolerances</div>
+                  <div className="section-title-label">{t("settings.maskTolerances")}</div>
                   <div className="settings-card">
                     <div className="form-row-group">
-                      <label className="pref-label">Mask Dilation (Expansion)</label>
+                      <label className="pref-label">{t("settings.maskDilation")}</label>
                       <div className="pref-control-right flex-align">
                         <input
                           type="range"

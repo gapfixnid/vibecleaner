@@ -126,6 +126,7 @@ interface SidebarProps {
   backendUrl: string;
   /** Image version per page — bumps when the underlying image changes. */
   pageVersions: Record<number, number>;
+  t?: (key: string) => string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -145,6 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSaveImages,
   backendUrl,
   pageVersions,
+  t = (key) => key,
 }) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const pagesListRef = useRef<HTMLDivElement>(null);
@@ -282,17 +284,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="sidebar-title">
               <Layers size={14} className="title-icon" />
               <div className="sidebar-title-copy">
-                <span className="sidebar-title-main">Pages</span>
-                <span className="sidebar-title-sub">{pages.length} added</span>
+                <span className="sidebar-title-main">{t("sidebar.pages")}</span>
+                <span className="sidebar-title-sub">{t("sidebar.addedCount").replace("{count}", String(pages.length))}</span>
               </div>
             </div>
             <div className="sidebar-header-actions">
               <button
                 type="button"
                 className="pages-add-btn"
-                data-tooltip="Add Images"
+                data-tooltip={t("toolbar.addImages")}
                 data-tooltip-pos="sidebar-action"
-                aria-label="Add Images"
+                aria-label={t("toolbar.addImages")}
                 onClick={onImportImages}
               >
                 <Plus size={14} />
@@ -301,9 +303,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 className="pages-add-btn"
-                data-tooltip="Save Images"
+                data-tooltip={t("sidebar.saveImages")}
                 data-tooltip-pos="sidebar-action"
-                aria-label="Save Selected Images"
+                aria-label={t("sidebar.saveSelectedImages")}
                 disabled={selectedPageIds.length === 0}
                 onClick={onExportSelectedImages}
               >
@@ -318,7 +320,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <input
                 type="text"
                 className="search-input"
-                placeholder="Filter pages..."
+                placeholder={t("sidebar.filterPages")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -332,8 +334,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="empty-pages-icon" aria-hidden="true">
                     <Layers size={18} />
                   </div>
-                  <p className="empty-pages-title">No matching pages</p>
-                  <p className="empty-pages-copy">Try a different filename filter.</p>
+                  <p className="empty-pages-title">{t("sidebar.noMatchingPages")}</p>
+                  <p className="empty-pages-copy">{t("sidebar.differentFilter")}</p>
                 </div>
               ) : (
                 <div className="pages-virtual-spacer" style={{ height: `${filteredPages.length * PAGE_ROW_HEIGHT}px` }}>
@@ -432,30 +434,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {!isMulti && (
                     <button onClick={() => { startRename(pageIndex); setContextMenu(null); }}>
                       <Pencil size={12} />
-                      <span>Rename</span>
+                      <span>{t("sidebar.rename")}</span>
                     </button>
                   )}
                   <button onClick={() => { onDuplicatePage(pageIndex); setContextMenu(null); }}>
                     <Copy size={12} />
-                    <span>Duplicate</span>
+                    <span>{t("sidebar.duplicate")}</span>
                   </button>
                   <button className="danger" onClick={() => { onDeletePage(pageIndex); setContextMenu(null); }}>
                     <Trash2 size={12} />
-                    <span>Delete</span>
+                    <span>{t("sidebar.delete")}</span>
                   </button>
                   <div className="sidebar-context-menu-separator" />
                   <button onClick={() => { onTranslatePages(pageIndex); setContextMenu(null); }}>
                     <Languages size={12} />
-                    <span>{isMulti ? "Translate Pages" : "Translate Page"}</span>
+                    <span>{isMulti ? t("sidebar.translatePages") : t("sidebar.translatePage")}</span>
                   </button>
                   <button onClick={() => { onSaveImages(pageIndex); setContextMenu(null); }}>
                     <Download size={12} />
-                    <span>{isMulti ? "Save Images…" : "Save Image…"}</span>
+                    <span>{isMulti ? t("sidebar.saveImagesEllipsis") : t("sidebar.saveImageEllipsis")}</span>
                   </button>
                   <div className="sidebar-context-menu-separator" />
                   <button onClick={() => { onSelectAllPages(); setContextMenu(null); }}>
                     <CheckSquare size={12} />
-                    <span>Select All</span>
+                    <span>{t("sidebar.selectAll")}</span>
                   </button>
                 </div>
               );
@@ -465,10 +467,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </>
       ) : (
         <div className="empty-pages sidebar-empty-only" role="status">
-          <p className="empty-pages-title">No images loaded</p>
+          <p className="empty-pages-title">{t("sidebar.noImagesLoaded")}</p>
           <button type="button" className="empty-pages-action" onClick={onImportImages}>
             <Plus size={13} />
-            <span>Add Images</span>
+            <span>{t("toolbar.addImages")}</span>
           </button>
         </div>
       )}

@@ -21,6 +21,7 @@ interface InspectorProps {
   onReTranslateBubble: (id: number) => void;
   isProcessing: boolean;
   isMultiPageSelection?: boolean;
+  t?: (key: string) => string;
 }
 
 export const Inspector: React.FC<InspectorProps> = ({
@@ -31,6 +32,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   onReTranslateBubble,
   isProcessing,
   isMultiPageSelection,
+  t = (key) => key,
 }) => {
   const [activeTab, setActiveTab] = useState<"text" | "style">("text");
   const {
@@ -51,18 +53,18 @@ export const Inspector: React.FC<InspectorProps> = ({
   });
 
   if (isMultiPageSelection) {
-    return <InspectorEmptyState variant="multi-select" />;
+    return <InspectorEmptyState variant="multi-select" t={t} />;
   }
 
   if (!selectedBubble) {
-    return <InspectorEmptyState variant="no-selection" />;
+    return <InspectorEmptyState variant="no-selection" t={t} />;
   }
 
   return (
     <aside className="inspector-container">
       <div className="inspector-header">
         <Baseline size={14} className="header-icon" />
-        <span>Inspector — Bubble #{selectedBubble.id}</span>
+        <span>{t("inspector.header").replace("{id}", String(selectedBubble.id))}</span>
       </div>
 
       <div className="inspector-segmented-control">
@@ -71,14 +73,14 @@ export const Inspector: React.FC<InspectorProps> = ({
           onClick={() => setActiveTab("text")}
         >
           <Type size={12} />
-          <span>Text</span>
+          <span>{t("inspector.text")}</span>
         </button>
         <button 
           className={`segment-btn ${activeTab === "style" ? "active" : ""}`}
           onClick={() => setActiveTab("style")}
         >
           <Sparkles size={12} />
-          <span>Style</span>
+          <span>{t("inspector.style")}</span>
         </button>
       </div>
 
@@ -95,6 +97,7 @@ export const Inspector: React.FC<InspectorProps> = ({
             onSaveTextEdits={saveTextEdits}
             onReOcrBubble={onReOcrBubble}
             onReTranslateBubble={onReTranslateBubble}
+            t={t}
           />
         ) : (
           <InspectorStyleSection
@@ -105,9 +108,10 @@ export const Inspector: React.FC<InspectorProps> = ({
             setFontSizeDraft={setFontSizeDraft}
             setColorDraft={setColorDraft}
             updateBubbleField={updateBubbleField}
+            t={t}
           />
         )}
-        <InspectorProblemsSection selectedBubble={selectedBubble} />
+        <InspectorProblemsSection selectedBubble={selectedBubble} t={t} />
       </div>
     </aside>
   );

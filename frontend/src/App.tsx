@@ -201,6 +201,7 @@ function App() {
           onTranslatePages={handleContextTranslate}
           onSaveImages={handleContextSaveImages}
           backendUrl={currentBackendUrl}
+          t={t}
         />
 
         <Canvas
@@ -232,6 +233,7 @@ function App() {
           onReTranslateBubble={bubblesApi.handleReTranslateBubble}
           isProcessing={isProcessing}
           isMultiPageSelection={isMultiPageSelection}
+          t={t}
         />
       </div>
 

@@ -34,10 +34,19 @@ assert.equal(normalizeUiLanguage(undefined), "en");
 const korean = createTranslator("ko");
 assert.equal(korean("toolbar.translate"), "번역");
 assert.equal(korean("settings.uiLanguage"), "UI 언어");
+assert.equal(korean("sidebar.pages"), "페이지");
+assert.equal(korean("sidebar.filterPages"), "페이지 필터...");
+assert.equal(korean("inspector.typographyDesign"), "타이포그래피 및 디자인");
+assert.equal(korean("inspector.noSelection"), "선택 없음");
+assert.equal(korean("settings.recognitionRules"), "인식 규칙");
+assert.equal(korean("settings.inpaintingOptions"), "인페인팅 옵션");
 
 const english = createTranslator("en");
 assert.equal(english("toolbar.translate"), "Translate");
 assert.equal(english("settings.uiLanguage"), "UI Language");
+assert.equal(english("sidebar.pages"), "Pages");
+assert.equal(english("inspector.noSelection"), "No Selection");
+assert.equal(english("settings.recognitionRules"), "Recognition Rules");
 
 const fallback = createTranslator("ko");
 assert.equal(fallback("missing.key"), "missing.key");

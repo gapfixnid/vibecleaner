@@ -2,9 +2,10 @@ import { Baseline, Layers } from "lucide-react";
 
 interface InspectorEmptyStateProps {
   variant: "no-selection" | "multi-select";
+  t?: (key: string) => string;
 }
 
-export function InspectorEmptyState({ variant }: InspectorEmptyStateProps) {
+export function InspectorEmptyState({ variant, t = (key) => key }: InspectorEmptyStateProps) {
   const isMultiSelect = variant === "multi-select";
   const Icon = isMultiSelect ? Layers : Baseline;
 
@@ -14,11 +15,11 @@ export function InspectorEmptyState({ variant }: InspectorEmptyStateProps) {
         <Icon size={36} className="empty-icon" />
         <div className="glow-effect" />
       </div>
-      <h3 className="empty-title">{isMultiSelect ? "Multiple Pages Selected" : "No Selection"}</h3>
+      <h3 className="empty-title">{isMultiSelect ? t("inspector.multiSelect") : t("inspector.noSelection")}</h3>
       <p className="empty-desc">
         {isMultiSelect
-          ? "Select a single page to edit bubbles."
-          : "Select a speech bubble on the canvas to inspect and edit its properties."}
+          ? t("inspector.multiSelectDesc")
+          : t("inspector.noSelectionDesc")}
       </p>
       <style>{`
         .inspector-container.empty {
