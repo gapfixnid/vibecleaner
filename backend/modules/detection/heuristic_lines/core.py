@@ -76,10 +76,21 @@ def _detect_lines_and_direction_in_crop(
     mask_stats = _compute_mask_stats(text_mask)
 
     from modules.config import config
-    smart_direction = getattr(config, "SMART_DIRECTION", True)
+    direction_override = str(getattr(config, "text_direction_override", "auto") or "auto").strip().lower()
+    smart_direction = getattr(config, "smart_direction", True)
 
     from .skew import _filter_noise_lines
-    if not smart_direction:
+    component_vertical_lines: list[list[int]] = []
+    if direction_override in {"horizontal", "vertical"}:
+        direction = direction_override
+        if direction == "horizontal":
+            horizontal_lines = _detect_horizontal_lines_skew_aware(text_mask)
+            vertical_lines = []
+        else:
+            horizontal_lines = []
+            vertical_lines = _filter_noise_lines(_detect_lines_from_mask(text_mask, "vertical"), "vertical")
+            component_vertical_lines = _detect_sparse_vertical_component_columns(text_mask, component_boxes=mask_stats.component_boxes)
+    elif not smart_direction:
         direction = "horizontal"
         horizontal_lines = _detect_horizontal_lines_skew_aware(text_mask)
         vertical_lines = []

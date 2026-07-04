@@ -22,6 +22,14 @@ export interface SettingsDto {
   detect_model: string;
   confidence_threshold: number;
   tiling_enabled: boolean;
+  ocr_engine: string;
+  ocr_padding: number;
+  ocr_crop_scale: number;
+  line_merge_sensitivity: number;
+  adaptive_binarization: boolean;
+  adaptive_binarization_strength: number;
+  smart_direction: boolean;
+  text_direction_override: string;
   bubbles_only: boolean;
   min_font_size: number;
   max_font_size: number;

@@ -164,6 +164,8 @@ body {
 .number-stepper {
   display: inline-flex;
   align-items: stretch;
+  width: 94px;
+  min-width: 94px;
   background: var(--field-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -177,7 +179,8 @@ body {
 }
 
 .number-stepper-input {
-  width: 56px;
+  flex: 1;
+  min-width: 0;
   border: none;
   background: transparent;
   color: var(--text-primary);
@@ -191,7 +194,8 @@ body {
 .number-stepper-unit {
   display: flex;
   align-items: center;
-  padding-right: var(--space-3);
+  width: 18px;
+  justify-content: center;
   color: var(--text-secondary);
   font-size: 12px;
   pointer-events: none;

@@ -52,10 +52,10 @@ class RTDetrV2ONNXDetection(DetectionEngine):
         self.confidence_threshold = confidence_threshold
 
         from modules.config import config
-        model_name = getattr(config, "DETECT_MODEL", "Small (INT8) [기본값]")
+        model_name = getattr(config, "detect_model", "High Precision (FP32)")
         self.current_loaded_model = model_name
 
-        if model_name == "Small (INT8) [기본값]":
+        if model_name in {"Small (INT8)", "Small (INT8) [기본값]"}:
             model_id = ModelID.RTDETR_INT8_ONNX
             filename = 'detector-v4-s_int8.onnx'
         else:
@@ -69,15 +69,15 @@ class RTDetrV2ONNXDetection(DetectionEngine):
 
     def detect(self, image: np.ndarray) -> list[TextBlock]:
         from modules.config import config
-        model_name = getattr(config, "DETECT_MODEL", "Small (INT8) [기본값]")
+        model_name = getattr(config, "detect_model", "High Precision (FP32)")
         if getattr(self, "current_loaded_model", None) != model_name:
             self.initialize(device=self.device, confidence_threshold=self.confidence_threshold)
 
         # Synchronize confidence threshold from global config
-        self.confidence_threshold = getattr(config, "CONFIDENCE_THRESHOLD", self.confidence_threshold)
+        self.confidence_threshold = getattr(config, "confidence_threshold", self.confidence_threshold)
 
         # Check if tiling is enabled
-        tiling_enabled = getattr(config, "TILING_ENABLED", True)
+        tiling_enabled = getattr(config, "tiling_enabled", True)
         if not tiling_enabled:
             bubble_boxes, text_boxes = self._detect_single_image(image)
         else:

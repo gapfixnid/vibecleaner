@@ -54,8 +54,10 @@ class MangaOCRMobileONNXEngine(OCREngine):
 
     def process_image(self, img: np.ndarray, blk_list: list[TextBlock]) -> list[TextBlock]:
         from modules.config import config
-        base_padding = getattr(config, "OCR_PADDING", 8)
-        adaptive_bin = getattr(config, "ADAPTIVE_BINARIZATION", True)
+        base_padding = getattr(config, "ocr_padding", 8)
+        crop_scale = float(getattr(config, "ocr_crop_scale", 1.0) or 1.0)
+        crop_scale = max(0.5, min(3.0, crop_scale))
+        adaptive_bin = getattr(config, "adaptive_binarization", True)
 
         crops: list[np.ndarray] = []
         crop_indices: list[int] = []
@@ -81,6 +83,7 @@ class MangaOCRMobileONNXEngine(OCREngine):
                 padding = base_padding + 4  # small text
             else:
                 padding = base_padding
+            padding = int(round(padding * crop_scale))
 
             x1 = max(0, x1 - padding)
             y1 = max(0, y1 - padding)

@@ -192,10 +192,29 @@ export type TranslationKey =
   | "settings.maxTokens"
   | "settings.llmOptionsHelp"
   | "settings.recognitionRules"
+  | "settings.detectionModel"
+  | "settings.modelHighPrecision"
+  | "settings.modelSmall"
   | "settings.tilingEnabled"
   | "settings.bubblesOnly"
   | "settings.confidenceTolerances"
   | "settings.confidenceThreshold"
+  | "settings.ocrOptions"
+  | "settings.ocrEngine"
+  | "settings.ocrEngineAuto"
+  | "settings.ocrEngineManga"
+  | "settings.ocrEnginePpocr"
+  | "settings.ocrPadding"
+  | "settings.ocrCropScale"
+  | "settings.adaptiveBinarization"
+  | "settings.adaptiveBinarizationStrength"
+  | "settings.directionOptions"
+  | "settings.smartDirection"
+  | "settings.directionOverride"
+  | "settings.directionAuto"
+  | "settings.directionHorizontal"
+  | "settings.directionVertical"
+  | "settings.lineMergeSensitivity"
   | "settings.inpaintingOptions"
   | "settings.cleanTextboxOnly"
   | "settings.clipInpaintingMask"
@@ -393,10 +412,29 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.maxTokens": "Max Output Tokens",
     "settings.llmOptionsHelp": "Defaults favor stable comic dialogue and valid JSON output. Higher values can sound more varied but may be less consistent.",
     "settings.recognitionRules": "Recognition Rules",
+    "settings.detectionModel": "Detection Model",
+    "settings.modelHighPrecision": "High Precision (FP32)",
+    "settings.modelSmall": "Small (INT8)",
     "settings.tilingEnabled": "Tiling Enabled (Increases detection quality for small bubbles)",
     "settings.bubblesOnly": "Speech Bubbles Only (Ignore free-floating sfx text)",
     "settings.confidenceTolerances": "Confidence Tolerances",
     "settings.confidenceThreshold": "Confidence Threshold",
+    "settings.ocrOptions": "OCR Options",
+    "settings.ocrEngine": "OCR Engine",
+    "settings.ocrEngineAuto": "Auto by source language",
+    "settings.ocrEngineManga": "Manga OCR Mobile",
+    "settings.ocrEnginePpocr": "PPOCR v5",
+    "settings.ocrPadding": "Crop Padding",
+    "settings.ocrCropScale": "Crop Scale",
+    "settings.adaptiveBinarization": "Adaptive Binarization",
+    "settings.adaptiveBinarizationStrength": "Binarization Strength",
+    "settings.directionOptions": "Text Direction",
+    "settings.smartDirection": "Smart Direction Detection",
+    "settings.directionOverride": "Direction Override",
+    "settings.directionAuto": "Auto",
+    "settings.directionHorizontal": "Horizontal",
+    "settings.directionVertical": "Vertical",
+    "settings.lineMergeSensitivity": "Line Merge Sensitivity",
     "settings.inpaintingOptions": "Inpainting Options",
     "settings.cleanTextboxOnly": "Clean Text Box Areas Only (Recommended)",
     "settings.clipInpaintingMask": "Clip Inpainting Mask to speech bubble stroke edges",
@@ -593,10 +631,29 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.maxTokens": "최대 출력 토큰",
     "settings.llmOptionsHelp": "기본값은 안정적인 만화 대사와 올바른 JSON 출력을 우선합니다. 값을 높이면 표현은 다양해질 수 있지만 일관성은 낮아질 수 있습니다.",
     "settings.recognitionRules": "인식 규칙",
+    "settings.detectionModel": "감지 모델",
+    "settings.modelHighPrecision": "고정밀(FP32)",
+    "settings.modelSmall": "소형(INT8)",
     "settings.tilingEnabled": "타일링 활성화(작은 말풍선 감지 품질 향상)",
     "settings.bubblesOnly": "말풍선만 처리(떠 있는 효과음 텍스트 무시)",
     "settings.confidenceTolerances": "신뢰도 허용값",
     "settings.confidenceThreshold": "신뢰도 기준",
+    "settings.ocrOptions": "OCR 옵션",
+    "settings.ocrEngine": "OCR 엔진",
+    "settings.ocrEngineAuto": "원본 언어에 맞춰 자동 선택",
+    "settings.ocrEngineManga": "Manga OCR Mobile",
+    "settings.ocrEnginePpocr": "PPOCR v5",
+    "settings.ocrPadding": "Crop 여백",
+    "settings.ocrCropScale": "Crop 배율",
+    "settings.adaptiveBinarization": "적응형 이진화",
+    "settings.adaptiveBinarizationStrength": "이진화 강도",
+    "settings.directionOptions": "텍스트 방향",
+    "settings.smartDirection": "방향 자동 판정",
+    "settings.directionOverride": "방향 재정의",
+    "settings.directionAuto": "자동",
+    "settings.directionHorizontal": "가로",
+    "settings.directionVertical": "세로",
+    "settings.lineMergeSensitivity": "줄 병합 감도",
     "settings.inpaintingOptions": "인페인팅 옵션",
     "settings.cleanTextboxOnly": "텍스트 박스 영역만 지우기(권장)",
     "settings.clipInpaintingMask": "인페인팅 마스크를 말풍선 테두리 안쪽으로 제한",

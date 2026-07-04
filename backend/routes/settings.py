@@ -30,6 +30,14 @@ class SettingsSchema(BaseModel):
     detect_model: str
     confidence_threshold: float
     tiling_enabled: bool
+    ocr_engine: str = "auto"
+    ocr_padding: int = 8
+    ocr_crop_scale: float = 1.5
+    line_merge_sensitivity: float = 1.2
+    adaptive_binarization: bool = True
+    adaptive_binarization_strength: float = 2.0
+    smart_direction: bool = True
+    text_direction_override: str = "auto"
     bubbles_only: bool
     min_font_size: float
     max_font_size: float
@@ -62,6 +70,14 @@ def get_settings():
         "detect_model": config.detect_model,
         "confidence_threshold": config.confidence_threshold,
         "tiling_enabled": config.tiling_enabled,
+        "ocr_engine": config.ocr_engine,
+        "ocr_padding": config.ocr_padding,
+        "ocr_crop_scale": config.ocr_crop_scale,
+        "line_merge_sensitivity": config.line_merge_sensitivity,
+        "adaptive_binarization": config.adaptive_binarization,
+        "adaptive_binarization_strength": config.adaptive_binarization_strength,
+        "smart_direction": config.smart_direction,
+        "text_direction_override": config.text_direction_override,
         "bubbles_only": config.bubbles_only,
         "min_font_size": config.min_font_size,
         "max_font_size": config.max_font_size,
@@ -96,6 +112,14 @@ def update_settings(settings: SettingsSchema):
     config.detect_model = settings.detect_model
     config.confidence_threshold = settings.confidence_threshold
     config.tiling_enabled = settings.tiling_enabled
+    config.ocr_engine = settings.ocr_engine
+    config.ocr_padding = settings.ocr_padding
+    config.ocr_crop_scale = settings.ocr_crop_scale
+    config.line_merge_sensitivity = settings.line_merge_sensitivity
+    config.adaptive_binarization = settings.adaptive_binarization
+    config.adaptive_binarization_strength = settings.adaptive_binarization_strength
+    config.smart_direction = settings.smart_direction
+    config.text_direction_override = settings.text_direction_override
     config.bubbles_only = settings.bubbles_only
     config.min_font_size = settings.min_font_size
     config.max_font_size = settings.max_font_size

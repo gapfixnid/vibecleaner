@@ -146,11 +146,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     min: number,
     max: number,
     step: number,
+    formatValue: (value: number) => string = (v) => String(v),
   ) => (
     <div className="form-row-group stack">
       <div className="flex-space-between">
         <label className="pref-label">{label}</label>
-        <span className="pref-value-pill">{value}</span>
+        <span className="pref-value-pill">{formatValue(value)}</span>
       </div>
       <input
         type="range"
@@ -326,28 +327,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                     </div>
                     <div
-                      className="theme-swatch-grid"
+                      className="form-row-group"
                       role="radiogroup"
                       aria-label={t("settings.theme")}
                     >
-                      {themes.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          role="radio"
-                          aria-checked={theme === t.id}
-                          aria-label={t.label}
-                          className={`theme-swatch ${theme === t.id ? "selected" : ""}`}
-                          onClick={() => setTheme(t.id)}
-                        >
-                          <span className="theme-preview" style={{ background: t.preview.body }}>
-                            <span className="theme-preview-bar" style={{ background: t.preview.bar }} />
-                            <span className="theme-preview-panel" style={{ background: t.preview.panel }} />
-                            <span className="theme-preview-accent" style={{ background: t.preview.accent }} />
-                          </span>
-                          <span className="theme-swatch-label">{t.label}</span>
-                        </button>
-                      ))}
+                      <label className="pref-label">{t("settings.theme")}</label>
+                      <div className="pref-control-right">
+                        <div className="theme-segmented">
+                          {themes.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              role="radio"
+                              aria-checked={theme === item.id}
+                              aria-label={item.label}
+                              className={`theme-segment ${theme === item.id ? "selected" : ""}`}
+                              onClick={() => setTheme(item.id)}
+                            >
+                              <span className="theme-dot" style={{ background: item.preview.accent }} />
+                              <span>{item.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -389,7 +391,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           min={0}
                           max={30}
                           step={1}
-                          unit="s"
                           onChange={(v) => handleAutoSave("translation_retry_backoff_seconds", v)}
                         />
                       </div>
@@ -725,6 +726,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="settings-section">
                   <div className="section-title-label">{t("settings.recognitionRules")}</div>
                   <div className="settings-card">
+                    <div className="form-row-group">
+                      <label className="pref-label">{t("settings.detectionModel")}</label>
+                      <div className="pref-control-right">
+                        <AppleSelect
+                          value={localSettings.detect_model}
+                          onChange={(v) => handleAutoSave("detect_model", v)}
+                          options={[
+                            { value: "High Precision (FP32)", label: t("settings.modelHighPrecision") },
+                            { value: "Small (INT8)", label: t("settings.modelSmall") },
+                          ]}
+                        />
+                      </div>
+                    </div>
+
                     <div className="form-row-group checkbox-row">
                       <label className="checkbox-label">
                         <input
@@ -746,6 +761,102 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <span>{t("settings.bubblesOnly")}</span>
                       </label>
                     </div>
+                  </div>
+
+                  <div className="section-title-label">{t("settings.ocrOptions")}</div>
+                  <div className="settings-card">
+                    <div className="form-row-group">
+                      <label className="pref-label">{t("settings.ocrEngine")}</label>
+                      <div className="pref-control-right">
+                        <AppleSelect
+                          value={localSettings.ocr_engine}
+                          onChange={(v) => handleAutoSave("ocr_engine", v)}
+                          options={[
+                            { value: "auto", label: t("settings.ocrEngineAuto") },
+                            { value: "manga_ocr", label: t("settings.ocrEngineManga") },
+                            { value: "ppocr", label: t("settings.ocrEnginePpocr") },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-row-group">
+                      <label className="pref-label">{t("settings.ocrPadding")}</label>
+                      <div className="pref-control-right">
+                        <NumberStepper
+                          label={t("settings.ocrPadding")}
+                          value={localSettings.ocr_padding}
+                          min={0}
+                          max={32}
+                          step={1}
+                          onChange={(v) => handleAutoSave("ocr_padding", v)}
+                        />
+                      </div>
+                    </div>
+                    {renderRangeControl(
+                      "ocr_crop_scale",
+                      t("settings.ocrCropScale"),
+                      localSettings.ocr_crop_scale,
+                      0.5,
+                      3,
+                      0.25,
+                      (value) => `${value.toFixed(2)}x`
+                    )}
+                    <div className="form-row-group checkbox-row">
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={localSettings.adaptive_binarization}
+                          onChange={(e) => handleAutoSave("adaptive_binarization", e.target.checked)}
+                        />
+                        <span>{t("settings.adaptiveBinarization")}</span>
+                      </label>
+                    </div>
+                    {localSettings.adaptive_binarization && renderRangeControl(
+                      "adaptive_binarization_strength",
+                      t("settings.adaptiveBinarizationStrength"),
+                      localSettings.adaptive_binarization_strength,
+                      0.5,
+                      5,
+                      0.25,
+                      (value) => value.toFixed(2)
+                    )}
+                  </div>
+
+                  <div className="section-title-label">{t("settings.directionOptions")}</div>
+                  <div className="settings-card">
+                    <div className="form-row-group checkbox-row">
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={localSettings.smart_direction}
+                          onChange={(e) => handleAutoSave("smart_direction", e.target.checked)}
+                        />
+                        <span>{t("settings.smartDirection")}</span>
+                      </label>
+                    </div>
+                    <div className="form-row-group">
+                      <label className="pref-label">{t("settings.directionOverride")}</label>
+                      <div className="pref-control-right">
+                        <AppleSelect
+                          value={localSettings.text_direction_override}
+                          onChange={(v) => handleAutoSave("text_direction_override", v)}
+                          options={[
+                            { value: "auto", label: t("settings.directionAuto") },
+                            { value: "horizontal", label: t("settings.directionHorizontal") },
+                            { value: "vertical", label: t("settings.directionVertical") },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                    {renderRangeControl(
+                      "line_merge_sensitivity",
+                      t("settings.lineMergeSensitivity"),
+                      localSettings.line_merge_sensitivity,
+                      0.5,
+                      2.5,
+                      0.1,
+                      (value) => value.toFixed(1)
+                    )}
                   </div>
 
                   <div className="section-title-label">{t("settings.confidenceTolerances")}</div>
@@ -1173,6 +1284,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         .theme-swatch.selected .theme-swatch-label {
           color: var(--text-primary);
           font-weight: 600;
+        }
+
+        .theme-segmented {
+          display: inline-flex;
+          width: 100%;
+          max-width: 250px;
+          padding: 2px;
+          gap: 2px;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--border-color);
+          background: var(--field-bg);
+        }
+
+        .theme-segment {
+          flex: 1;
+          min-width: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          height: 26px;
+          padding: 0 8px;
+          border: none;
+          border-radius: calc(var(--radius-md) - 2px);
+          background: transparent;
+          color: var(--text-secondary);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .theme-segment:hover {
+          color: var(--text-primary);
+          background: var(--fill-3);
+        }
+
+        .theme-segment.selected {
+          color: var(--text-primary);
+          background: var(--bg-panel);
+          box-shadow: var(--shadow-sm);
+        }
+
+        .theme-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          flex: 0 0 auto;
         }
 
         .model-hint {

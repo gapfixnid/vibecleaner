@@ -65,6 +65,8 @@ assert.equal(korean("sidebar.filterPages"), "페이지 필터...");
 assert.equal(korean("inspector.typographyDesign"), "타이포그래피 및 디자인");
 assert.equal(korean("inspector.noSelection"), "선택 없음");
 assert.equal(korean("settings.recognitionRules"), "인식 규칙");
+assert.equal(korean("settings.ocrEngine"), "OCR 엔진");
+assert.equal(korean("settings.directionOverride"), "방향 재정의");
 assert.equal(korean("settings.inpaintingOptions"), "인페인팅 옵션");
 assert.equal(korean("dialog.cancel"), "취소");
 assert.equal(korean("project.unsavedChanges"), "저장되지 않은 변경사항");
@@ -77,6 +79,8 @@ assert.equal(english("settings.uiLanguage"), "UI Language");
 assert.equal(english("sidebar.pages"), "Pages");
 assert.equal(english("inspector.noSelection"), "No Selection");
 assert.equal(english("settings.recognitionRules"), "Recognition Rules");
+assert.equal(english("settings.ocrEngine"), "OCR Engine");
+assert.equal(english("settings.directionOverride"), "Direction Override");
 assert.equal(english("dialog.cancel"), "Cancel");
 assert.equal(english("export.successTitle"), "Export Successful");
 

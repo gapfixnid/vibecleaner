@@ -81,10 +81,14 @@ class AppConfig:
     bubbles_only: bool = False
 
     # -- OCR ----------------------------------------------------------------
+    ocr_engine: str = "auto"
     ocr_padding: int = 8
+    ocr_crop_scale: float = 1.5
     line_merge_sensitivity: float = 1.2
     adaptive_binarization: bool = True
+    adaptive_binarization_strength: float = 2.0
     smart_direction: bool = True
+    text_direction_override: str = "auto"
 
     # -- Rendering ----------------------------------------------------------
     min_font_size: float = 6.0
@@ -128,6 +132,46 @@ class AppConfig:
     def BUBBLES_ONLY(self, value: bool) -> None:
         self.bubbles_only = value
 
+    @property
+    def OCR_ENGINE(self) -> str:
+        return self.ocr_engine
+
+    @OCR_ENGINE.setter
+    def OCR_ENGINE(self, value: str) -> None:
+        self.ocr_engine = value
+
+    @property
+    def OCR_PADDING(self) -> int:
+        return self.ocr_padding
+
+    @OCR_PADDING.setter
+    def OCR_PADDING(self, value: int) -> None:
+        self.ocr_padding = value
+
+    @property
+    def OCR_CROP_SCALE(self) -> float:
+        return self.ocr_crop_scale
+
+    @OCR_CROP_SCALE.setter
+    def OCR_CROP_SCALE(self, value: float) -> None:
+        self.ocr_crop_scale = value
+
+    @property
+    def ADAPTIVE_BINARIZATION(self) -> bool:
+        return self.adaptive_binarization
+
+    @ADAPTIVE_BINARIZATION.setter
+    def ADAPTIVE_BINARIZATION(self, value: bool) -> None:
+        self.adaptive_binarization = value
+
+    @property
+    def SMART_DIRECTION(self) -> bool:
+        return self.smart_direction
+
+    @SMART_DIRECTION.setter
+    def SMART_DIRECTION(self, value: bool) -> None:
+        self.smart_direction = value
+
     # -----------------------------------------------------------------------
     # Mapping: JSON key → dataclass field name  (round-trip safe)
     # -----------------------------------------------------------------------
@@ -156,10 +200,14 @@ class AppConfig:
             "detect_model": "detect_model",
             "confidence_threshold": "confidence_threshold",
             "tiling_enabled": "tiling_enabled",
+            "ocr_engine": "ocr_engine",
             "ocr_padding": "ocr_padding",
+            "ocr_crop_scale": "ocr_crop_scale",
             "line_merge_sensitivity": "line_merge_sensitivity",
             "adaptive_binarization": "adaptive_binarization",
+            "adaptive_binarization_strength": "adaptive_binarization_strength",
             "smart_direction": "smart_direction",
+            "text_direction_override": "text_direction_override",
             "bubbles_only": "bubbles_only",
             "min_font_size": "min_font_size",
             "max_font_size": "max_font_size",
@@ -240,10 +288,9 @@ class AppConfig:
             else:
                 gray = crop
 
-            # CLAHe: adaptive histogram equalization with contrast limiting.
-            # clipLimit=2.0 amplifies local contrast; tileGridSize=8×8 works
-            # well for typical manga text crops (20–200 px).
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            clip_limit = float(getattr(config, "adaptive_binarization_strength", 2.0))
+            clip_limit = max(0.5, min(5.0, clip_limit))
+            clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(8, 8))
             enhanced = clahe.apply(gray)
 
             thresh = cv2.adaptiveThreshold(
@@ -281,8 +328,9 @@ def __getattr__(name: str) -> Any:
                 "UI_LANGUAGE", "SOURCE_LANGUAGE", "TARGET_LANGUAGE",
                 "DETECT_MODEL", "CONFIDENCE_THRESHOLD",
                 "TILING_ENABLED", "BUBBLES_ONLY",
-                "OCR_PADDING", "LINE_MERGE_SENSITIVITY",
-                "ADAPTIVE_BINARIZATION", "SMART_DIRECTION",
+                "OCR_ENGINE", "OCR_PADDING", "OCR_CROP_SCALE", "LINE_MERGE_SENSITIVITY",
+                "ADAPTIVE_BINARIZATION", "ADAPTIVE_BINARIZATION_STRENGTH",
+                "SMART_DIRECTION", "TEXT_DIRECTION_OVERRIDE",
                 "MIN_FONT_SIZE", "MAX_FONT_SIZE", "DEFAULT_FONT_SIZE",
                 "INPAINT_MASK_DILATION", "INPAINT_USE_TEXTBOX_ONLY",
                 "INPAINT_CLIP_TO_BUBBLE"):

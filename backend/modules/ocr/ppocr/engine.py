@@ -170,7 +170,7 @@ class PPOCRv5Engine(OCREngine):
 		if boxes is None or len(boxes) == 0:
 			return blk_list
 		
-		adaptive_bin = getattr(config, "ADAPTIVE_BINARIZATION", True)
+		adaptive_bin = getattr(config, "adaptive_binarization", True)
 		crops = []
 		for quad in boxes:
 			crop = crop_quad(img, quad.astype(np.float32))
@@ -184,15 +184,17 @@ class PPOCRv5Engine(OCREngine):
 		for quad in boxes:
 			xs = quad[:, 0]
 			ys = quad[:, 1]
-			x1, y1, x2, y2 = int(xs.min()), int(ys.min()), int(xs.max()), int(xs.max())
+			x1, y1, x2, y2 = int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())
 			bboxes.append((x1, y1, x2, y2))
 		return lists_to_blk_list(blk_list, bboxes, texts)
 
 
 def _crop_line(img: np.ndarray, line) -> np.ndarray | None:
 	from modules.config import config
-	base_padding = getattr(config, "OCR_PADDING", 8)
-	adaptive_bin = getattr(config, "ADAPTIVE_BINARIZATION", True)
+	base_padding = getattr(config, "ocr_padding", 8)
+	crop_scale = float(getattr(config, "ocr_crop_scale", 1.0) or 1.0)
+	crop_scale = max(0.5, min(3.0, crop_scale))
+	adaptive_bin = getattr(config, "adaptive_binarization", True)
 
 	arr = np.asarray(line)
 	if arr.ndim == 2 and arr.shape[0] >= 4 and arr.shape[1] == 2:
@@ -213,6 +215,7 @@ def _crop_line(img: np.ndarray, line) -> np.ndarray | None:
 		padding = base_padding + 4  # small text
 	else:
 		padding = base_padding
+	padding = int(round(padding * crop_scale))
 
 	x1 = max(0, x1 - padding)
 	y1 = max(0, y1 - padding)

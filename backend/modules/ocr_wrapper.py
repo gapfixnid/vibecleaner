@@ -23,7 +23,27 @@ class LocalOCR:
         self.settings = DummySettings()
         self.japanese_engine = None
         self.korean_engine = None
+        self.ppocr_engines = {}
         self._lock = threading.Lock()
+
+    def _resolve_engine_name(self) -> str:
+        from modules.config import config
+
+        requested = str(getattr(config, "ocr_engine", "auto") or "auto").strip().lower()
+        if requested in {"manga_ocr", "manga-ocr", "manga", "manga_ocr_mobile"}:
+            return "manga_ocr"
+        if requested in {"ppocr", "paddleocr", "paddle_ocr"}:
+            return "ppocr"
+        if self.lang in ["Japanese", "日本語", "ja"]:
+            return "manga_ocr"
+        return "ppocr"
+
+    def _ppocr_lang_code(self) -> str:
+        if self.lang in ["English", "en"]:
+            return "en"
+        if self.lang in ["Chinese", "zh", "Japanese", "日本語", "ja"]:
+            return "ch"
+        return "ko"
         
     def recognize_text(self, image: np.ndarray, text_blocks: list[TextBlock]) -> list[TextBlock]:
         """
@@ -32,7 +52,8 @@ class LocalOCR:
         if not text_blocks:
             return text_blocks
             
-        if self.lang in ["Japanese", "日本語", "ja"]:
+        engine_name = self._resolve_engine_name()
+        if engine_name == "manga_ocr":
             if self.japanese_engine is None:
                 with self._lock:
                     if self.japanese_engine is None:
@@ -41,15 +62,13 @@ class LocalOCR:
                         self.japanese_engine = engine
             return self.japanese_engine.process_image(image, text_blocks)
         else:
-            if self.korean_engine is None:
+            lang_code = self._ppocr_lang_code()
+            if lang_code not in self.ppocr_engines:
                 with self._lock:
-                    if self.korean_engine is None:
+                    if lang_code not in self.ppocr_engines:
                         engine = PPOCRv5Engine()
-                        lang_code = 'ko'
-                        if self.lang in ["English", "en"]:
-                            lang_code = 'en'
-                        elif self.lang in ["Chinese", "zh"]:
-                            lang_code = 'ch'
                         engine.initialize(lang=lang_code)
-                        self.korean_engine = engine
-            return self.korean_engine.process_image(image, text_blocks)
+                        self.ppocr_engines[lang_code] = engine
+                        if lang_code == "ko":
+                            self.korean_engine = engine
+            return self.ppocr_engines[lang_code].process_image(image, text_blocks)
