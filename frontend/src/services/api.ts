@@ -11,7 +11,7 @@ import type {
   TranslationModelsResponse,
   LoadProjectResult,
 } from "../types";
-import { toBubbleInfo, toPagesResponse } from "./mappers";
+import { toBubbleInfo, toBubbleUpdateDto, toPagesResponse } from "./mappers";
 
 let BACKEND_URL = "http://127.0.0.1:8000";
 
@@ -122,7 +122,7 @@ export const exportPage = async (pageId: string, formData: FormData): Promise<Ex
 };
 
 export const updateBubbles = async (pageId: string, bubbles: BubbleUpdate[]): Promise<ActionResult> => {
-  const res = await api.updateBubbles(pageId, bubbles);
+  const res = await api.updateBubbles(pageId, bubbles.map(toBubbleUpdateDto));
   return { status: "success", ...res };
 };
 

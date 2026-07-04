@@ -1,4 +1,5 @@
-import type { BubbleInfo, PageInfo, PagesResponse } from "../types";
+import type { BubbleInfo, BubbleUpdate, PageInfo, PagesResponse } from "../types";
+import type { BubbleUpdateDto } from "../types/api";
 import type { BubbleDto } from "../types/bubble";
 import type { PageDto, ProjectDto } from "../types/project";
 
@@ -61,5 +62,23 @@ export function toBubbleInfo(bubble: BubbleDto): BubbleInfo {
       width: line.width,
       height: line.height,
     })),
+  };
+}
+
+export function toBubbleUpdateDto(bubble: BubbleUpdate): BubbleUpdateDto {
+  return {
+    id: bubble.id,
+    x: bubble.x,
+    y: bubble.y,
+    width: bubble.width,
+    height: bubble.height,
+    text: bubble.text,
+    translated: bubble.translated,
+    font_family: bubble.font_family,
+    font_size: bubble.font_size,
+    bold: bubble.bold,
+    italic: bubble.italic,
+    color: bubble.color,
+    alignment: bubble.alignment,
   };
 }
