@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 import * as api from "../services/api";
+import { getStoredUiLanguage, rememberUiLanguage } from "../i18n";
 import type { Settings } from "../types";
 
 const DEFAULT_SETTINGS: Settings = {
@@ -10,7 +11,7 @@ const DEFAULT_SETTINGS: Settings = {
   translation_api_key_configured: false,
   translation_timeout_seconds: 90,
   translation_supports_vision: false,
-  ui_language: "en",
+  ui_language: getStoredUiLanguage(),
   source_language: "Japanese",
   target_language: "Korean",
   system_prompt: "",
@@ -27,7 +28,15 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 export function useAppSettings() {
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
+
+  const setSettings = useCallback<Dispatch<SetStateAction<Settings>>>((next) => {
+    setSettingsState((prev) => {
+      const resolved = typeof next === "function" ? next(prev) : next;
+      rememberUiLanguage(resolved.ui_language);
+      return resolved;
+    });
+  }, []);
 
   const handleSaveSettings = useCallback(async (updated: Settings) => {
     try {
@@ -36,7 +45,7 @@ export function useAppSettings() {
     } catch (e) {
       console.error("Failed to auto-save settings", e);
     }
-  }, []);
+  }, [setSettings]);
 
   return {
     settings,

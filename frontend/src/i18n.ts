@@ -1,5 +1,7 @@
 export type UiLanguage = "en" | "ko";
 
+export const UI_LANGUAGE_STORAGE_KEY = "vibecleaner_ui_language";
+
 export type TranslationKey =
   | "app.title"
   | "toolbar.addImages"
@@ -576,6 +578,22 @@ export function normalizeUiLanguage(value: unknown): UiLanguage {
   return value === "ko" ? "ko" : "en";
 }
 
+export function getStoredUiLanguage(storage: Storage | null = getUiLanguageStorage()): UiLanguage {
+  try {
+    return normalizeUiLanguage(storage?.getItem(UI_LANGUAGE_STORAGE_KEY));
+  } catch {
+    return "en";
+  }
+}
+
+export function rememberUiLanguage(value: unknown, storage: Storage | null = getUiLanguageStorage()): void {
+  try {
+    storage?.setItem(UI_LANGUAGE_STORAGE_KEY, normalizeUiLanguage(value));
+  } catch {
+    // Ignore unavailable storage; backend settings remain the source of truth.
+  }
+}
+
 export function createTranslator(value: unknown) {
   const language = normalizeUiLanguage(value);
   const cached = translatorCache.get(language);
@@ -593,4 +611,9 @@ export function createTranslator(value: unknown) {
 
 function isTranslationKey(key: string): key is TranslationKey {
   return Object.hasOwn(translations.en, key);
+}
+
+function getUiLanguageStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage ?? null;
 }

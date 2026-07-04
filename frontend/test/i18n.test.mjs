@@ -30,6 +30,33 @@ assert.equal(normalizeUiLanguage("en"), "en");
 assert.equal(normalizeUiLanguage("unsupported"), "en");
 assert.equal(normalizeUiLanguage(undefined), "en");
 
+const memoryStorage = (initial = {}) => {
+  const data = { ...initial };
+  return {
+    getItem: (key) => Object.hasOwn(data, key) ? data[key] : null,
+    setItem: (key, value) => {
+      data[key] = String(value);
+    },
+    removeItem: (key) => {
+      delete data[key];
+    },
+  };
+};
+
+assert.equal(
+  sandbox.module.exports.getStoredUiLanguage(memoryStorage({ vibecleaner_ui_language: "ko" })),
+  "ko",
+);
+assert.equal(
+  sandbox.module.exports.getStoredUiLanguage(memoryStorage({ vibecleaner_ui_language: "bogus" })),
+  "en",
+);
+const writableStorage = memoryStorage();
+sandbox.module.exports.rememberUiLanguage("ko", writableStorage);
+assert.equal(writableStorage.getItem("vibecleaner_ui_language"), "ko");
+sandbox.module.exports.rememberUiLanguage("bogus", writableStorage);
+assert.equal(writableStorage.getItem("vibecleaner_ui_language"), "en");
+
 const korean = createTranslator("ko");
 assert.equal(korean("toolbar.translate"), "번역");
 assert.equal(korean("settings.uiLanguage"), "UI 언어");
