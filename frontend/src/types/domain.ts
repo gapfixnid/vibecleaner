@@ -28,6 +28,14 @@ export interface BubbleInfo {
   status: string;
   problems: string[];
   edited: boolean;
+  layout_overflow: boolean;
+  writing_mode: string;
+  text_direction: string;
+  justification: string;
+  layout_padding: Record<string, number>;
+  layout_margin: Record<string, number>;
+  layout_confidence: number;
+  layout_reasoning: string;
   lines: LineLayout[];
 }
 

@@ -377,6 +377,14 @@ async fn get_page(
             let alignment = b.get("alignment").and_then(|v| v.as_str()).unwrap_or("center");
             let text_class = b.get("text_class").and_then(|v| v.as_str()).unwrap_or("");
             let lines = b.get("lines").cloned().unwrap_or(serde_json::json!([]));
+            let writing_mode = b.get("writing_mode").and_then(|v| v.as_str()).unwrap_or("horizontal");
+            let text_direction = b.get("text_direction").and_then(|v| v.as_str()).unwrap_or("ltr");
+            let justification = b.get("justification").and_then(|v| v.as_str()).unwrap_or("none");
+            let layout_padding = b.get("layout_padding").cloned().unwrap_or(serde_json::json!({}));
+            let layout_margin = b.get("layout_margin").cloned().unwrap_or(serde_json::json!({}));
+            let layout_confidence = b.get("layout_confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let layout_reasoning = b.get("layout_reasoning").and_then(|v| v.as_str()).unwrap_or("");
+            let layout_overflow = b.get("layout_overflow").and_then(|v| v.as_bool()).unwrap_or(false);
             let status = b.get("status").cloned().unwrap_or_else(|| {
                 serde_json::json!(if translated.is_empty() { "needs_review" } else { "ok" })
             });
@@ -403,7 +411,14 @@ async fn get_page(
                 },
                 "layout": {
                     "lines": lines,
-                    "overflow": false
+                    "overflow": layout_overflow,
+                    "writing_mode": writing_mode,
+                    "text_direction": text_direction,
+                    "justification": justification,
+                    "padding": layout_padding,
+                    "margin": layout_margin,
+                    "confidence": layout_confidence,
+                    "reasoning": layout_reasoning
                 },
                 "text_class": text_class,
                 "problems": problems,

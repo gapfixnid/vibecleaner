@@ -47,6 +47,14 @@ def _rect_response(rect: QRectF | None) -> dict | None:
     }
 
 
+def _layout_overflow_problems(bubble: TextBubble, layout: dict) -> list[str]:
+    problems = list(bubble.problems)
+    if layout.get("overflow") or layout.get("reached_min_font"):
+        if not any("layout overflow" == problem.lower() for problem in problems):
+            problems.append("layout overflow")
+    return problems
+
+
 def _get_page_by_id(page_id: str):
     for page in state.pages:
         if page.page_id == page_id:
@@ -109,6 +117,13 @@ def _layout_cache_key(bubble: TextBubble) -> tuple:
         bubble.italic,
         bubble.color,
         bubble.alignment,
+        bubble.writing_mode,
+        bubble.text_direction,
+        bubble.justification,
+        tuple(sorted(bubble.layout_padding.items())),
+        tuple(sorted(bubble.layout_margin.items())),
+        round(bubble.layout_confidence, 3),
+        bubble.layout_reasoning,
     )
 
 
@@ -123,6 +138,8 @@ def _compute_bubble_layout(bubble: TextBubble, image) -> dict:
     return {
         "font_size": bubble.font_size if bubble.font_size > 0 else int(layout.font.pointSizeF()),
         "font_family": computed_font_family,
+        "overflow": bool(getattr(layout, "is_overflow", False)),
+        "reached_min_font": bool(getattr(layout, "reached_min_font", False)),
         "lines": [
             {
                 "text": line.text,
@@ -166,6 +183,19 @@ def get_bubbles_response(page_id: str):
             cached_layout = _compute_bubble_layout(bubble, source_img)
             computed_layouts[_layout_cache_key(bubble)] = cached_layout
 
+        problems = _layout_overflow_problems(bubble, cached_layout)
+        status = derive_bubble_status(
+            TextBubble(
+                id=bubble.id,
+                box=bubble.box,
+                text=bubble.text,
+                translated=bubble.translated,
+                problems=problems,
+                edited=bubble.edited,
+                status=bubble.status,
+            )
+        )
+
         bubbles_list.append({
             "id": bubble.id,
             "x": bubble.box.x(),
@@ -180,13 +210,21 @@ def get_bubbles_response(page_id: str):
             "font_size": bubble.font_size,
             "computed_font_family": cached_layout.get("font_family", ""),
             "computed_font_size": cached_layout["font_size"],
+            "writing_mode": bubble.writing_mode,
+            "text_direction": bubble.text_direction,
+            "justification": bubble.justification,
+            "layout_padding": dict(bubble.layout_padding),
+            "layout_margin": dict(bubble.layout_margin),
+            "layout_confidence": bubble.layout_confidence,
+            "layout_reasoning": bubble.layout_reasoning,
+            "layout_overflow": bool(cached_layout.get("overflow") or cached_layout.get("reached_min_font")),
             "bold": bubble.bold,
             "italic": bubble.italic,
             "color": bubble.color,
             "alignment": bubble.alignment,
             "text_class": bubble.text_class,
-            "status": derive_bubble_status(bubble),
-            "problems": list(bubble.problems),
+            "status": status,
+            "problems": problems,
             "edited": bubble.edited,
             "lines": cached_layout["lines"],
         })
@@ -218,6 +256,13 @@ def update_bubbles_response(page_id: str, bubbles: List[BubbleUpdateSchema]):
             text_box = existing.text_box if existing else None
             layout_box = existing.layout_box if existing else None
             text_class = existing.text_class if existing else "text_bubble"
+            writing_mode = existing.writing_mode if existing else "horizontal"
+            text_direction = existing.text_direction if existing else "ltr"
+            justification = existing.justification if existing else "none"
+            layout_padding = dict(existing.layout_padding) if existing else {}
+            layout_margin = dict(existing.layout_margin) if existing else {}
+            layout_confidence = existing.layout_confidence if existing else 0.0
+            layout_reasoning = existing.layout_reasoning if existing else ""
             edited = bool(existing.edited) if existing else True
             problems = list(existing.problems) if existing else []
             status = existing.status if existing else "needs_review"
@@ -251,6 +296,13 @@ def update_bubbles_response(page_id: str, bubbles: List[BubbleUpdateSchema]):
                 italic=b_schema.italic,
                 color=b_schema.color,
                 alignment=b_schema.alignment,
+                writing_mode=writing_mode,
+                text_direction=text_direction,
+                justification=justification,
+                layout_padding=layout_padding,
+                layout_margin=layout_margin,
+                layout_confidence=layout_confidence,
+                layout_reasoning=layout_reasoning,
                 status=status,
                 problems=problems,
                 edited=edited,

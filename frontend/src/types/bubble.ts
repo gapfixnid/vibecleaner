@@ -22,6 +22,13 @@ export interface TextLineDto {
 export interface TextLayoutDto {
   lines: TextLineDto[];
   overflow: boolean;
+  writing_mode?: string;
+  text_direction?: string;
+  justification?: string;
+  padding?: Record<string, number>;
+  margin?: Record<string, number>;
+  confidence?: number;
+  reasoning?: string;
 }
 
 export interface BubbleDto {

@@ -86,6 +86,15 @@ def _join_merged_text(parts: list[str]) -> str:
     return separator.join(cleaned)
 
 
+def _insets_to_dict(insets) -> dict[str, float]:
+    return {
+        "top": float(getattr(insets, "top", 0.0)),
+        "right": float(getattr(insets, "right", 0.0)),
+        "bottom": float(getattr(insets, "bottom", 0.0)),
+        "left": float(getattr(insets, "left", 0.0)),
+    }
+
+
 def _bubbles_from_analysis(
     image: np.ndarray,
     blocks: list,
@@ -143,6 +152,13 @@ def _bubbles_from_analysis(
         tb.font_size = 0
         tb.color = _color_to_hex(bd.font_color)
         tb.alignment = layout_plan.alignment
+        tb.writing_mode = getattr(layout_plan, "writing_mode", "horizontal")
+        tb.text_direction = getattr(layout_plan, "text_direction", "ltr")
+        tb.justification = getattr(layout_plan, "justification", "none")
+        tb.layout_padding = _insets_to_dict(getattr(layout_plan, "padding", None))
+        tb.layout_margin = _insets_to_dict(getattr(layout_plan, "margin", None))
+        tb.layout_confidence = float(getattr(layout_plan, "confidence", 0.0) or 0.0)
+        tb.layout_reasoning = getattr(layout_plan, "reasoning", "")
 
         bubbles.append(tb)
 

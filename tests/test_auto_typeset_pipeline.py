@@ -15,6 +15,7 @@ if str(BACKEND) not in sys.path:
 import services.auto_typeset_pipeline as pipeline_module
 from app.models import MangaPage, TextBubble
 from services.bubble_analysis_service import BubbleAnalysisResult, BubbleData
+from services.layout_planner_service import Insets
 
 
 class FakeInpaintingService:
@@ -243,6 +244,67 @@ class AutoTypesetPipelineTests(unittest.TestCase):
 
         self.assertEqual(len(bubbles), 1)
         self.assertEqual(bubbles[0].font_family, "")
+
+    def test_bubbles_from_analysis_preserves_layout_plan_metadata(self):
+        image = np.zeros((40, 40, 3), dtype=np.uint8)
+        bubble_data = BubbleData(
+            bubble_box=(2, 3, 30, 31),
+            text_box=(4, 5, 28, 29),
+            layout_box=(8, 9, 24, 25),
+            text="hello",
+            text_class="text_bubble",
+        )
+
+        with (
+            patch.object(
+                pipeline_module.page_analysis_service,
+                "analyze",
+                return_value=SimpleNamespace(
+                    reading_order=SimpleNamespace(direction="rtl"),
+                    writing_mode="vertical",
+                ),
+            ),
+            patch.object(
+                pipeline_module.bubble_analysis_service,
+                "analyze",
+                return_value=BubbleAnalysisResult(
+                    bubbles=[bubble_data],
+                    reading_order="RTL",
+                    writing_mode="vertical",
+                ),
+            ),
+            patch.object(
+                pipeline_module.layout_planner_service,
+                "plan",
+                return_value=SimpleNamespace(
+                    alignment="right",
+                    writing_mode="vertical",
+                    text_direction="rtl",
+                    justification="full",
+                    padding=Insets(top=1, right=2, bottom=3, left=4),
+                    margin=Insets(top=5, right=6, bottom=7, left=8),
+                    confidence=0.73,
+                    reasoning="writing_mode=vertical; alignment=right",
+                ),
+            ),
+        ):
+            bubbles = pipeline_module._bubbles_from_analysis(
+                image,
+                blocks=[],
+                source_lang="Japanese",
+                target_lang="Korean",
+            )
+
+        self.assertEqual(len(bubbles), 1)
+        bubble = bubbles[0]
+        self.assertEqual(bubble.alignment, "right")
+        self.assertEqual(bubble.writing_mode, "vertical")
+        self.assertEqual(bubble.text_direction, "rtl")
+        self.assertEqual(bubble.justification, "full")
+        self.assertEqual(bubble.layout_padding, {"top": 1, "right": 2, "bottom": 3, "left": 4})
+        self.assertEqual(bubble.layout_margin, {"top": 5, "right": 6, "bottom": 7, "left": 8})
+        self.assertEqual(bubble.layout_confidence, 0.73)
+        self.assertEqual(bubble.layout_reasoning, "writing_mode=vertical; alignment=right")
 
     def test_merge_overlapping_bubbles_preserves_cjk_lines_without_spaces(self):
         first = TextBubble(

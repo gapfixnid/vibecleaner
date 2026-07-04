@@ -110,6 +110,13 @@ const bubbleDto = {
   },
   layout: {
     overflow: false,
+    writing_mode: "vertical",
+    text_direction: "rtl",
+    justification: "full",
+    padding: { top: 1, right: 2, bottom: 3, left: 4 },
+    margin: { top: 5, right: 6, bottom: 7, left: 8 },
+    confidence: 0.73,
+    reasoning: "writing_mode=vertical; alignment=center",
     lines: [{ text: "안녕", x: 1, y: 2, width: 30, height: 12 }],
   },
   problems: ["check translation"],
@@ -137,6 +144,14 @@ assert.deepEqual(plain(toBubbleInfo(bubbleDto)), {
   status: "needs_review",
   problems: ["check translation"],
   edited: true,
+  layout_overflow: false,
+  writing_mode: "vertical",
+  text_direction: "rtl",
+  justification: "full",
+  layout_padding: { top: 1, right: 2, bottom: 3, left: 4 },
+  layout_margin: { top: 5, right: 6, bottom: 7, left: 8 },
+  layout_confidence: 0.73,
+  layout_reasoning: "writing_mode=vertical; alignment=center",
   lines: [{ text: "안녕", x: 1, y: 2, width: 30, height: 12 }],
 });
 

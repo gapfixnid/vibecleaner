@@ -94,6 +94,40 @@ class BubbleServiceTests(unittest.TestCase):
         self.assertEqual(bubble["computed_font_family"], "Resolved Font")
         self.assertEqual(bubble["computed_font_size"], 17)
 
+    def test_get_bubbles_response_marks_layout_overflow_from_render_result(self):
+        page = MangaPage(
+            file_path="sample.png",
+            cv_image=np.zeros((64, 64, 3), dtype=np.uint8),
+            bubbles=[
+                TextBubble(
+                    id=1,
+                    box=QRectF(1, 2, 30, 40),
+                    text="hello",
+                    translated="안녕",
+                    font_family="",
+                    font_size=0,
+                )
+            ],
+        )
+        page.page_id = "page_a"
+        with bubble_service.state.lock:
+            bubble_service.state.pages = [page]
+            bubble_service.state.current_page_idx = 0
+
+        fake_font = SimpleNamespace(pointSizeF=lambda: 8.0, family=lambda: "Resolved Font")
+        fake_layout = SimpleNamespace(font=fake_font, line_layouts=[], is_overflow=True, reached_min_font=True)
+        with patch.object(
+            bubble_service.render_service,
+            "get_layout_for_bubble",
+            return_value=fake_layout,
+        ):
+            response = bubble_service.get_bubbles_response("page_a")
+
+        bubble = response["bubbles"][0]
+        self.assertEqual(bubble["status"], "layout_overflow")
+        self.assertIn("layout overflow", bubble["problems"])
+        self.assertTrue(bubble["layout_overflow"])
+
 
 if __name__ == "__main__":
     unittest.main()

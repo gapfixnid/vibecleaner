@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 import numpy as np
 from PySide6.QtCore import QRectF
 
@@ -20,6 +20,13 @@ class TextBubble:
     italic: bool = False
     color: str = "#000000"
     alignment: str = "center"
+    writing_mode: str = "horizontal"
+    text_direction: str = "ltr"
+    justification: str = "none"
+    layout_padding: Dict[str, float] = field(default_factory=dict)
+    layout_margin: Dict[str, float] = field(default_factory=dict)
+    layout_confidence: float = 0.0
+    layout_reasoning: str = ""
     status: str = "idle"
     problems: List[str] = field(default_factory=list)
     edited: bool = False
@@ -63,6 +70,15 @@ class TextBubble:
                 "color": self.color,
                 "alignment": self.alignment,
             },
+            "layout_plan": {
+                "writing_mode": self.writing_mode,
+                "text_direction": self.text_direction,
+                "justification": self.justification,
+                "padding": dict(self.layout_padding),
+                "margin": dict(self.layout_margin),
+                "confidence": self.layout_confidence,
+                "reasoning": self.layout_reasoning,
+            },
         }
         text_box = self._rect_to_project_list(self.text_box)
         if text_box is not None:
@@ -78,6 +94,7 @@ class TextBubble:
     def from_project_dict(cls, data: dict[str, Any]) -> "TextBubble":
         x, y, width, height = data["box"]
         style = data.get("style", {})
+        layout_plan = data.get("layout_plan", {})
         return cls(
             id=data["id"],
             box=QRectF(x, y, width, height),
@@ -92,6 +109,13 @@ class TextBubble:
             italic=style.get("italic", data.get("italic", False)),
             color=style.get("color", data.get("color", "#000000")),
             alignment=style.get("alignment", data.get("alignment", "center")),
+            writing_mode=layout_plan.get("writing_mode", data.get("writing_mode", "horizontal")),
+            text_direction=layout_plan.get("text_direction", data.get("text_direction", "ltr")),
+            justification=layout_plan.get("justification", data.get("justification", "none")),
+            layout_padding=dict(layout_plan.get("padding", data.get("layout_padding", {}))),
+            layout_margin=dict(layout_plan.get("margin", data.get("layout_margin", {}))),
+            layout_confidence=float(layout_plan.get("confidence", data.get("layout_confidence", 0.0)) or 0.0),
+            layout_reasoning=layout_plan.get("reasoning", data.get("layout_reasoning", "")),
             status=data.get("status", "idle"),
             problems=list(data.get("problems", [])),
             edited=bool(data.get("edited", False)),
@@ -112,6 +136,13 @@ class TextBubble:
             italic=self.italic,
             color=self.color,
             alignment=self.alignment,
+            writing_mode=self.writing_mode,
+            text_direction=self.text_direction,
+            justification=self.justification,
+            layout_padding=dict(self.layout_padding),
+            layout_margin=dict(self.layout_margin),
+            layout_confidence=self.layout_confidence,
+            layout_reasoning=self.layout_reasoning,
             status=self.status,
             problems=list(self.problems),
             edited=self.edited,
