@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
@@ -13,6 +14,7 @@ if str(BACKEND) not in sys.path:
 
 import services.auto_typeset_pipeline as pipeline_module
 from app.models import MangaPage, TextBubble
+from services.bubble_analysis_service import BubbleAnalysisResult, BubbleData
 
 
 class FakeInpaintingService:
@@ -107,6 +109,51 @@ class AutoTypesetPipelineTests(unittest.TestCase):
         self.assertEqual(translation_service.calls[0]["texts"], ["hello"])
         self.assertEqual(inpainting_service.calls[0]["boxes"], [[3.0, 4.0, 11.0, 10.0]])
         self.assertEqual(inpainting_service.calls[0]["bubble_boxes"], [[2.0, 3.0, 12.0, 11.0]])
+
+    def test_bubbles_from_analysis_preserves_detected_font_color(self):
+        image = np.zeros((40, 40, 3), dtype=np.uint8)
+        bubble_data = BubbleData(
+            bubble_box=(2, 3, 20, 21),
+            text_box=(4, 5, 18, 19),
+            layout_box=(5, 6, 17, 18),
+            text="hello",
+            text_class="text_bubble",
+            font_color=(12, 34, 56),
+        )
+
+        with (
+            patch.object(
+                pipeline_module.page_analysis_service,
+                "analyze",
+                return_value=SimpleNamespace(
+                    reading_order=SimpleNamespace(direction="ltr"),
+                    writing_mode="horizontal",
+                ),
+            ),
+            patch.object(
+                pipeline_module.bubble_analysis_service,
+                "analyze",
+                return_value=BubbleAnalysisResult(
+                    bubbles=[bubble_data],
+                    reading_order="LTR",
+                    writing_mode="horizontal",
+                ),
+            ),
+            patch.object(
+                pipeline_module.layout_planner_service,
+                "plan",
+                return_value=SimpleNamespace(alignment="center"),
+            ),
+        ):
+            bubbles = pipeline_module._bubbles_from_analysis(
+                image,
+                blocks=[],
+                source_lang="Japanese",
+                target_lang="Korean",
+            )
+
+        self.assertEqual(len(bubbles), 1)
+        self.assertEqual(bubbles[0].color, "#0c2238")
 
 
 if __name__ == "__main__":

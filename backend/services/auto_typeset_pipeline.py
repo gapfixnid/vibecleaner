@@ -57,6 +57,18 @@ def _rect_from_xyxy(xyxy):
     return QRectF(x1, y1, x2 - x1, y2 - y1)
 
 
+def _color_to_hex(color) -> str:
+    if isinstance(color, str) and color.startswith("#") and len(color) == 7:
+        return color
+    if isinstance(color, (list, tuple)) and len(color) >= 3:
+        try:
+            r, g, b = [max(0, min(255, int(v))) for v in color[:3]]
+            return f"#{r:02x}{g:02x}{b:02x}"
+        except (TypeError, ValueError):
+            pass
+    return "#000000"
+
+
 def _bubbles_from_analysis(
     image: np.ndarray,
     blocks: list,
@@ -111,7 +123,7 @@ def _bubbles_from_analysis(
         )
         tb.font_family = "Pretendard Variable"
         tb.font_size = 0
-        tb.color = "#000000"
+        tb.color = _color_to_hex(bd.font_color)
         tb.alignment = layout_plan.alignment
 
         bubbles.append(tb)
