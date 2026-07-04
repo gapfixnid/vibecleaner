@@ -37,6 +37,27 @@ class BubbleAnalysisServiceTests(unittest.TestCase):
         self.assertLessEqual(x2, 80)
         self.assertLessEqual(y2, 80)
 
+    def test_korean_bubbles_sort_left_to_right_like_page_analysis(self):
+        service = BubbleAnalysisService()
+        left = bubble_module.BubbleData(
+            bubble_box=(10, 10, 30, 30),
+            text_box=(10, 10, 30, 30),
+            layout_box=(10, 10, 30, 30),
+            text="left",
+        )
+        right = bubble_module.BubbleData(
+            bubble_box=(70, 10, 90, 30),
+            text_box=(70, 10, 90, 30),
+            layout_box=(70, 10, 90, 30),
+            text="right",
+        )
+
+        reading_order = service._get_reading_order("Korean")
+        sorted_bubbles = service._sort_by_reading_order([right, left], reading_order)
+
+        self.assertEqual(reading_order, "LTR")
+        self.assertEqual([bubble.text for bubble in sorted_bubbles], ["left", "right"])
+
 
 if __name__ == "__main__":
     unittest.main()

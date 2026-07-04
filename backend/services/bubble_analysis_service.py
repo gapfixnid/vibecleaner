@@ -353,8 +353,10 @@ class BubbleAnalysisService:
 
     def _get_reading_order(self, source_lang: str) -> str:
         """Determine reading order from source language."""
-        rtl_languages = {"Japanese", "Chinese", "Korean"}
-        return "RTL" if source_lang in rtl_languages else "LTR"
+        from services.page_analysis_service import infer_reading_order
+
+        direction = infer_reading_order(source_lang).direction
+        return "RTL" if direction == "rtl" else "LTR"
 
     def _hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
         """Convert hex color to RGB tuple."""
