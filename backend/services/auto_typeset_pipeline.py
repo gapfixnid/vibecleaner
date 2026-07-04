@@ -69,6 +69,23 @@ def _color_to_hex(color) -> str:
     return "#000000"
 
 
+def _contains_cjk(text: str) -> bool:
+    return any(
+        "\u3040" <= ch <= "\u30ff"
+        or "\u3400" <= ch <= "\u9fff"
+        or "\uac00" <= ch <= "\ud7af"
+        for ch in text
+    )
+
+
+def _join_merged_text(parts: list[str]) -> str:
+    cleaned = [part.strip() for part in parts if part and part.strip()]
+    if not cleaned:
+        return ""
+    separator = "\n" if any(_contains_cjk(part) for part in cleaned) else " "
+    return separator.join(cleaned)
+
+
 def _bubbles_from_analysis(
     image: np.ndarray,
     blocks: list,
@@ -182,10 +199,12 @@ def _merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float =
                     elif ajt is not None:
                         ai.text_box = QRectF(ajt)
 
-                    texts = [t for t in (ai.text, aj.text) if t and t.strip()]
-                    ai.text = " ".join(texts) if texts else ai.text
-                    translations = [t for t in (ai.translated, aj.translated) if t and t.strip()]
-                    ai.translated = " ".join(translations) if translations else ai.translated
+                    merged_text = _join_merged_text([ai.text, aj.text])
+                    if merged_text:
+                        ai.text = merged_text
+                    merged_translation = _join_merged_text([ai.translated, aj.translated])
+                    if merged_translation:
+                        ai.translated = merged_translation
                     current.pop(j)
                     merged = True
                     continue

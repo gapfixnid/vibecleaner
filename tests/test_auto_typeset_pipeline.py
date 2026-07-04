@@ -155,6 +155,28 @@ class AutoTypesetPipelineTests(unittest.TestCase):
         self.assertEqual(len(bubbles), 1)
         self.assertEqual(bubbles[0].color, "#0c2238")
 
+    def test_merge_overlapping_bubbles_preserves_cjk_lines_without_spaces(self):
+        first = TextBubble(
+            id=1,
+            box=QRectF(10, 10, 30, 30),
+            text_box=QRectF(12, 12, 10, 10),
+            text="こん",
+            translated="안녕",
+        )
+        second = TextBubble(
+            id=2,
+            box=QRectF(12, 12, 30, 30),
+            text_box=QRectF(20, 20, 10, 10),
+            text="にちは",
+            translated="하세요",
+        )
+
+        merged = pipeline_module._merge_overlapping_bubbles([first, second])
+
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0].text, "こん\nにちは")
+        self.assertEqual(merged[0].translated, "안녕\n하세요")
+
 
 if __name__ == "__main__":
     unittest.main()
