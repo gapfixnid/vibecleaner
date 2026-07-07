@@ -11,7 +11,7 @@ if str(BACKEND) not in sys.path:
 from modules.config import AppConfig
 from modules.utils.download import ModelID
 from services.model_requirements import get_required_model_ids, get_model_status
-from routes import settings as settings_route
+from api.routes import settings as settings_route
 from download_models import get_model_ids
 
 
@@ -116,7 +116,7 @@ class ModelRequirementsTests(unittest.TestCase):
         )
 
         with (
-            patch("routes.settings.config", cfg),
+            patch("api.routes.settings.config", cfg),
             patch("services.model_requirements.ModelDownloader.is_downloaded", return_value=True),
         ):
             status = settings_route.get_models_status()

@@ -1,21 +1,20 @@
 import os
 import zipfile
 import json
+import logging
 import cv2
 import numpy as np
 from fastapi import APIRouter, HTTPException, Form
 from PIL import Image
-from core import (
-    encode_preview_jpeg_bytes,
-    load_cv_image,
-    logger,
-    state,
-    submit_cache_task,
-    warm_original_thumbnail,
-)
 from app.models import MangaPage
+from app.version import APP_NAME
+from domain.project_state import state
+from services.cache_service import submit_cache_task
+from services.image_encoding_service import encode_preview_jpeg_bytes
+from services.page_image_loader import load_cv_image, warm_original_thumbnail
 
 router = APIRouter()
+logger = logging.getLogger(APP_NAME)
 
 PROJECT_CACHE_WARM_RADIUS = 2
 

@@ -1,8 +1,9 @@
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Form
+from fastapi import APIRouter, Depends, HTTPException, Form
 from pydantic import BaseModel
 
-from services.auto_typeset_pipeline import auto_typeset_pipeline
+from api.dependencies import get_container
+from core.container import AppContainer
 from services.bubble_service import (
     BubbleUpdateSchema,
     get_bubbles_response,
@@ -25,11 +26,6 @@ from services.page_crud_service import (
 )
 from services.page_export_service import export_page_response
 from services.page_inpaint_service import start_inpaint_bubble, start_inpaint_page
-from core import (
-    state,
-    job_manager,
-)
-
 router = APIRouter()
 
 
@@ -102,32 +98,32 @@ def run_inpaint(page_id: str):
     return start_inpaint_page(page_id)
 
 @router.post("/api/pages/{page_id}/translate-all")
-def run_translate_all(page_id: str):
-    with state.lock:
+def run_translate_all(page_id: str, container: AppContainer = Depends(get_container)):
+    with container.legacy_state.lock:
         page_idx = _resolve_page_index(page_id)
-    return job_manager.start(
+    return container.job_manager.start(
         "auto-typeset",
         page_idx,
         f"auto-typeset:{page_id}",
-        lambda job: auto_typeset_pipeline.run_page(job, page_id, show_progress=True),
+        lambda job: container.auto_typeset_pipeline.run_page(job, page_id, show_progress=True),
     )
 
 @router.post("/api/pages/translate-batch")
-def run_translate_batch(req: TranslateBatchRequest):
+def run_translate_batch(req: TranslateBatchRequest, container: AppContainer = Depends(get_container)):
     """Translate multiple pages as a single batch job."""
-    with state.lock:
+    with container.legacy_state.lock:
         valid_indices = _resolve_indices_from_request(req)
         if not valid_indices:
             raise HTTPException(status_code=400, detail="No valid pages to translate")
-        page_ids = [state.pages[idx].page_id for idx in valid_indices]
+        page_ids = [container.legacy_state.pages[idx].page_id for idx in valid_indices]
         first_idx = valid_indices[0]
 
     key = f"auto-typeset-batch:{','.join(page_ids)}"
-    return job_manager.start(
+    return container.job_manager.start(
         "auto-typeset-batch",
         first_idx,
         key,
-        lambda job: auto_typeset_pipeline.run_batch(job, page_ids),
+        lambda job: container.auto_typeset_pipeline.run_batch(job, page_ids),
     )
 
 

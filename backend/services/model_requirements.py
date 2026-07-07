@@ -94,7 +94,7 @@ def get_model_status(settings: AppConfig | None = None) -> dict[str, Any]:
 
 
 def download_required_models(settings: AppConfig | None = None, job: dict[str, Any] | None = None) -> dict[str, Any]:
-    from core import job_manager
+    from services.job_service import job_manager
 
     cfg = settings or config
     model_ids = get_required_model_ids(cfg)

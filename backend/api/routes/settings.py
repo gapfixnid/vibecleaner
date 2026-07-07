@@ -1,13 +1,17 @@
 import ipaddress
+import logging
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from app.version import APP_NAME
 from modules.config import config, OLLAMA_API_URL
-from core import job_manager, logger, translation_service
+from services.job_service import job_manager
 from services.model_requirements import download_required_models, get_model_status
+from services.service_registry import translation_service
 
 router = APIRouter()
+logger = logging.getLogger(APP_NAME)
 
 class SettingsSchema(BaseModel):
     translation_model: str

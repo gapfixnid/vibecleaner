@@ -8,7 +8,7 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from routes import settings as settings_route
+from api.routes import settings as settings_route
 
 
 class SettingsUiLanguageTest(unittest.TestCase):
