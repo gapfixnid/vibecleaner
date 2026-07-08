@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_settings_route_does_not_import_global_config_or_service_registry():
     source = (ROOT / "backend" / "api" / "routes" / "settings.py").read_text(encoding="utf-8")
 
-    assert "from modules.config import config" not in source
+    assert ("from modules.config import " + "config") not in source
     assert "from services.service_registry import" not in source
 
 
@@ -16,6 +16,7 @@ def test_removed_singleton_modules_and_imports_stay_removed():
 
     assert not (backend / "services" / "service_registry.py").exists()
     assert not (backend / "pipeline" / ("auto_" + "typeset.py")).exists()
+    assert not (backend / "domain" / "project_state.py").exists()
 
     scanned_files = [
         path
@@ -27,9 +28,11 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert ("services." + "auto_" + "typeset_pipeline") not in combined
     assert ("pipeline." + "auto_" + "typeset") not in combined
     assert ("auto_" + "typeset_pipeline") not in combined
-    assert "from domain.project_state import state" not in combined
+    assert ("from domain." + "project_state import " + "state") not in combined
+    assert ("from domain." + "project_state import " + "ProjectState") not in combined
+    assert ("legacy" + "_state") not in combined
     assert "state = ProjectState()" not in combined
-    assert "from modules.config import config" not in combined
+    assert ("from modules.config import " + "config") not in combined
     assert "config: AppConfig = AppConfig()" not in combined
     assert "load_settings = config.load" not in combined
     assert "save_settings = config.save" not in combined

@@ -13,7 +13,7 @@ if str(BACKEND) not in sys.path:
 
 import services.bubble_service as bubble_service
 from app.models import MangaPage, TextBubble
-from domain.project_state import ProjectState
+from core.state.project_state import ProjectState
 
 
 class FakeRenderService:

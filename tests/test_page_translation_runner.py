@@ -12,7 +12,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from app.models import MangaPage, TextBubble
-from domain.project_state import ProjectState
+from core.state.project_state import ProjectState
 from modules.config import AppConfig
 from pipeline.page_translation import run_page_translation
 from pipeline.planner import PipelinePlanner

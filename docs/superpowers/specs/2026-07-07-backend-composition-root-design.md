@@ -180,7 +180,7 @@ def create_app() -> FastAPI:
 @dataclass
 class AppContainer:
     config: AppConfig
-    project_repository: ProjectRepository
+    project_state: ProjectState
     job_manager: JobManagerPort
     detector: TextDetector
     ocr: OcrEngine

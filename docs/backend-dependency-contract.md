@@ -45,7 +45,6 @@ Application code must not introduce these dependencies:
 
 ```powershell
 from services.service_registry import ...
-from domain.project_state import state
 from modules.config import config
 from engines...              # inside backend/api or backend/pipeline
 import engines               # inside backend/api or backend/pipeline
@@ -113,7 +112,7 @@ Run these before claiming dependency boundaries are clean:
 ```powershell
 rg "from engines|import engines" backend/pipeline backend/api
 rg "service_registry|state = ProjectState\(|config: AppConfig = AppConfig\(" backend
-rg "from domain.project_state import state|from modules.config import config" backend tests
+rg "domain.project_state|legacy_state|from modules.config import config" backend tests
 ```
 
 Expected result: no application imports or singleton definitions that violate

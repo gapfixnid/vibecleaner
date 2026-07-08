@@ -77,7 +77,7 @@ def new_project(container: AppContainer = Depends(get_container)):
     Used by the "New Project" action. The frontend is responsible for warning
     about unsaved changes before calling this; the backend simply clears state.
     """
-    state = container.legacy_state
+    state = container.project_state
     with state.lock:
         state.pages = []
         state.current_page_idx = -1
@@ -114,7 +114,7 @@ def open_directory(directory: str = Form(...), container: AppContainer = Depends
         except Exception:
             continue
 
-    state = container.legacy_state
+    state = container.project_state
     with state.lock:
         # Append to existing pages (dedup by file path); keep the current page.
         existing_paths = {p.file_path for p in state.pages}
@@ -164,7 +164,7 @@ def open_files(files_json: str = Form(...), container: AppContainer = Depends(ge
         except Exception:
             continue
 
-    state = container.legacy_state
+    state = container.project_state
     with state.lock:
         # Append to existing pages (dedup by file path); keep the current page.
         existing_paths = {p.file_path for p in state.pages}
@@ -187,7 +187,7 @@ def save_project(
     selected_indices: str = Form(""),
     container: AppContainer = Depends(get_container),
 ):
-    state = container.legacy_state
+    state = container.project_state
     if not file_path:
         raise HTTPException(status_code=400, detail="file_path is required")
 
@@ -302,7 +302,7 @@ def save_project(
 
 @router.post("/api/project/load")
 def load_project(file_path: str = Form(...), container: AppContainer = Depends(get_container)):
-    state = container.legacy_state
+    state = container.project_state
     if not file_path:
         raise HTTPException(status_code=400, detail="file_path is required")
             

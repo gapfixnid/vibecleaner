@@ -57,7 +57,7 @@ def test_translate_all_uses_canonical_pipeline_runner():
     state = SimpleNamespace(lock=_Lock(), pages=[page])
     runner = _RecordingRunner()
     container = SimpleNamespace(
-        legacy_state=state,
+        project_state=state,
         config=SimpleNamespace(source_language="Japanese", target_language="Korean"),
         job_manager=_RecordingJobManager(),
         pipeline_runner=runner,

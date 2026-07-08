@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from threading import RLock
-
-from core.models.page import MangaPage
+from typing import Any
 
 
 @dataclass
 class ProjectState:
-    pages: list[MangaPage] = field(default_factory=list)
+    pages: list[Any] = field(default_factory=list)
     current_page_idx: int = -1
     revision: int = 0
 

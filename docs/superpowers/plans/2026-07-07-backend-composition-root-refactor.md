@@ -404,9 +404,9 @@ Expected: FAIL because `create_app` and new dependencies are not wired.
 - [ ] **Step 3: Implement container and route dependency injection**
 
 Move routers to `backend/api/routes`. Replace route imports from `core`,
-`services.service_registry`, `modules.config`, and `domain.project_state` with
-container dependencies. Keep response shapes compatible with existing frontend
-types.
+`services.service_registry`, module-level config, and module-level project state
+with container dependencies. Keep response shapes compatible with existing
+frontend types.
 
 - [ ] **Step 4: Run API smoke test**
 
@@ -420,7 +420,7 @@ Expected: PASS.
 **Files:**
 - Remove: `backend/services/service_registry.py`
 - Remove route-level page translation wrappers after route migration.
-- Modify: `backend/domain/project_state.py` or remove after route migration.
+- Remove: `backend/domain/project_state.py` after route migration.
 - Modify: `backend/modules/config.py` or leave only a compatibility import during this Big Bang if complete removal breaks external callers.
 - Modify: existing tests under `tests/`.
 
@@ -468,13 +468,17 @@ Expected: PASS.
 - `backend/modules/config.py` no longer creates or auto-loads a module-level
   `config` singleton, and model-requirement helpers now require an explicit
   `AppConfig` from the container or CLI composition path.
+- `backend/domain/project_state.py` has been removed. API routes now use the
+  container-owned `core.state.ProjectState` through `container.project_state`.
+- `AppContainer` no longer exposes a duplicate `legacy_state` field or unused
+  runtime `project_repository` field.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 
 Run:
 
 ```powershell
-rg "service_registry|from domain.project_state import state|from modules.config import config" backend tests
+rg "service_registry|domain.project_state|legacy_state|from modules.config import config" backend tests
 ```
 
 Expected: list remaining callers to update.
@@ -570,8 +574,9 @@ Architecture cleanup pivot, 2026-07-08:
   stages no longer import an old wrapper module for helper behavior.
 - Unused desktop/frontend command surfaces for the old page translation path
   were removed.
-- Remaining cleanup targets include container `legacy_state`, `domain` project
-  state usage in API/services, and transitional `backend/modules` wrappers.
+- Remaining cleanup targets include transitional `backend/modules` wrappers,
+  service-level singleton instances, and hard-coded defaults that should move
+  behind strategies or explicit container-owned options.
 
 ---
 

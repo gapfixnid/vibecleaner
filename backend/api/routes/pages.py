@@ -36,7 +36,7 @@ class TranslateBatchRequest(BaseModel):
 
 @router.get("/api/pages")
 def get_pages(container: AppContainer = Depends(get_container)):
-    return get_pages_response(container.legacy_state)
+    return get_pages_response(container.project_state)
 
 @router.post("/api/pages/select")
 def select_page(
@@ -44,11 +44,11 @@ def select_page(
     page_id: Optional[str] = Form(None),
     container: AppContainer = Depends(get_container),
 ):
-    return select_page_response(container.legacy_state, index=index, page_id=page_id)
+    return select_page_response(container.project_state, index=index, page_id=page_id)
 
 @router.post("/api/pages/{page_id}/rename")
 def rename_page(page_id: str, name: str = Form(...), container: AppContainer = Depends(get_container)):
-    return rename_page_response(container.legacy_state, page_id, name)
+    return rename_page_response(container.project_state, page_id, name)
 
 
 @router.post("/api/pages/duplicate")
@@ -57,12 +57,12 @@ def duplicate_page(
     page_id: Optional[str] = Form(None),
     container: AppContainer = Depends(get_container),
 ):
-    return duplicate_page_response(container.legacy_state, index=index, page_id=page_id)
+    return duplicate_page_response(container.project_state, index=index, page_id=page_id)
 
 
 @router.post("/api/pages/duplicate-batch")
 def duplicate_page_batch(req: TranslateBatchRequest, container: AppContainer = Depends(get_container)):
-    return duplicate_page_batch_response(container.legacy_state, req)
+    return duplicate_page_batch_response(container.project_state, req)
 
 
 @router.post("/api/pages/delete")
@@ -71,12 +71,12 @@ def delete_page(
     page_id: Optional[str] = Form(None),
     container: AppContainer = Depends(get_container),
 ):
-    return delete_page_response(container.legacy_state, index=index, page_id=page_id)
+    return delete_page_response(container.project_state, index=index, page_id=page_id)
 
 
 @router.post("/api/pages/delete-batch")
 def delete_page_batch(req: TranslateBatchRequest, container: AppContainer = Depends(get_container)):
-    return delete_page_batch_response(container.legacy_state, req)
+    return delete_page_batch_response(container.project_state, req)
 
 @router.post("/api/pages/reorder")
 def reorder_pages(
@@ -84,7 +84,7 @@ def reorder_pages(
     to_index: int = Form(...),
     container: AppContainer = Depends(get_container),
 ):
-    return reorder_pages_response(container.legacy_state, from_index, to_index)
+    return reorder_pages_response(container.project_state, from_index, to_index)
 
 @router.get("/api/pages/{page_id}/image")
 def get_page_image(
@@ -94,11 +94,11 @@ def get_page_image(
     preview: bool = False,
     container: AppContainer = Depends(get_container),
 ):
-    return get_page_image_response(container.legacy_state, page_id, image_type=type, thumbnail=thumbnail, preview=preview)
+    return get_page_image_response(container.project_state, page_id, image_type=type, thumbnail=thumbnail, preview=preview)
 
 @router.get("/api/pages/{page_id}/bubbles")
 def get_bubbles(page_id: str, container: AppContainer = Depends(get_container)):
-    return get_bubbles_response(container.legacy_state, page_id, container.render_service)
+    return get_bubbles_response(container.project_state, page_id, container.render_service)
 
 @router.post("/api/pages/{page_id}/bubbles")
 def update_bubbles(
@@ -106,28 +106,28 @@ def update_bubbles(
     bubbles: List[BubbleUpdateSchema],
     container: AppContainer = Depends(get_container),
 ):
-    return update_bubbles_response(container.legacy_state, page_id, bubbles)
+    return update_bubbles_response(container.project_state, page_id, bubbles)
 
 @router.post("/api/pages/{page_id}/bubbles/{bubble_id}/ocr")
 def re_ocr_bubble(page_id: str, bubble_id: int, container: AppContainer = Depends(get_container)):
-    return re_ocr_bubble_response(container.legacy_state, page_id, bubble_id, container.detection_service, container.config)
+    return re_ocr_bubble_response(container.project_state, page_id, bubble_id, container.detection_service, container.config)
 
 @router.post("/api/pages/{page_id}/bubbles/{bubble_id}/translate")
 def translate_single_bubble(page_id: str, bubble_id: int, container: AppContainer = Depends(get_container)):
-    return start_translate_bubble(container.legacy_state, page_id, bubble_id, container.translation_service, container.config)
+    return start_translate_bubble(container.project_state, page_id, bubble_id, container.translation_service, container.config)
 
 @router.post("/api/pages/{page_id}/bubbles/{bubble_id}/inpaint")
 def inpaint_single_bubble(page_id: str, bubble_id: int, container: AppContainer = Depends(get_container)):
-    return start_inpaint_bubble(container.legacy_state, page_id, bubble_id, container.inpainting_service)
+    return start_inpaint_bubble(container.project_state, page_id, bubble_id, container.inpainting_service)
 
 @router.post("/api/pages/{page_id}/inpaint")
 def run_inpaint(page_id: str, container: AppContainer = Depends(get_container)):
-    return start_inpaint_page(container.legacy_state, page_id, container.inpainting_service)
+    return start_inpaint_page(container.project_state, page_id, container.inpainting_service)
 
 @router.post("/api/pages/{page_id}/translate-all")
 def run_translate_all(page_id: str, container: AppContainer = Depends(get_container)):
-    with container.legacy_state.lock:
-        page_idx = _resolve_page_index(container.legacy_state, page_id)
+    with container.project_state.lock:
+        page_idx = _resolve_page_index(container.project_state, page_id)
     return container.job_manager.start(
         "page-translation",
         page_idx,
@@ -135,7 +135,7 @@ def run_translate_all(page_id: str, container: AppContainer = Depends(get_contai
         lambda job: run_page_translation(
             job=job,
             page_id=page_id,
-            state=container.legacy_state,
+            state=container.project_state,
             config=container.config,
             job_manager=container.job_manager,
             runner=container.pipeline_runner,
@@ -147,11 +147,11 @@ def run_translate_all(page_id: str, container: AppContainer = Depends(get_contai
 @router.post("/api/pages/translate-batch")
 def run_translate_batch(req: TranslateBatchRequest, container: AppContainer = Depends(get_container)):
     """Translate multiple pages as a single batch job."""
-    with container.legacy_state.lock:
-        valid_indices = _resolve_indices_from_request(container.legacy_state, req)
+    with container.project_state.lock:
+        valid_indices = _resolve_indices_from_request(container.project_state, req)
         if not valid_indices:
             raise HTTPException(status_code=400, detail="No valid pages to translate")
-        page_ids = [container.legacy_state.pages[idx].page_id for idx in valid_indices]
+        page_ids = [container.project_state.pages[idx].page_id for idx in valid_indices]
         first_idx = valid_indices[0]
 
     key = f"page-translation-batch:{','.join(page_ids)}"
@@ -171,8 +171,8 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
     for page_id in page_ids:
         page_idx = None
         try:
-            with container.legacy_state.lock:
-                page_idx = _resolve_page_index(container.legacy_state, page_id)
+            with container.project_state.lock:
+                page_idx = _resolve_page_index(container.project_state, page_id)
             container.job_manager.update(
                 job,
                 progress=int((completed / total) * 100),
@@ -182,7 +182,7 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
             run_page_translation(
                 job=job,
                 page_id=page_id,
-                state=container.legacy_state,
+                state=container.project_state,
                 config=container.config,
                 job_manager=container.job_manager,
                 runner=container.pipeline_runner,
@@ -213,4 +213,4 @@ def export_page(
     use_dialog: bool = Form(False),
     container: AppContainer = Depends(get_container),
 ):
-    return export_page_response(container.legacy_state, page_id, container.export_service, save_path=save_path)
+    return export_page_response(container.project_state, page_id, container.export_service, save_path=save_path)
