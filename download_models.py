@@ -11,7 +11,7 @@ sys.path.append(os.path.join(current_dir, "backend"))
 
 from modules.logging_config import configure_logging
 from modules.utils.download import ModelDownloader, ModelID
-from modules.config import config
+from modules.config import AppConfig
 from services.model_requirements import get_required_model_ids
 from app.version import APP_NAME
 
@@ -36,12 +36,18 @@ ALL_CORE_MODEL_IDS = [
 ]
 
 
-def get_model_ids(profile: str = "current", settings=None) -> list[ModelID]:
+def _load_current_settings() -> AppConfig:
+    settings = AppConfig()
+    settings.load()
+    return settings
+
+
+def get_model_ids(profile: str = "current", settings: AppConfig | None = None) -> list[ModelID]:
     if profile == "minimal":
         return MINIMAL_MODEL_IDS
     if profile == "all":
         return ALL_CORE_MODEL_IDS
-    return get_required_model_ids(settings or config)
+    return get_required_model_ids(settings or _load_current_settings())
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:

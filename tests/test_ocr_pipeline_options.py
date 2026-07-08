@@ -122,10 +122,9 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         crop = np.full((12, 12, 3), 128, dtype=np.uint8)
 
         with (
-            patch("modules.config.config", cfg),
-            patch("modules.config.cv2.createCLAHE") as create_clahe,
-            patch("modules.config.cv2.adaptiveThreshold", return_value=np.zeros((12, 12), dtype=np.uint8)),
-            patch("modules.config.cv2.cvtColor", side_effect=lambda image, *_args: image[:, :, 0] if image.ndim == 3 else np.dstack([image] * 3)),
+            patch("modules.ocr.ppocr.preprocessing.cv2.createCLAHE") as create_clahe,
+            patch("modules.ocr.ppocr.preprocessing.cv2.adaptiveThreshold", return_value=np.zeros((12, 12), dtype=np.uint8)),
+            patch("modules.ocr.ppocr.preprocessing.cv2.cvtColor", side_effect=lambda image, *_args: image[:, :, 0] if image.ndim == 3 else np.dstack([image] * 3)),
         ):
             create_clahe.return_value.apply.side_effect = lambda gray: gray
             cfg.apply_adaptive_binarization(crop)

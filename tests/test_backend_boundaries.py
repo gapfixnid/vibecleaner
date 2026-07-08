@@ -28,6 +28,10 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert "from domain.project_state import state" not in combined
     assert "state = ProjectState()" not in combined
     assert "from modules.config import config" not in combined
+    assert "config: AppConfig = AppConfig()" not in combined
+    assert "load_settings = config.load" not in combined
+    assert "save_settings = config.save" not in combined
+    assert "apply_adaptive_binarization = config.apply_adaptive_binarization" not in combined
     assert "from services.service_registry import" not in combined
 
 

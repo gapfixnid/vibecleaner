@@ -465,6 +465,9 @@ Expected: PASS.
   of importing the global config singleton, and page translation routes use the
   container-owned `auto_typeset_runner` field instead of the legacy
   `auto_typeset_pipeline` name.
+- `backend/modules/config.py` no longer creates or auto-loads a module-level
+  `config` singleton, and model-requirement helpers now require an explicit
+  `AppConfig` from the container or CLI composition path.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

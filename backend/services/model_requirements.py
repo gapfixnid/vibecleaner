@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from modules.config import AppConfig, config
+from modules.config import AppConfig
 from modules.utils.download import ModelDownloader, ModelID
 
 
@@ -38,8 +38,8 @@ def _ppocr_recognition_model(source_language: str) -> ModelID:
     return ModelID.PPOCR_V5_REC_MOBILE
 
 
-def get_required_model_ids(settings: AppConfig | None = None) -> list[ModelID]:
-    cfg = settings or config
+def get_required_model_ids(settings: AppConfig) -> list[ModelID]:
+    cfg = settings
     required: list[ModelID] = []
 
     detect_model = _normalized(getattr(cfg, "detect_model", "High Precision (FP32)"))
@@ -79,8 +79,8 @@ def _model_item(model_id: ModelID) -> dict[str, Any]:
     }
 
 
-def get_model_status(settings: AppConfig | None = None) -> dict[str, Any]:
-    cfg = settings or config
+def get_model_status(settings: AppConfig) -> dict[str, Any]:
+    cfg = settings
     items = [_model_item(model_id) for model_id in get_required_model_ids(cfg)]
     missing = [item for item in items if not item["downloaded"]]
     return {
@@ -93,10 +93,10 @@ def get_model_status(settings: AppConfig | None = None) -> dict[str, Any]:
     }
 
 
-def download_required_models(settings: AppConfig | None = None, job: dict[str, Any] | None = None) -> dict[str, Any]:
+def download_required_models(settings: AppConfig, job: dict[str, Any] | None = None) -> dict[str, Any]:
     from services.job_service import job_manager
 
-    cfg = settings or config
+    cfg = settings
     model_ids = get_required_model_ids(cfg)
     total = len(model_ids)
     downloaded: list[str] = []

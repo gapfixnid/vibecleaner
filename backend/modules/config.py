@@ -4,9 +4,7 @@
 # Usage:
 #   from modules.config import AppConfig       # AppConfig settings model
 #   from modules.config import APP_DATA_DIR    # module-level constants
-#   config.TRANSLATION_PROVIDER = "google"     # read / write settings
-#   config.load()                              # reload from disk
-#   config.save()                              # persist to disk
+#   cfg = AppConfig(); cfg.load()              # container-owned settings
 
 from __future__ import annotations
 
@@ -16,9 +14,6 @@ import os
 import platform
 from dataclasses import dataclass, field, asdict
 from typing import Any
-
-import cv2
-import numpy as np
 
 from app.version import APP_NAME
 
@@ -47,7 +42,7 @@ os.makedirs(APP_DATA_DIR, exist_ok=True)
 SETTINGS_FILE_PATH: str = os.path.join(APP_DATA_DIR, "settings.json")
 
 # ---------------------------------------------------------------------------
-# AppConfig — mutable settings container (single instance: `config`)
+# AppConfig — mutable settings container
 # ---------------------------------------------------------------------------
 
 
@@ -293,46 +288,3 @@ class AppConfig:
         )
 
 
-# ---------------------------------------------------------------------------
-# Singleton instance
-# ---------------------------------------------------------------------------
-
-config: AppConfig = AppConfig()
-
-# Auto-load on import (preserves existing behaviour)
-config.load()
-
-# ---------------------------------------------------------------------------
-# Legacy top-level aliases (backward compat — deprecated)
-# These are kept so that code doing `app_config.TRANSLATION_MODEL` still
-# works via `__getattr__` on the module level (see below).
-# ---------------------------------------------------------------------------
-
-
-def __getattr__(name: str) -> Any:
-    """Fallback: redirect bare-name access to the singleton instance."""
-    if name in ("TRANSLATION_MODEL", "TRANSLATION_PROVIDER",
-                "TRANSLATION_API_BASE_URL", "TRANSLATION_API_KEY",
-                "TRANSLATION_TIMEOUT_SECONDS", "TRANSLATION_SUPPORTS_VISION",
-                "TRANSLATION_CACHE_ENABLED", "TRANSLATION_CACHE_MODE",
-                "SYSTEM_PROMPT",
-                "UI_LANGUAGE", "SOURCE_LANGUAGE", "TARGET_LANGUAGE",
-                "DETECT_MODEL", "CONFIDENCE_THRESHOLD",
-                "TILING_ENABLED", "BUBBLES_ONLY",
-                "OCR_ENGINE", "OCR_PADDING", "OCR_CROP_SCALE", "LINE_MERGE_SENSITIVITY",
-                "ADAPTIVE_BINARIZATION", "ADAPTIVE_BINARIZATION_STRENGTH",
-                "SMART_DIRECTION", "TEXT_DIRECTION_OVERRIDE",
-                "MIN_FONT_SIZE", "MAX_FONT_SIZE", "DEFAULT_FONT_SIZE",
-                "INPAINT_MASK_DILATION", "INPAINT_USE_TEXTBOX_ONLY",
-                "INPAINT_CLIP_TO_BUBBLE"):
-        # Map SCREAMING_SNAKE_CASE → snake_case on the config instance
-        snake = name.lower()
-        if hasattr(config, snake):
-            return getattr(config, snake)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-# Also expose the old function names for backward compatibility.
-load_settings = config.load
-save_settings = config.save
-apply_adaptive_binarization = config.apply_adaptive_binarization
