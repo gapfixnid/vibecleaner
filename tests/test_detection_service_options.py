@@ -28,6 +28,10 @@ class FakeDetector:
         model_name=None,
         confidence_threshold=None,
         tiling_enabled=None,
+        bubbles_only=None,
+        line_merge_sensitivity=None,
+        smart_direction=None,
+        text_direction_override=None,
     ):
         self.calls.append(
             {
@@ -35,6 +39,10 @@ class FakeDetector:
                 "model_name": model_name,
                 "confidence_threshold": confidence_threshold,
                 "tiling_enabled": tiling_enabled,
+                "bubbles_only": bubbles_only,
+                "line_merge_sensitivity": line_merge_sensitivity,
+                "smart_direction": smart_direction,
+                "text_direction_override": text_direction_override,
             }
         )
         return [FakeBlock()]
@@ -59,6 +67,10 @@ def test_detection_service_passes_explicit_detection_options_from_config():
             detect_model="Small (INT8)",
             confidence_threshold=0.61,
             tiling_enabled=False,
+            bubbles_only=True,
+            line_merge_sensitivity=1.9,
+            smart_direction=False,
+            text_direction_override="vertical",
             ocr_engine="ppocr",
         ),
     )
@@ -68,4 +80,8 @@ def test_detection_service_passes_explicit_detection_options_from_config():
     assert detector.calls[0]["model_name"] == "Small (INT8)"
     assert detector.calls[0]["confidence_threshold"] == 0.61
     assert detector.calls[0]["tiling_enabled"] is False
+    assert detector.calls[0]["bubbles_only"] is True
+    assert detector.calls[0]["line_merge_sensitivity"] == 1.9
+    assert detector.calls[0]["smart_direction"] is False
+    assert detector.calls[0]["text_direction_override"] == "vertical"
     assert blocks[0].text == "ppocr:text"

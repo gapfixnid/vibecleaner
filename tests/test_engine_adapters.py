@@ -44,6 +44,10 @@ class FakeDetectBubblesDetector:
         model_name=None,
         confidence_threshold=None,
         tiling_enabled=None,
+        bubbles_only=None,
+        line_merge_sensitivity=None,
+        smart_direction=None,
+        text_direction_override=None,
     ):
         self.calls.append(
             {
@@ -51,6 +55,10 @@ class FakeDetectBubblesDetector:
                 "model_name": model_name,
                 "confidence_threshold": confidence_threshold,
                 "tiling_enabled": tiling_enabled,
+                "bubbles_only": bubbles_only,
+                "line_merge_sensitivity": line_merge_sensitivity,
+                "smart_direction": smart_direction,
+                "text_direction_override": text_direction_override,
             }
         )
         return [FakeLegacyBlock([3, 4, 13, 14])]
@@ -156,6 +164,26 @@ def test_detection_adapter_wraps_detect_bubbles_legacy_engine():
     assert detector.calls[0]["confidence_threshold"] == 0.52
     assert detector.calls[0]["tiling_enabled"] is False
     assert result.regions[0].box == Box(x1=3, y1=4, x2=13, y2=14)
+
+
+def test_detection_adapter_passes_explicit_postprocess_options():
+    detector = FakeDetectBubblesDetector()
+    adapter = DetectionEngineAdapter(engine=detector)
+
+    adapter.detect(
+        ImageData(array=object()),
+        DetectionOptions(
+            bubbles_only=True,
+            line_merge_sensitivity=1.8,
+            smart_direction=False,
+            text_direction_override="horizontal",
+        ),
+    )
+
+    assert detector.calls[0]["bubbles_only"] is True
+    assert detector.calls[0]["line_merge_sensitivity"] == 1.8
+    assert detector.calls[0]["smart_direction"] is False
+    assert detector.calls[0]["text_direction_override"] == "horizontal"
 
 
 def test_ocr_adapter_adds_recognized_text_to_regions():

@@ -43,8 +43,20 @@ class DetectionEngine(ABC):
         
     def create_text_blocks(
         self, 
-        image: np.ndarray, 
+        image: np.ndarray,
         text_boxes: np.ndarray,
-        bubble_boxes: Optional[np.ndarray] = None
+        bubble_boxes: Optional[np.ndarray] = None,
+        bubbles_only: bool | None = None,
+        line_merge_sensitivity: float | None = None,
+        smart_direction: bool | None = None,
+        text_direction_override: str | None = None,
     ) -> list[TextBlock]:
-        return self.pipeline.build_text_blocks(image, text_boxes, bubble_boxes)
+        return self.pipeline.build_text_blocks(
+            image,
+            text_boxes,
+            bubble_boxes,
+            bubbles_only=bubbles_only,
+            line_merge_sensitivity=line_merge_sensitivity,
+            smart_direction=smart_direction,
+            text_direction_override=text_direction_override,
+        )

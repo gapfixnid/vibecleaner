@@ -12,6 +12,10 @@ class DetectionOptions:
     model_name: str = "High Precision (FP32)"
     confidence_threshold: float = 0.3
     tiling_enabled: bool = True
+    bubbles_only: bool = False
+    line_merge_sensitivity: float = 1.2
+    smart_direction: bool = True
+    text_direction_override: str = "auto"
 
 
 @dataclass

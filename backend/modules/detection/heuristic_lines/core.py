@@ -26,6 +26,9 @@ def annotate_blocks_with_heuristic_lines(
     image: np.ndarray,
     blocks: list[TextBlock],
     source_language: str | None = None,
+    line_merge_sensitivity: float = 1.2,
+    smart_direction: bool = True,
+    text_direction_override: str = "auto",
 ) -> list[TextBlock]:
     if image is None or image.size == 0 or not blocks:
         return blocks
@@ -41,7 +44,13 @@ def annotate_blocks_with_heuristic_lines(
             continue
 
         crop = image[y1:y2, x1:x2]
-        lines, direction = _detect_lines_and_direction_in_crop(crop, block_source_language)
+        lines, direction = _detect_lines_and_direction_in_crop(
+            crop,
+            block_source_language,
+            line_merge_sensitivity=line_merge_sensitivity,
+            smart_direction=smart_direction,
+            text_direction_override=text_direction_override,
+        )
         image_lines = [_offset_line(line, x1, y1) for line in lines]
 
         block.lines = _sort_lines(image_lines, direction)
@@ -49,20 +58,34 @@ def annotate_blocks_with_heuristic_lines(
 
     return blocks
 
-def _detect_lines_in_crop(image: np.ndarray, direction_hint: str | None) -> list[list[int]]:
+def _detect_lines_in_crop(
+    image: np.ndarray,
+    direction_hint: str | None,
+    line_merge_sensitivity: float = 1.2,
+) -> list[list[int]]:
     if direction_hint in {"horizontal", "vertical"}:
         text_mask = _prepare_text_mask(image)
         if text_mask is None:
             height, width = image.shape[:2]
             return [[0, 0, max(0, width), max(0, height)]]
-        return _detect_lines_from_mask(text_mask, direction_hint)
+        return _detect_lines_from_mask(
+            text_mask,
+            direction_hint,
+            line_merge_sensitivity=line_merge_sensitivity,
+        )
 
-    lines, _ = _detect_lines_and_direction_in_crop(image)
+    lines, _ = _detect_lines_and_direction_in_crop(
+        image,
+        line_merge_sensitivity=line_merge_sensitivity,
+    )
     return lines
 
 def _detect_lines_and_direction_in_crop(
     image: np.ndarray,
     source_language: str = "",
+    line_merge_sensitivity: float = 1.2,
+    smart_direction: bool = True,
+    text_direction_override: str = "auto",
 ) -> tuple[list[list[int]], str]:
     height, width = image.shape[:2]
     if width <= 1 or height <= 1:
@@ -75,28 +98,49 @@ def _detect_lines_and_direction_in_crop(
         return [box], _fallback_direction(box, source_language)
     mask_stats = _compute_mask_stats(text_mask)
 
-    from modules.config import config
-    direction_override = str(getattr(config, "text_direction_override", "auto") or "auto").strip().lower()
-    smart_direction = getattr(config, "smart_direction", True)
+    direction_override = str(text_direction_override or "auto").strip().lower()
 
     from .skew import _filter_noise_lines
     component_vertical_lines: list[list[int]] = []
     if direction_override in {"horizontal", "vertical"}:
         direction = direction_override
         if direction == "horizontal":
-            horizontal_lines = _detect_horizontal_lines_skew_aware(text_mask)
+            horizontal_lines = _detect_horizontal_lines_skew_aware(
+                text_mask,
+                line_merge_sensitivity=line_merge_sensitivity,
+            )
             vertical_lines = []
         else:
             horizontal_lines = []
-            vertical_lines = _filter_noise_lines(_detect_lines_from_mask(text_mask, "vertical"), "vertical")
+            vertical_lines = _filter_noise_lines(
+                _detect_lines_from_mask(
+                    text_mask,
+                    "vertical",
+                    line_merge_sensitivity=line_merge_sensitivity,
+                ),
+                "vertical",
+            )
             component_vertical_lines = _detect_sparse_vertical_component_columns(text_mask, component_boxes=mask_stats.component_boxes)
     elif not smart_direction:
         direction = "horizontal"
-        horizontal_lines = _detect_horizontal_lines_skew_aware(text_mask)
+        horizontal_lines = _detect_horizontal_lines_skew_aware(
+            text_mask,
+            line_merge_sensitivity=line_merge_sensitivity,
+        )
         vertical_lines = []
     else:
-        horizontal_lines = _detect_horizontal_lines_skew_aware(text_mask)
-        vertical_lines = _filter_noise_lines(_detect_lines_from_mask(text_mask, "vertical"), "vertical")
+        horizontal_lines = _detect_horizontal_lines_skew_aware(
+            text_mask,
+            line_merge_sensitivity=line_merge_sensitivity,
+        )
+        vertical_lines = _filter_noise_lines(
+            _detect_lines_from_mask(
+                text_mask,
+                "vertical",
+                line_merge_sensitivity=line_merge_sensitivity,
+            ),
+            "vertical",
+        )
         component_vertical_lines = _detect_sparse_vertical_component_columns(text_mask, component_boxes=mask_stats.component_boxes)
 
         horizontal_score = _score_line_candidate(horizontal_lines, "horizontal", text_mask, mask_stats=mask_stats)
@@ -130,7 +174,10 @@ def _detect_lines_and_direction_in_crop(
             if len(sub_masks) > 1:
                 lines = []
                 for sub_mask in sub_masks:
-                    sub_lines = _detect_horizontal_lines_skew_aware(sub_mask)
+                    sub_lines = _detect_horizontal_lines_skew_aware(
+                        sub_mask,
+                        line_merge_sensitivity=line_merge_sensitivity,
+                    )
                     sub_lines = [l for l in sub_lines if l != [0, 0, width, height]]
                     lines.extend(sub_lines)
                 mask_was_split = True
@@ -144,8 +191,16 @@ def _detect_lines_and_direction_in_crop(
             integral_image=mask_stats.integral_image,
         )
         lines = _collapse_edge_spanning_horizontal_fragments(lines, text_mask, vertical_lines)
-        lines, text_mask = _replace_low_density_line_with_inverse_mask(image, lines, text_mask)
-        lines = _merge_small_horizontal_fragments(lines)
+        lines, text_mask = _replace_low_density_line_with_inverse_mask(
+            image,
+            lines,
+            text_mask,
+            line_merge_sensitivity=line_merge_sensitivity,
+        )
+        lines = _merge_small_horizontal_fragments(
+            lines,
+            line_merge_sensitivity=line_merge_sensitivity,
+        )
         lines = _filter_marginal_horizontal_artifacts(lines, text_mask)
     else:
         if _should_use_component_vertical_columns(text_mask, vertical_lines, component_vertical_lines):
@@ -252,6 +307,7 @@ def _replace_low_density_line_with_inverse_mask(
     image: np.ndarray,
     lines: list[list[int]],
     text_mask: np.ndarray,
+    line_merge_sensitivity: float = 1.2,
 ) -> tuple[list[list[int]], np.ndarray]:
     if len(lines) != 1:
         return lines, text_mask
@@ -282,9 +338,19 @@ def _replace_low_density_line_with_inverse_mask(
     if inverse_mask is None or not bool(inverse_mask.any()):
         return lines, text_mask
 
-    inverse_lines = _detect_horizontal_lines_skew_aware(inverse_mask)
+    inverse_lines = _detect_horizontal_lines_skew_aware(
+        inverse_mask,
+        line_merge_sensitivity=line_merge_sensitivity,
+    )
     from .skew import _filter_noise_lines
-    inverse_vertical_lines = _filter_noise_lines(_detect_lines_from_mask(inverse_mask, "vertical"), "vertical")
+    inverse_vertical_lines = _filter_noise_lines(
+        _detect_lines_from_mask(
+            inverse_mask,
+            "vertical",
+            line_merge_sensitivity=line_merge_sensitivity,
+        ),
+        "vertical",
+    )
     inverse_lines = _trim_marginal_vertical_noise_from_horizontal_lines(
         inverse_lines,
         inverse_mask,

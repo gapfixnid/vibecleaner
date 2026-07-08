@@ -1,7 +1,6 @@
 from typing import Optional
 
 import logging
-from modules.config import config
 import numpy as np
 
 from modules.detection.backend import resolve_detection_backend
@@ -27,6 +26,10 @@ class DetectionPipeline:
         image: np.ndarray,
         text_boxes: np.ndarray,
         bubble_boxes: Optional[np.ndarray] = None,
+        bubbles_only: bool | None = None,
+        line_merge_sensitivity: float | None = None,
+        smart_direction: bool | None = None,
+        text_direction_override: str | None = None,
     ) -> list[TextBlock]:
         text_boxes = filter_and_fix_bboxes(text_boxes, image.shape)
         bubble_boxes = filter_and_fix_bboxes(bubble_boxes, image.shape)
@@ -38,9 +41,28 @@ class DetectionPipeline:
             return []
 
         text_colors_per_box = self._extract_text_colors(image, text_boxes)
-        text_blocks = self._match_text_to_bubbles(image, text_boxes, bubble_boxes, text_colors_per_box)
-        self._annotate_lines(image, text_blocks)
+        text_blocks = self._match_text_to_bubbles(
+            image,
+            text_boxes,
+            bubble_boxes,
+            text_colors_per_box,
+            bubbles_only=self._resolve_option("bubbles_only", bubbles_only, False),
+        )
+        self._annotate_lines(
+            image,
+            text_blocks,
+            line_merge_sensitivity=self._resolve_option("line_merge_sensitivity", line_merge_sensitivity, 1.2),
+            smart_direction=self._resolve_option("smart_direction", smart_direction, True),
+            text_direction_override=self._resolve_option("text_direction_override", text_direction_override, "auto"),
+        )
         return text_blocks
+
+    def _resolve_option(self, name: str, explicit_value, default):
+        if explicit_value is not None:
+            return explicit_value
+        if self.settings is not None and hasattr(self.settings, name):
+            return getattr(self.settings, name)
+        return default
 
     def _extract_text_colors(self, image: np.ndarray, text_boxes: np.ndarray) -> list[tuple]:
         h, w = image.shape[:2]
@@ -116,6 +138,7 @@ class DetectionPipeline:
         text_boxes: np.ndarray,
         bubble_boxes: np.ndarray,
         text_colors_per_box: list[tuple],
+        bubbles_only: bool = False,
     ) -> list[TextBlock]:
         text_blocks = []
         text_matched = [False] * len(text_boxes)
@@ -132,7 +155,7 @@ class DetectionPipeline:
                 if does_rectangle_fit(bubble_box, txt_box) or do_rectangles_overlap(bubble_box, txt_box):
                     # Check if it has a bubble-like background if bubbles_only is enabled
                     is_bubble_bg = True
-                    if config.bubbles_only:
+                    if bubbles_only:
                         is_bubble_bg = self._is_bubble_background(image, bubble_box)
 
                     if is_bubble_bg:
@@ -152,10 +175,23 @@ class DetectionPipeline:
 
         return text_blocks
 
-    def _annotate_lines(self, image: np.ndarray, text_blocks: list[TextBlock]) -> None:
+    def _annotate_lines(
+        self,
+        image: np.ndarray,
+        text_blocks: list[TextBlock],
+        line_merge_sensitivity: float = 1.2,
+        smart_direction: bool = True,
+        text_direction_override: str = "auto",
+    ) -> None:
         try:
             device = resolve_device(self.settings.is_gpu_enabled(), self.backend) if self.settings else "cpu"
             _ = device
-            annotate_blocks_with_heuristic_lines(image, text_blocks)
+            annotate_blocks_with_heuristic_lines(
+                image,
+                text_blocks,
+                line_merge_sensitivity=line_merge_sensitivity,
+                smart_direction=smart_direction,
+                text_direction_override=text_direction_override,
+            )
         except Exception:
             logger.exception("Failed to build heuristic text lines. block_count=%s", len(text_blocks))

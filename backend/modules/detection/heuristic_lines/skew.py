@@ -35,9 +35,22 @@ def _filter_noise_lines(lines: list[list[int]], direction: str) -> list[list[int
         filtered.append(line)
     return filtered
 
-def _detect_horizontal_lines_skew_aware(text_mask: np.ndarray) -> list[list[int]]:
-    base_lines = _filter_noise_lines(_detect_lines_from_mask(text_mask, "horizontal"), "horizontal")
-    base_lines = _merge_aligned_horizontal_fragments(base_lines)
+def _detect_horizontal_lines_skew_aware(
+    text_mask: np.ndarray,
+    line_merge_sensitivity: float = 1.2,
+) -> list[list[int]]:
+    base_lines = _filter_noise_lines(
+        _detect_lines_from_mask(
+            text_mask,
+            "horizontal",
+            line_merge_sensitivity=line_merge_sensitivity,
+        ),
+        "horizontal",
+    )
+    base_lines = _merge_aligned_horizontal_fragments(
+        base_lines,
+        line_merge_sensitivity=line_merge_sensitivity,
+    )
     if not base_lines:
         base_lines = [[0, 0, text_mask.shape[1], text_mask.shape[0]]]
 
@@ -198,7 +211,10 @@ def _recover_multiline_base_rows(
         return None
     return recovered_rows
 
-def _merge_aligned_horizontal_fragments(lines: list[list[int]]) -> list[list[int]]:
+def _merge_aligned_horizontal_fragments(
+    lines: list[list[int]],
+    line_merge_sensitivity: float = 1.2,
+) -> list[list[int]]:
     if len(lines) <= 1 or any(_is_polygon_line(line) for line in lines):
         return lines
 
@@ -226,9 +242,7 @@ def _merge_aligned_horizontal_fragments(lines: list[list[int]]) -> list[list[int
             matched_row.append(box)
 
     merged_boxes: list[list[int]] = []
-    from modules.config import config
-    sensitivity = getattr(config, "LINE_MERGE_SENSITIVITY", 1.2)
-    gap_limit = max(14.0, median_height * 1.55 * (sensitivity / 1.2))
+    gap_limit = max(14.0, median_height * 1.55 * (line_merge_sensitivity / 1.2))
     for row in rows:
         row = sorted(row, key=lambda item: item[0])
         current = row[0].copy()

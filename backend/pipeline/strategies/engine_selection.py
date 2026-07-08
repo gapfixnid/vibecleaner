@@ -14,6 +14,10 @@ class EngineSelectionStrategy:
             model_name=settings.detect_model,
             confidence_threshold=settings.confidence_threshold,
             tiling_enabled=settings.tiling_enabled,
+            bubbles_only=settings.bubbles_only,
+            line_merge_sensitivity=settings.line_merge_sensitivity,
+            smart_direction=settings.smart_direction,
+            text_direction_override=settings.text_direction_override,
         )
 
     def ocr_options(self, settings: AppConfigSnapshot) -> OcrOptions:

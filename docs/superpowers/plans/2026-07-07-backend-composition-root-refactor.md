@@ -452,6 +452,11 @@ Expected: PASS.
 - The YOLO ONNX detection engine now receives explicit model,
   confidence-threshold, and tiling options through `initialize` and `detect`
   instead of reading the global config singleton.
+- Heuristic detection post-processing now receives explicit bubbles-only,
+  line-merge sensitivity, smart-direction, and text-direction override options
+  through `DetectionOptions`, `EngineSelectionStrategy`, and the detection
+  adapter/service path; `DetectionPipeline` and heuristic line helpers no
+  longer read the global config singleton.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

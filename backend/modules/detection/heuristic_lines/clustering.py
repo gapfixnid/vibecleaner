@@ -5,7 +5,11 @@ import imkit as imk
 
 from .mask import _mask_bounds, _sum_box_pixels
 
-def _detect_lines_from_mask(text_mask: np.ndarray, direction: str) -> list[list[int]]:
+def _detect_lines_from_mask(
+    text_mask: np.ndarray,
+    direction: str,
+    line_merge_sensitivity: float = 1.2,
+) -> list[list[int]]:
     height, width = text_mask.shape[:2]
     x_sum = text_mask.sum(axis=0)
     y_sum = text_mask.sum(axis=1)
@@ -45,7 +49,16 @@ def _detect_lines_from_mask(text_mask: np.ndarray, direction: str) -> list[list[
             continue
 
         if direction == "horizontal":
-            boxes.extend(_split_horizontal_span(text_mask, sx1, sy1, sx2, sy2))
+            boxes.extend(
+                _split_horizontal_span(
+                    text_mask,
+                    sx1,
+                    sy1,
+                    sx2,
+                    sy2,
+                    line_merge_sensitivity=line_merge_sensitivity,
+                )
+            )
         else:
             min_x = sx1 + bounds[0]
             max_x = sx1 + bounds[2]
@@ -177,7 +190,14 @@ def _is_soft_horizontal_valley(y_sum: np.ndarray, run: list[int], max_peak: int,
 
     return min_val <= min(left_peak, right_peak) * 0.35
 
-def _split_horizontal_span(text_mask: np.ndarray, sx1: int, sy1: int, sx2: int, sy2: int) -> list[list[int]]:
+def _split_horizontal_span(
+    text_mask: np.ndarray,
+    sx1: int,
+    sy1: int,
+    sx2: int,
+    sy2: int,
+    line_merge_sensitivity: float = 1.2,
+) -> list[list[int]]:
     region = text_mask[sy1:sy2, sx1:sx2]
     bounds = _mask_bounds(region)
     if bounds is None:
@@ -188,12 +208,35 @@ def _split_horizontal_span(text_mask: np.ndarray, sx1: int, sy1: int, sx2: int, 
         sub_boxes = []
         last_y = 0
         for split_y in splits:
-            sub_boxes.extend(_split_horizontal_span(text_mask, sx1, sy1 + last_y, sx2, sy1 + split_y))
+            sub_boxes.extend(
+                _split_horizontal_span(
+                    text_mask,
+                    sx1,
+                    sy1 + last_y,
+                    sx2,
+                    sy1 + split_y,
+                    line_merge_sensitivity=line_merge_sensitivity,
+                )
+            )
             last_y = split_y + 1
-        sub_boxes.extend(_split_horizontal_span(text_mask, sx1, sy1 + last_y, sx2, sy2))
+        sub_boxes.extend(
+            _split_horizontal_span(
+                text_mask,
+                sx1,
+                sy1 + last_y,
+                sx2,
+                sy2,
+                line_merge_sensitivity=line_merge_sensitivity,
+            )
+        )
         return sub_boxes
 
-    component_rows = _split_tall_horizontal_span(region, sx1, sy1)
+    component_rows = _split_tall_horizontal_span(
+        region,
+        sx1,
+        sy1,
+        line_merge_sensitivity=line_merge_sensitivity,
+    )
     if component_rows is not None:
         return component_rows
 
@@ -370,7 +413,10 @@ def _has_intervening_text_ink(
     ink_columns = int(bridge.any(axis=0).sum())
     return ink_columns >= max(3, min(12, int(round(bridge_width * 0.08))))
 
-def _merge_small_horizontal_fragments(lines: list[list[int]]) -> list[list[int]]:
+def _merge_small_horizontal_fragments(
+    lines: list[list[int]],
+    line_merge_sensitivity: float = 1.2,
+) -> list[list[int]]:
     from .geometry import _is_polygon_line, _line_axis_box
 
     if len(lines) <= 1:
@@ -411,10 +457,8 @@ def _merge_small_horizontal_fragments(lines: list[list[int]]) -> list[list[int]]
             vertical_overlap = min(box[3], target[3]) - max(box[1], target[1]) + 1
             min_h = min(box_height, target_height)
 
-            from modules.config import config
-            sensitivity = getattr(config, "LINE_MERGE_SENSITIVITY", 1.2)
             vertical_gap = max(0, max(box[1], target[1]) - min(box[3], target[3]) - 1)
-            gap_limit = max(8.0, median_height * 0.45 * (sensitivity / 1.2))
+            gap_limit = max(8.0, median_height * 0.45 * (line_merge_sensitivity / 1.2))
 
             has_overlap = min_h > 0 and (vertical_overlap / min_h) >= 0.20
             has_small_gap = vertical_gap <= gap_limit and box_height < target_height * 0.60
@@ -527,7 +571,12 @@ def _refine_box_in_range(text_mask: np.ndarray, x1: int, y1: int, x2: int, y2: i
     bx1, by1, bx2, by2 = bounds
     return [x1 + bx1, y1 + by1, x1 + bx2, y1 + by2]
 
-def _split_tall_horizontal_span(region: np.ndarray, offset_x: int, offset_y: int) -> list[list[int]] | None:
+def _split_tall_horizontal_span(
+    region: np.ndarray,
+    offset_x: int,
+    offset_y: int,
+    line_merge_sensitivity: float = 1.2,
+) -> list[list[int]] | None:
     components = _component_boxes(region)
     if len(components) < 4:
         return None
@@ -560,7 +609,12 @@ def _split_tall_horizontal_span(region: np.ndarray, offset_x: int, offset_y: int
             if box is not None:
                 local_boxes.append(box)
 
-    local_boxes = _merge_left_marginal_boxes(local_boxes, region.shape[1], median_height)
+    local_boxes = _merge_left_marginal_boxes(
+        local_boxes,
+        region.shape[1],
+        median_height,
+        line_merge_sensitivity=line_merge_sensitivity,
+    )
     if len(local_boxes) <= 1:
         return None
 
@@ -772,7 +826,12 @@ def _components_to_band_box(
     bx1, by1, bx2, by2 = bounds
     return [x1 + bx1, y1 + by1, x1 + bx2, y1 + by2]
 
-def _merge_left_marginal_boxes(boxes: list[list[int]], span_width: int, median_height: float) -> list[list[int]]:
+def _merge_left_marginal_boxes(
+    boxes: list[list[int]],
+    span_width: int,
+    median_height: float,
+    line_merge_sensitivity: float = 1.2,
+) -> list[list[int]]:
     if len(boxes) <= 2:
         return boxes
 
@@ -793,8 +852,6 @@ def _merge_left_marginal_boxes(boxes: list[list[int]], span_width: int, median_h
         consumed.add(index)
         for other_index in range(index + 1, len(left_boxes)):
             other = left_boxes[other_index]
-            from modules.config import config
-            sensitivity = getattr(config, "LINE_MERGE_SENSITIVITY", 1.2)
             vertical_gap = max(0, max(merged[1], other[1]) - min(merged[3], other[3]))
             horizontal_gap = max(0, max(merged[0], other[0]) - min(merged[2], other[2]))
             union = [
@@ -803,7 +860,7 @@ def _merge_left_marginal_boxes(boxes: list[list[int]], span_width: int, median_h
                 max(merged[2], other[2]),
                 max(merged[3], other[3]),
             ]
-            if vertical_gap <= median_height * 0.8 * (sensitivity / 1.2) and horizontal_gap <= median_height * 1.2 and (union[3] - union[1] + 1) <= median_height * 4.8:
+            if vertical_gap <= median_height * 0.8 * (line_merge_sensitivity / 1.2) and horizontal_gap <= median_height * 1.2 and (union[3] - union[1] + 1) <= median_height * 4.8:
                 merged = union
                 consumed.add(other_index)
         merged_left.append(merged)

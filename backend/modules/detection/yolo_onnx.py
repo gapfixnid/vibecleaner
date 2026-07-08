@@ -70,6 +70,10 @@ class YoloONNXDetection(DetectionEngine):
         model_name: str | None = None,
         confidence_threshold: float | None = None,
         tiling_enabled: bool | None = None,
+        bubbles_only: bool | None = None,
+        line_merge_sensitivity: float | None = None,
+        smart_direction: bool | None = None,
+        text_direction_override: str | None = None,
     ) -> list[TextBlock]:
         model_name = model_name or getattr(self, "current_loaded_model", "ysgyolo.onnx")
         if getattr(self, "current_loaded_model", None) != model_name:
@@ -90,7 +94,15 @@ class YoloONNXDetection(DetectionEngine):
             bubble_boxes, text_boxes = self.image_slicer.process_slices_for_detection(
                 image, self._detect_single_image
             )
-        return self.create_text_blocks(image, text_boxes, bubble_boxes)
+        return self.create_text_blocks(
+            image,
+            text_boxes,
+            bubble_boxes,
+            bubbles_only=bubbles_only,
+            line_merge_sensitivity=line_merge_sensitivity,
+            smart_direction=smart_direction,
+            text_direction_override=text_direction_override,
+        )
 
     def _detect_single_image(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         h_orig, w_orig = image.shape[:2]

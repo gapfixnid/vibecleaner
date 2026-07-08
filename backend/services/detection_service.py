@@ -50,6 +50,24 @@ class DetectionService:
             return bool(tiling_enabled)
         return bool(getattr(self.config, "tiling_enabled", True))
 
+    def _bubbles_only(self, bubbles_only: bool | None = None) -> bool:
+        if bubbles_only is not None:
+            return bool(bubbles_only)
+        return bool(getattr(self.config, "bubbles_only", False))
+
+    def _line_merge_sensitivity(self, line_merge_sensitivity: float | None = None) -> float:
+        if line_merge_sensitivity is not None:
+            return float(line_merge_sensitivity)
+        return float(getattr(self.config, "line_merge_sensitivity", 1.2))
+
+    def _smart_direction(self, smart_direction: bool | None = None) -> bool:
+        if smart_direction is not None:
+            return bool(smart_direction)
+        return bool(getattr(self.config, "smart_direction", True))
+
+    def _text_direction_override(self, text_direction_override: str | None = None) -> str:
+        return str(text_direction_override or getattr(self.config, "text_direction_override", "auto") or "auto")
+
     # ------------------------------------------------------------------ #
     #  Cache persistence (disk)
     # ------------------------------------------------------------------ #
@@ -140,6 +158,10 @@ class DetectionService:
         model_name: str | None = None,
         confidence_threshold: float | None = None,
         tiling_enabled: bool | None = None,
+        bubbles_only: bool | None = None,
+        line_merge_sensitivity: float | None = None,
+        smart_direction: bool | None = None,
+        text_direction_override: str | None = None,
     ) -> List[Any]:
         """Detect text blocks and run OCR on them, utilizing OCR cache."""
         t0 = time.perf_counter()
@@ -153,6 +175,10 @@ class DetectionService:
                     model_name=self._detect_model_name(model_name),
                     confidence_threshold=self._confidence_threshold(confidence_threshold),
                     tiling_enabled=self._tiling_enabled(tiling_enabled),
+                    bubbles_only=self._bubbles_only(bubbles_only),
+                    line_merge_sensitivity=self._line_merge_sensitivity(line_merge_sensitivity),
+                    smart_direction=self._smart_direction(smart_direction),
+                    text_direction_override=self._text_direction_override(text_direction_override),
                 )
             except Exception as exc:
                 self.last_error = str(exc)

@@ -39,6 +39,10 @@ class RTDETRv2Detector:
         model_name: str | None = None,
         confidence_threshold: float | None = None,
         tiling_enabled: bool | None = None,
+        bubbles_only: bool | None = None,
+        line_merge_sensitivity: float | None = None,
+        smart_direction: bool | None = None,
+        text_direction_override: str | None = None,
     ) -> list[TextBlock]:
         """
         Detect text bubble and free text areas.
@@ -56,6 +60,10 @@ class RTDETRv2Detector:
                 model_name=model_name,
                 confidence_threshold=confidence_threshold,
                 tiling_enabled=tiling_enabled,
+                bubbles_only=bubbles_only,
+                line_merge_sensitivity=line_merge_sensitivity,
+                smart_direction=smart_direction,
+                text_direction_override=text_direction_override,
             )
             return blocks
         except Exception as exc:
