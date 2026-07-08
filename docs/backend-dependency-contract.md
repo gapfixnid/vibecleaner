@@ -115,6 +115,7 @@ rg "service_registry|state = ProjectState\(|config: AppConfig = AppConfig\(" bac
 rg "domain.project_state|legacy_state|from modules.config import config" backend tests
 rg "^service = .*Service\(|^[a-z_]+_service = [A-Z][A-Za-z]+Service\(" backend/services backend/pipeline
 rg "from services|import services" backend/pipeline
+rg "from modules|import modules" backend/pipeline
 ```
 
 Expected result: no application imports or singleton definitions that violate

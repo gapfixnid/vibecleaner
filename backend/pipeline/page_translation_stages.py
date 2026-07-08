@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 from typing import Any
 
 from fastapi import HTTPException
 
 from core.models.image import ImageData
-from modules.utils.textblock import TextBlock
 from pipeline.page_analysis import (
     bubbles_from_analysis,
     merge_overlapping_bubbles,
@@ -158,7 +158,7 @@ class PageTranslationStage:
             if show_progress:
                 job_manager.update(job, progress=45, message="Translating text")
             temp_blocks = [
-                TextBlock(text_bbox=bubble.source_xyxy(), text=bubble.text)
+                SimpleNamespace(text_bbox=bubble.source_xyxy(), text=bubble.text, translation="")
                 for bubble in untranslated
             ]
             self.translation_service.translate_blocks(temp_blocks, config.source_language, config.target_language, image)
