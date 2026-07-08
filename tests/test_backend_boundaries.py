@@ -15,6 +15,7 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     backend = ROOT / "backend"
 
     assert not (backend / "services" / "service_registry.py").exists()
+    assert not (backend / "pipeline" / ("auto_" + "typeset.py")).exists()
 
     scanned_files = [
         path
@@ -23,8 +24,9 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     ]
     combined = "\n".join(path.read_text(encoding="utf-8") for path in scanned_files)
 
-    assert "services.auto_typeset_pipeline" not in combined
-    assert "auto_typeset_pipeline" not in combined
+    assert ("services." + "auto_" + "typeset_pipeline") not in combined
+    assert ("pipeline." + "auto_" + "typeset") not in combined
+    assert ("auto_" + "typeset_pipeline") not in combined
     assert "from domain.project_state import state" not in combined
     assert "state = ProjectState()" not in combined
     assert "from modules.config import config" not in combined

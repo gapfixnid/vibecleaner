@@ -26,8 +26,8 @@ flowchart LR
 - `backend/core/`: application configuration snapshots, models, ports, state contracts, and the composition root in `backend/core/container.py`.
 - `backend/pipeline/`: page-processing plans, runner, stages, strategies, validation, and provenance capture.
 - `backend/engines/`: concrete detection, OCR, translation, inpainting, and rendering adapters behind core ports.
-- `backend/infrastructure/`: image, font, cache, storage, download, and asset helpers as the backend is migrated away from legacy utility modules.
-- `backend/modules/`: legacy model wrappers and low-level utilities still used behind adapters during migration.
+- `backend/infrastructure/`: image, font, cache, storage, download, and asset helpers.
+- `backend/modules/`: transitional model wrappers and low-level utilities. These are not part of the final architecture and should be removed or absorbed behind port-native engines as cleanup work continues.
 - `download_models.py`: downloads the core local model set into the user's app data directory.
 - `scripts/verify-packaging.py`: checks packaging prerequisites without downloading large model assets.
 - `scripts/build-runtime-sidecar.ps1`: builds the packaged backend sidecar from runtime-only dependencies.
@@ -38,10 +38,14 @@ Backend dependency direction is intentionally one-way:
 
 - `backend/api` may depend on `backend/core` and container-owned application services.
 - `backend/pipeline` may depend on `backend/core` contracts, pipeline stages, strategies, validation, and provenance.
-- `backend/engines` and `backend/infrastructure` adapt concrete libraries and legacy helpers behind core ports.
+- `backend/engines` and `backend/infrastructure` adapt concrete libraries behind core ports.
 - `backend/core/container.py` is the only place that wires API-facing services, pipeline stages, concrete engines, infrastructure, configuration, and project state together.
 
 Routes must not import concrete engines, `services.service_registry`, module-level project state, or module-level config singletons. Runtime state and settings are container-owned instances, so tests can assemble fake ports and run the pipeline without local model files.
+
+The cleanup goal is that the application runs through the new architecture
+only. Any remaining legacy state/model wrapper dependency is migration debt,
+not an accepted end state.
 
 See `docs/backend-dependency-contract.md` for the full import boundary,
 composition root, dependency-set, and verification contract.

@@ -1,6 +1,5 @@
 import type { ProjectDto, PageDto, SettingsDto } from "./project";
 import type { BubbleDto, BubblePatchDto } from "./bubble";
-import type { PipelineTargetDto, PipelineProgressDto } from "./pipeline";
 
 export interface ActionResultDto {
   status?: string;
@@ -115,10 +114,6 @@ export interface vibeCleanerApi {
   translateBatch(pageIndices?: number[], pageIds?: string[]): Promise<JobStatusDto>;
   getJob(jobId: string): Promise<JobStatusDto>;
   cancelJob(jobId: string): Promise<JobStatusDto>;
-  runAutoTypeset(
-    target: PipelineTargetDto,
-    onProgress?: (progress: PipelineProgressDto) => void
-  ): Promise<PageDto>;
   updateBubbles(pageId: string, bubbles: BubbleUpdateDto[]): Promise<ActionResultDto>;
   updateBubble(pageId: string, bubbleId: string, patch: BubblePatchDto): Promise<BubbleDto>;
   layoutBubble(pageId: string, bubbleId: string): Promise<BubbleDto>;

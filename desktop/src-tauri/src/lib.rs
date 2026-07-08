@@ -3,7 +3,7 @@ use std::net::TcpListener;
 use std::sync::Mutex;
 use std::process::{Child, Command};
 use std::path::{Path, PathBuf};
-use tauri::{Manager, Emitter};
+use tauri::Manager;
 
 struct PortState(u16);
 
@@ -664,72 +664,6 @@ async fn cancel_job(
 }
 
 #[tauri::command]
-async fn run_auto_typeset(
-    window: tauri::Window,
-    port_state: tauri::State<'_, PortState>,
-    target: serde_json::Value,
-) -> Result<serde_json::Value, String> {
-    let page_ids = target.get("page_ids")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| "Invalid page_ids".to_string())?;
-
-    let client = reqwest::Client::new();
-    let port = port_state.0;
-
-    for page_id in page_ids {
-        let page_id_str = page_id.as_str().ok_or_else(|| "Invalid page_id".to_string())?.to_string();
-        let url = format!("http://127.0.0.1:{}/api/pages/{}/translate-all", port, page_id_str);
-        
-        let res = client.post(&url)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP POST 실패: {e}"))?;
-
-        let job_status: serde_json::Value = response_json(res).await?;
-
-        let job_id = job_status.get("job_id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| "Job ID missing".to_string())?.to_string();
-
-        // Poll job status
-        loop {
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            let poll_url = format!("http://127.0.0.1:{}/api/jobs/{}", port, job_id);
-            let poll_res = client.get(&poll_url).send().await;
-            
-            if let Ok(resp) = poll_res {
-                if let Ok(status) = resp.json::<serde_json::Value>().await {
-                    let state = status.get("status").and_then(|v| v.as_str()).unwrap_or("queued");
-                    let progress = status.get("progress").and_then(|v| v.as_i64()).unwrap_or(0);
-                    let message = status.get("message").and_then(|v| v.as_str()).unwrap_or("");
-
-                    // Emit progress event to frontend
-                    let _ = window.emit("pipeline-progress", serde_json::json!({
-                        "page_id": page_id_str,
-                        "stage": "translate",
-                        "progress": progress,
-                        "message": message,
-                        "timestamp": ""
-                    }));
-
-                    if state == "succeeded" {
-                        break;
-                    } else if state == "failed" || state == "cancelled" {
-                        return Err(status.get("error").and_then(|v| v.as_str()).unwrap_or("Job failed").to_string());
-                    }
-                }
-            }
-        }
-    }
-
-    if let Some(first_id) = page_ids.first().and_then(|v| v.as_str()) {
-        get_page(port_state, first_id.to_string()).await
-    } else {
-        Err("No pages processed".to_string())
-    }
-}
-
-#[tauri::command]
 async fn update_bubble(
     port_state: tauri::State<'_, PortState>,
     page_id: String,
@@ -1139,7 +1073,6 @@ pub fn run() {
             translate_batch,
             get_job,
             cancel_job,
-            run_auto_typeset,
             update_bubbles,
             update_bubble,
             layout_bubble,

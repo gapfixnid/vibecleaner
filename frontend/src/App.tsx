@@ -14,7 +14,7 @@ import { useDialog } from "./hooks/useDialog";
 import { useProcessingTask } from "./hooks/useProcessingTask";
 import { useProject } from "./hooks/useProject";
 import { useTheme } from "./hooks/useTheme";
-import { useAutoTypeset } from "./hooks/useAutoTypeset";
+import { usePageTranslation } from "./hooks/usePageTranslation";
 import { usePageExport } from "./hooks/usePageExport";
 import { useBackendBootstrap } from "./hooks/useBackendBootstrap";
 import { useWindowCloseGuard } from "./hooks/useWindowCloseGuard";
@@ -98,7 +98,7 @@ function App() {
     resolveContextTargets,
   } = selectionApi;
 
-  const { handleTranslate, handleTranslatePages } = useAutoTypeset({
+  const { handleTranslate, handleTranslatePages } = usePageTranslation({
     pages,
     selectedPageIds,
     currentIndexRef,

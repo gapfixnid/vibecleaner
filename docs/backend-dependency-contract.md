@@ -31,7 +31,7 @@ composition root that wires concrete runtime dependencies.
 | `backend/api` | HTTP routes, request parsing, response schemas | `backend/core`, container-owned use cases, FastAPI dependencies | concrete engines, infrastructure internals, global state/config singletons |
 | `backend/core` except `container.py` | models, ports, config snapshots, errors, state contracts | standard library and stable third-party types | API, pipeline stages, concrete engines, infrastructure helpers |
 | `backend/pipeline` | plans, runner, stages, strategies, validation, provenance | `backend/core` contracts and sibling pipeline modules | API routes, concrete engines, service registry, module-level config/state |
-| `backend/engines` | concrete detection, OCR, translation, inpainting, rendering adapters | `backend/core`, infrastructure helpers, legacy low-level wrappers during migration | API routes, pipeline runner/stages, FastAPI dependencies |
+| `backend/engines` | concrete detection, OCR, translation, inpainting, rendering adapters | `backend/core`, infrastructure helpers, external model libraries | API routes, pipeline runner/stages, FastAPI dependencies |
 | `backend/infrastructure` | image, font, cache, storage, download, asset access | `backend/core` DTOs and external libraries | API routes, pipeline runner/stages |
 | `backend/core/container.py` | runtime assembly | all backend layers needed for wiring | business logic that belongs in routes, stages, or adapters |
 
@@ -49,14 +49,15 @@ from domain.project_state import state
 from modules.config import config
 from engines...              # inside backend/api or backend/pipeline
 import engines               # inside backend/api or backend/pipeline
-auto_typeset_pipeline = ...
 state = ProjectState(...)
 config = AppConfig(...)
 ```
 
-Legacy modules may still exist behind adapters while the migration continues,
-but API routes and pipeline stages must not reach into them directly for runtime
-state, settings, or concrete engine construction.
+Legacy modules are not part of the final architecture. If a legacy dependency
+still exists, treat it as cleanup debt and remove or absorb it behind a
+port-native engine/infrastructure implementation. API routes and pipeline stages
+must not reach into legacy modules directly for runtime state, settings, or
+concrete engine construction.
 
 ## Settings And Engine Options
 
@@ -111,7 +112,7 @@ Run these before claiming dependency boundaries are clean:
 
 ```powershell
 rg "from engines|import engines" backend/pipeline backend/api
-rg "service_registry|auto_typeset_pipeline =|state = ProjectState\(|config: AppConfig = AppConfig\(" backend
+rg "service_registry|state = ProjectState\(|config: AppConfig = AppConfig\(" backend
 rg "from domain.project_state import state|from modules.config import config" backend tests
 ```
 

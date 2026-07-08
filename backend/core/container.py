@@ -9,15 +9,6 @@ from core.state.repository import InMemoryProjectRepository
 from pipeline.planner import PipelinePlanner
 from pipeline.registry import StageRegistry
 from pipeline.runner import PipelineRunner
-from pipeline.stages import (
-    DetectionStage,
-    InpaintingStage,
-    LayoutStage,
-    OcrStage,
-    RenderingStage,
-    TranslationStage,
-)
-from pipeline.strategies.engine_selection import EngineSelectionStrategy
 
 
 @dataclass
@@ -26,7 +17,6 @@ class AppContainer:
     legacy_state: Any
     job_manager: Any
     translation_service: Any
-    auto_typeset_runner: Any
     detection_service: Any
     inpainting_service: Any
     render_service: Any
@@ -42,14 +32,9 @@ class AppContainer:
 def build_container(config: Any | None = None) -> AppContainer:
     # Existing services still own the concrete model wrappers during the first
     # composition-root pass; later tasks replace these with direct adapters.
-    from engines.detection.adapter import DetectionEngineAdapter
-    from engines.inpainting.adapter import InpaintingEngineAdapter
-    from engines.ocr.adapter import OcrEngineAdapter
-    from engines.rendering.adapter import RenderingEngineAdapter
-    from engines.translation.adapter import TranslationEngineAdapter
     from modules.config import AppConfig
     from domain.project_state import ProjectState as LegacyProjectState
-    from pipeline.auto_typeset import AutoTypesetPipeline
+    from pipeline.page_translation_stages import build_page_translation_runner
     from services.job_service import job_manager
     from services.detection_service import DetectionService
     from services.export_service import ExportService
@@ -68,15 +53,11 @@ def build_container(config: Any | None = None) -> AppContainer:
     export_service = ExportService(render_service)
 
     settings = AppConfigSnapshot.from_object(runtime_config)
-    strategy = EngineSelectionStrategy()
-    registry = StageRegistry()
-
-    registry.register(DetectionStage(DetectionEngineAdapter(detection_service), strategy))
-    registry.register(OcrStage(OcrEngineAdapter(detection_service), strategy))
-    registry.register(TranslationStage(TranslationEngineAdapter(translation_service), strategy))
-    registry.register(InpaintingStage(InpaintingEngineAdapter(inpainting_service), strategy))
-    registry.register(LayoutStage())
-    registry.register(RenderingStage(RenderingEngineAdapter(render_service), strategy))
+    pipeline_runner = build_page_translation_runner(
+        detection_service=detection_service,
+        inpainting_service=inpainting_service,
+        translation_service=translation_service,
+    )
 
     legacy_project_state = LegacyProjectState()
     project_state = NewProjectState()
@@ -85,14 +66,6 @@ def build_container(config: Any | None = None) -> AppContainer:
         legacy_state=legacy_project_state,
         job_manager=job_manager,
         translation_service=translation_service,
-        auto_typeset_runner=AutoTypesetPipeline(
-            state=legacy_project_state,
-            config=runtime_config,
-            job_manager=job_manager,
-            detection_service=detection_service,
-            inpainting_service=inpainting_service,
-            translation_service=translation_service,
-        ),
         detection_service=detection_service,
         inpainting_service=inpainting_service,
         render_service=render_service,
@@ -100,7 +73,7 @@ def build_container(config: Any | None = None) -> AppContainer:
         settings=settings,
         project_state=project_state,
         project_repository=InMemoryProjectRepository(project_state),
-        stage_registry=registry,
-        pipeline_runner=PipelineRunner(registry),
+        stage_registry=pipeline_runner.registry,
+        pipeline_runner=pipeline_runner,
         pipeline_planner=PipelinePlanner(),
     )

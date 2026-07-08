@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { ApiError } from "../types/api";
 import type {
   ActionResultDto,
@@ -16,7 +15,6 @@ import type {
 } from "../types/api";
 import type { ProjectDto, PageDto, SettingsDto } from "../types/project";
 import type { BubbleDto, BubblePatchDto } from "../types/bubble";
-import type { PipelineTargetDto, PipelineProgressDto } from "../types/pipeline";
 
 async function callTauri<T>(cmd: string, args?: Record<string, any>): Promise<T> {
   try {
@@ -103,25 +101,6 @@ export const tauriClient: vibeCleanerApi = {
 
   async cancelJob(jobId: string): Promise<JobStatusDto> {
     return callTauri<JobStatusDto>("cancel_job", { jobId });
-  },
-
-  async runAutoTypeset(
-    target: PipelineTargetDto,
-    onProgress?: (progress: PipelineProgressDto) => void
-  ): Promise<PageDto> {
-    let unlisten: (() => void) | undefined;
-    if (onProgress) {
-      unlisten = await listen<PipelineProgressDto>("pipeline-progress", (event) => {
-        if (target.page_ids.includes(event.payload.page_id)) {
-          onProgress(event.payload);
-        }
-      });
-    }
-    try {
-      return await callTauri<PageDto>("run_auto_typeset", { target });
-    } finally {
-      if (unlisten) unlisten();
-    }
   },
 
   async updateBubbles(pageId: string, bubbles: BubbleUpdateDto[]): Promise<ActionResultDto> {

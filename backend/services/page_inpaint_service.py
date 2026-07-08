@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 
-from pipeline.auto_typeset import bubble_clip_boxes, inpaint_boxes
+from pipeline.page_analysis import bubble_clip_boxes, inpaint_boxes
 from services.image_encoding_service import encode_preview_jpeg_bytes
 from services.job_service import job_manager
 from services.page_crud_service import resolve_page, resolve_page_index

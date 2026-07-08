@@ -13,7 +13,7 @@
 - Preserve the existing frontend API contract for settings, project, pages, jobs, translate-all, batch translation, inpainting, export, and bubble actions.
 - Do not let `backend/pipeline` import concrete `backend/engines` modules.
 - Do not let `backend/api/routes` import concrete engines, `service_registry`, global state, or global config.
-- Use container-owned instances instead of module-level `state`, `config`, `service_registry`, or `auto_typeset_pipeline` singletons.
+- Use container-owned instances instead of module-level `state`, `config`, or `service_registry` singletons.
 - `provenance`, `strategies`, and `validation` must be used by the runner.
 - Pipeline tests must run with fake engines and without local model files.
 
@@ -48,7 +48,7 @@ Modify:
 Remove after replacement:
 
 - `backend/services/service_registry.py`
-- Module-level singleton access from `backend/services/auto_typeset_pipeline.py`
+- Module-level page-translation pipeline singletons.
 - Module-level singleton access from `backend/domain/project_state.py`
 - Module-level singleton access from `backend/modules/config.py`
 
@@ -419,7 +419,7 @@ Expected: PASS.
 
 **Files:**
 - Remove: `backend/services/service_registry.py`
-- Modify: `backend/services/auto_typeset_pipeline.py` or remove after route migration.
+- Remove route-level page translation wrappers after route migration.
 - Modify: `backend/domain/project_state.py` or remove after route migration.
 - Modify: `backend/modules/config.py` or leave only a compatibility import during this Big Bang if complete removal breaks external callers.
 - Modify: existing tests under `tests/`.
@@ -429,13 +429,14 @@ Expected: PASS.
 - Produces: no direct imports of removed singleton modules from backend application code.
 
 **Progress note, 2026-07-08:**
-- `backend/pipeline/auto_typeset.py` now executes page translation through
-  `PipelineRunner` stages: `load_page`, `detect_analyze`,
-  `inpaint_translate`, and `commit_page`.
-- `run_batch` delegates to `run_page`, so both single-page and batch paths share
-  the same runner/provenance path.
-- `tests/test_auto_typeset_pipeline.py` asserts that `run_page` records stage
-  provenance for the legacy-compatible auto-typeset workflow.
+- `backend/pipeline/page_translation.py` now executes page translation through
+  the canonical `PipelineRunner` plan.
+- `backend/pipeline/page_translation_stages.py` registers production stages:
+  `detection`, `ocr`, `translation`, `inpainting`, `layout`, and `rendering`.
+- Single-page and batch translation routes both call the canonical runner
+  through `run_page_translation`.
+- `tests/test_page_translation_runner.py` asserts that page translation records
+  canonical stage provenance and commits the translated page state.
 - The inpainting legacy wrapper now receives explicit engine, dilation, and
   bubble-clipping options through `InpaintingService` and
   `InpaintingEngineAdapter` instead of reading the global config singleton.
@@ -463,8 +464,7 @@ Expected: PASS.
   longer read the global config singleton for crop preprocessing.
 - The composition root now builds a container-owned `AppConfig` instance instead
   of importing the global config singleton, and page translation routes use the
-  container-owned `auto_typeset_runner` field instead of the legacy
-  `auto_typeset_pipeline` name.
+  container-owned canonical pipeline runner.
 - `backend/modules/config.py` no longer creates or auto-loads a module-level
   `config` singleton, and model-requirement helpers now require an explicit
   `AppConfig` from the container or CLI composition path.
@@ -474,7 +474,7 @@ Expected: PASS.
 Run:
 
 ```powershell
-rg "service_registry|auto_typeset_pipeline|from domain.project_state import state|from modules.config import config" backend tests
+rg "service_registry|from domain.project_state import state|from modules.config import config" backend tests
 ```
 
 Expected: list remaining callers to update.
@@ -490,7 +490,7 @@ test fixtures.
 Run:
 
 ```powershell
-pytest tests/test_auto_typeset_pipeline.py tests/test_inpainting_engine_options.py tests/test_ocr_pipeline_options.py tests/test_translation_options.py -v
+pytest tests/test_page_translation_runner.py tests/test_inpainting_engine_options.py tests/test_ocr_pipeline_options.py tests/test_translation_options.py -v
 ```
 
 Expected: PASS after tests are updated to new names and injected fakes.
@@ -518,7 +518,7 @@ Run:
 
 ```powershell
 rg "from engines|import engines" backend/pipeline backend/api
-rg "service_registry|auto_typeset_pipeline =|state = ProjectState\\(|config: AppConfig = AppConfig\\(" backend
+rg "service_registry|state = ProjectState\\(|config: AppConfig = AppConfig\\(" backend
 ```
 
 Expected: first command finds no pipeline/API imports of concrete engines;
@@ -544,8 +544,8 @@ Verification result:
 
 - `python -m pytest -q`: 76 passed.
 - `rg "from engines|import engines" backend/pipeline backend/api`: no matches.
-- `rg "service_registry|auto_typeset_pipeline =|state = ProjectState\\(|config: AppConfig = AppConfig\\(" backend`: no matches.
-- Extended singleton scan for direct `modules.config config`, legacy `load_settings`/`save_settings`, adaptive-binarization alias, `auto_typeset_pipeline`, and global `ProjectState`: no matches.
+- `rg "service_registry|state = ProjectState\\(|config: AppConfig = AppConfig\\(" backend`: no matches.
+- Extended singleton scan for direct `modules.config config`, legacy `load_settings`/`save_settings`, adaptive-binarization alias, and global `ProjectState`: no matches.
 
 Documentation follow-up, 2026-07-08:
 
@@ -558,6 +558,20 @@ Documentation follow-up, 2026-07-08:
 - Standalone `npm --prefix frontend run dev` is documented as static UI work
   only because it does not launch the backend or provide the Tauri command
   bridge.
+
+Architecture cleanup pivot, 2026-07-08:
+
+- The priority is no longer to keep compatibility wrappers alive. The goal is
+  to remove legacy/dead/hard-coded paths until the app runs through the new
+  architecture only.
+- The old page translation wrapper module was removed. Single-page and batch
+  translation routes now call the canonical `PipelineRunner` plan.
+- Page analysis helpers moved to `backend/pipeline/page_analysis.py`; production
+  stages no longer import an old wrapper module for helper behavior.
+- Unused desktop/frontend command surfaces for the old page translation path
+  were removed.
+- Remaining cleanup targets include container `legacy_state`, `domain` project
+  state usage in API/services, and transitional `backend/modules` wrappers.
 
 ---
 

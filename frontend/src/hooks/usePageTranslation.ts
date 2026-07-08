@@ -3,7 +3,7 @@ import * as api from "../services/api";
 import type { PageInfo } from "../types";
 import type { RunTask, WaitForJob } from "./useProcessingTask";
 
-interface UseAutoTypesetDeps {
+interface UsePageTranslationDeps {
   pages: PageInfo[];
   selectedPageIds: number[];
   currentIndexRef: MutableRefObject<number>;
@@ -19,16 +19,16 @@ interface UseAutoTypesetDeps {
   t?: (key: string) => string;
 }
 
-export function sortAutoTypesetPageIds(pageIds: number[]) {
+export function sortPageTranslationIds(pageIds: number[]) {
   return [...pageIds].sort((a, b) => a - b);
 }
 
-export function resolveAutoTypesetDisplayIndex(sortedPageIds: number[], activeIdx: number) {
+export function resolvePageTranslationDisplayIndex(sortedPageIds: number[], activeIdx: number) {
   if (sortedPageIds.length === 0) return null;
   return sortedPageIds.includes(activeIdx) ? activeIdx : sortedPageIds[0];
 }
 
-export function useAutoTypeset({
+export function usePageTranslation({
   pages,
   selectedPageIds,
   currentIndexRef,
@@ -42,7 +42,7 @@ export function useAutoTypeset({
   setSelectedPageIds,
   selectPage,
   t = (key) => key,
-}: UseAutoTypesetDeps) {
+}: UsePageTranslationDeps) {
   const selectedPageIdsRef = useRef<number[]>([]);
 
   useEffect(() => {
@@ -79,11 +79,11 @@ export function useAutoTypeset({
   ]);
 
   const handleTranslatePages = useCallback(async (pageIds: number[]) => {
-    const sorted = sortAutoTypesetPageIds(pageIds);
+    const sorted = sortPageTranslationIds(pageIds);
     const total = sorted.length;
     if (total === 0) return;
     const activeIdx = currentIndexRef.current;
-    const displayIdx = resolveAutoTypesetDisplayIndex(sorted, activeIdx);
+    const displayIdx = resolvePageTranslationDisplayIndex(sorted, activeIdx);
     if (displayIdx == null) return;
 
     await runTask(

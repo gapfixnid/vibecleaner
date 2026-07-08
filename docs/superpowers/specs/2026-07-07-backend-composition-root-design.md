@@ -191,9 +191,8 @@ class AppContainer:
 ```
 
 Global singleton modules such as `service_registry.py`, module-level
-`state = ProjectState()`, module-level `config = AppConfig()`, and
-`auto_typeset_pipeline = AutoTypesetPipeline()` should be removed or replaced
-by container-owned instances.
+`state = ProjectState()`, and module-level `config = AppConfig()` should be
+removed or replaced by container-owned instances.
 
 ## API Layer
 
@@ -268,7 +267,7 @@ Concrete engines receive explicit options from the pipeline strategy layer.
 
 ## Pipeline
 
-The existing `auto_typeset_pipeline.py` should become a stage-based runner.
+The page translation route should execute the canonical stage-based runner.
 
 ```text
 PipelinePlanner
@@ -413,7 +412,9 @@ backend/app/models.py             -> backend/core/models/*
 backend/domain/project_state.py   -> backend/core/state/project_state.py
 backend/modules/config.py         -> backend/core/config.py
 
-backend/services/auto_typeset_pipeline.py
+backend page translation workflow
+  -> backend/pipeline/page_translation.py
+  -> backend/pipeline/page_translation_stages.py
   -> backend/pipeline/runner.py
   -> backend/pipeline/stages/*
   -> backend/pipeline/context.py
@@ -480,7 +481,7 @@ The refactor is complete when:
 3. Detection, OCR, translation, inpainting, and rendering engines receive
    explicit option DTOs instead of reading global settings directly.
 4. `service_registry.py` is removed.
-5. The module-level `auto_typeset_pipeline` singleton is removed.
+5. The page translation route uses the canonical pipeline runner.
 6. The project state and config are container-owned instances.
 7. `translate-all`, batch translation, inpainting, export, and project/page
    management keep the existing frontend API contract.
