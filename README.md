@@ -119,10 +119,11 @@ Start the desktop app. `npm run dev` runs `tauri dev`; Tauri starts the Vite fro
 npm run dev
 ```
 
-For browser-only frontend work, start the backend and frontend yourself:
+The frontend API client currently talks through Tauri commands, so use `npm run dev`
+for normal app work. Running Vite in a standalone browser is useful only for
+static UI work that does not call backend or desktop APIs.
 
 ```powershell
-.\venv\Scripts\python.exe backend\main.py --port 8000
 npm --prefix frontend run dev
 ```
 

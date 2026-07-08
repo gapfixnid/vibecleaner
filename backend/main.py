@@ -16,6 +16,10 @@ backend_dir = os.path.dirname(os.path.abspath(__file__))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
+# Text layout uses QFontMetricsF in request handlers, so the backend process
+# needs an offscreen QApplication before routes start serving bubble data.
+import app.qt_runtime  # noqa: F401
+
 from app.version import APP_NAME, __version__ as APP_VERSION
 from core.container import build_container
 from modules.logging_config import configure_logging
