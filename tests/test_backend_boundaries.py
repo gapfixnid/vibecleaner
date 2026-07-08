@@ -50,6 +50,25 @@ def test_pipeline_and_api_do_not_import_concrete_engines():
     assert "import engines" not in combined
 
 
+def test_pipeline_does_not_import_services():
+    pipeline = ROOT / "backend" / "pipeline"
+    offenders = []
+
+    for path in pipeline.rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("services"):
+                offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name == "services" or alias.name.startswith("services."):
+                        offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+
+    assert offenders == []
+
+
 def test_services_do_not_define_module_level_service_singletons():
     services = ROOT / "backend" / "services"
     offenders = []

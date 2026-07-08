@@ -16,12 +16,6 @@ from pipeline.page_analysis import (
 from pipeline.context import PipelineContext
 from pipeline.registry import StageRegistry
 from pipeline.runner import PipelineRunner
-from services.image_encoding_service import encode_preview_jpeg_bytes, encode_thumbnail_bytes
-from services.page_image_loader import ensure_page_image, invalidate_page_caches
-from services.review_state_service import refresh_page_status
-from services.bubble_analysis_service import BubbleAnalysisService
-from services.layout_planner_service import LayoutPlannerService
-from services.page_analysis_service import PageAnalysisService
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +40,9 @@ def _ensure_project_revision(state: Any, start_revision: int) -> None:
 class PageDetectionStage:
     name = "detection"
 
-    def __init__(self, detection_service: Any) -> None:
+    def __init__(self, detection_service: Any, *, ensure_page_image: Any) -> None:
         self.detection_service = detection_service
+        self.ensure_page_image = ensure_page_image
 
     def run(self, context: PipelineContext) -> PipelineContext:
         state = context.artifacts["state"]
@@ -59,7 +54,7 @@ class PageDetectionStage:
         with state.lock:
             page_idx = _resolve_page_index(state, context.page_id)
             page = state.pages[page_idx]
-            ensure_page_image(page)
+            self.ensure_page_image(page)
             start_revision = state.revision
             image = page.cv_image.copy()
             inpainted_image = page.inpainted_image.copy() if page.inpainted_image is not None else None
@@ -103,13 +98,13 @@ class PageOcrStage:
     def __init__(
         self,
         *,
-        page_analysis_service: Any | None = None,
-        bubble_analysis_service: Any | None = None,
-        layout_planner_service: Any | None = None,
+        page_analysis_service: Any,
+        bubble_analysis_service: Any,
+        layout_planner_service: Any,
     ) -> None:
-        self.page_analysis_service = page_analysis_service or PageAnalysisService()
-        self.bubble_analysis_service = bubble_analysis_service or BubbleAnalysisService()
-        self.layout_planner_service = layout_planner_service or LayoutPlannerService()
+        self.page_analysis_service = page_analysis_service
+        self.bubble_analysis_service = bubble_analysis_service
+        self.layout_planner_service = layout_planner_service
 
     def run(self, context: PipelineContext) -> PipelineContext:
         job = context.artifacts["job"]
@@ -219,6 +214,19 @@ class PageLayoutStage:
 class PageRenderingStage:
     name = "rendering"
 
+    def __init__(
+        self,
+        *,
+        encode_preview_jpeg_bytes: Any,
+        encode_thumbnail_bytes: Any,
+        refresh_page_status: Any,
+        invalidate_page_caches: Any,
+    ) -> None:
+        self.encode_preview_jpeg_bytes = encode_preview_jpeg_bytes
+        self.encode_thumbnail_bytes = encode_thumbnail_bytes
+        self.refresh_page_status = refresh_page_status
+        self.invalidate_page_caches = invalidate_page_caches
+
     def run(self, context: PipelineContext) -> PipelineContext:
         state = context.artifacts["state"]
         job = context.artifacts["job"]
@@ -230,7 +238,7 @@ class PageRenderingStage:
         start_revision = context.artifacts["start_revision"]
 
         job_manager.ensure_not_cancelled(job)
-        inpainted_preview_bytes = encode_preview_jpeg_bytes(inpainted_image) if inpainted_image is not None else None
+        inpainted_preview_bytes = self.encode_preview_jpeg_bytes(inpainted_image) if inpainted_image is not None else None
         job_manager.ensure_not_cancelled(job)
 
         with state.lock:
@@ -240,9 +248,9 @@ class PageRenderingStage:
             page.bubbles = local_bubbles
             page.bubble_counter = bubble_counter
             page.inpainted_image = inpainted_image
-            refresh_page_status(page)
-            invalidate_page_caches(page, thumbnails=True, responses=True)
-            page._thumbnail_original_bytes = encode_thumbnail_bytes(page.cv_image)
+            self.refresh_page_status(page)
+            self.invalidate_page_caches(page, thumbnails=True, responses=True)
+            page._thumbnail_original_bytes = self.encode_thumbnail_bytes(page.cv_image)
             if inpainted_preview_bytes is not None:
                 page._preview_inpainted_bytes = inpainted_preview_bytes
             state.touch()
@@ -257,12 +265,17 @@ def build_page_translation_runner(
     detection_service: Any,
     inpainting_service: Any,
     translation_service: Any,
-    page_analysis_service: Any | None = None,
-    bubble_analysis_service: Any | None = None,
-    layout_planner_service: Any | None = None,
+    page_analysis_service: Any,
+    bubble_analysis_service: Any,
+    layout_planner_service: Any,
+    ensure_page_image: Any,
+    invalidate_page_caches: Any,
+    encode_preview_jpeg_bytes: Any,
+    encode_thumbnail_bytes: Any,
+    refresh_page_status: Any,
 ) -> PipelineRunner:
     registry = StageRegistry()
-    registry.register(PageDetectionStage(detection_service))
+    registry.register(PageDetectionStage(detection_service, ensure_page_image=ensure_page_image))
     registry.register(
         PageOcrStage(
             page_analysis_service=page_analysis_service,
@@ -273,5 +286,12 @@ def build_page_translation_runner(
     registry.register(PageTranslationStage(translation_service))
     registry.register(PageInpaintingStage(inpainting_service))
     registry.register(PageLayoutStage())
-    registry.register(PageRenderingStage())
+    registry.register(
+        PageRenderingStage(
+            encode_preview_jpeg_bytes=encode_preview_jpeg_bytes,
+            encode_thumbnail_bytes=encode_thumbnail_bytes,
+            refresh_page_status=refresh_page_status,
+            invalidate_page_caches=invalidate_page_caches,
+        )
+    )
     return PipelineRunner(registry)

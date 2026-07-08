@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -81,8 +82,6 @@ def bubbles_from_analysis(
     bubble_analysis_service,
     layout_planner_service,
 ) -> list:
-    from services.layout_planner_service import BubbleLayoutInput
-
     page_result = page_analysis_service.analyze(
         image,
         source_lang=source_lang,
@@ -106,7 +105,7 @@ def bubbles_from_analysis(
         text_rect = _rect_from_xyxy(bubble_data.text_box)
         bubble_rect = _rect_from_xyxy(bubble_data.bubble_box)
         layout_box = _rect_from_xyxy(bubble_data.layout_box)
-        layout_input = BubbleLayoutInput(
+        layout_input = SimpleNamespace(
             bubble_box=bubble_rect,
             layout_box=layout_box,
             text=bubble_data.text,

@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import numpy as np
 from PySide6.QtCore import QRectF
@@ -70,23 +69,26 @@ def test_page_translation_runner_uses_canonical_stages_and_updates_page_state():
         detection_service=SimpleNamespace(),
         inpainting_service=inpainting_service,
         translation_service=translation_service,
+        page_analysis_service=SimpleNamespace(),
+        bubble_analysis_service=SimpleNamespace(),
+        layout_planner_service=SimpleNamespace(),
+        ensure_page_image=lambda page: None,
+        invalidate_page_caches=lambda *args, **kwargs: None,
+        encode_preview_jpeg_bytes=lambda image: b"preview",
+        encode_thumbnail_bytes=lambda image: b"thumb",
+        refresh_page_status=lambda page: setattr(page, "status", "ready_for_review"),
     )
 
-    with (
-        patch("pipeline.page_translation_stages.ensure_page_image", lambda page: None),
-        patch("pipeline.page_translation_stages.encode_preview_jpeg_bytes", lambda image: b"preview"),
-        patch("pipeline.page_translation_stages.encode_thumbnail_bytes", lambda image: b"thumb"),
-    ):
-        result = run_page_translation(
-            job={"cancel_requested": False},
-            page_id="page_a",
-            state=state,
-            config=config,
-            job_manager=job_manager,
-            runner=runner,
-            planner=PipelinePlanner(),
-            show_progress=False,
-        )
+    result = run_page_translation(
+        job={"cancel_requested": False},
+        page_id="page_a",
+        state=state,
+        config=config,
+        job_manager=job_manager,
+        runner=runner,
+        planner=PipelinePlanner(),
+        show_progress=False,
+    )
 
     assert result == {"translated_count": 1}
     assert [stage.stage for stage in runner.last_result.context.provenance.stages] == [

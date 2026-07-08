@@ -30,10 +30,16 @@ def build_container(config: Any | None = None) -> AppContainer:
     from modules.config import AppConfig
     from pipeline.page_translation_stages import build_page_translation_runner
     from services.job_service import job_manager
+    from services.bubble_analysis_service import BubbleAnalysisService
     from services.detection_service import DetectionService
     from services.export_service import ExportService
+    from services.image_encoding_service import encode_preview_jpeg_bytes, encode_thumbnail_bytes
     from services.inpainting_service import InpaintingService
+    from services.layout_planner_service import LayoutPlannerService
+    from services.page_analysis_service import PageAnalysisService
+    from services.page_image_loader import ensure_page_image, invalidate_page_caches
     from services.render_service import RenderService
+    from services.review_state_service import refresh_page_status
     from services.translation_service import TranslationService
 
     runtime_config = config or AppConfig()
@@ -51,6 +57,14 @@ def build_container(config: Any | None = None) -> AppContainer:
         detection_service=detection_service,
         inpainting_service=inpainting_service,
         translation_service=translation_service,
+        page_analysis_service=PageAnalysisService(),
+        bubble_analysis_service=BubbleAnalysisService(),
+        layout_planner_service=LayoutPlannerService(),
+        ensure_page_image=ensure_page_image,
+        invalidate_page_caches=invalidate_page_caches,
+        encode_preview_jpeg_bytes=encode_preview_jpeg_bytes,
+        encode_thumbnail_bytes=encode_thumbnail_bytes,
+        refresh_page_status=refresh_page_status,
     )
 
     return AppContainer(

@@ -475,6 +475,9 @@ Expected: PASS.
 - Module-level `service = ...Service()` singletons were removed from
   `backend/services`, and `backend/pipeline/page_analysis.py` no longer creates
   module-level service instances at import time.
+- `backend/pipeline` no longer imports `backend/services` directly. Page
+  translation stages receive analysis, cache, encoding, and review-state
+  collaborators from the composition root.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 
@@ -577,9 +580,9 @@ Architecture cleanup pivot, 2026-07-08:
   stages no longer import an old wrapper module for helper behavior.
 - Unused desktop/frontend command surfaces for the old page translation path
   were removed.
-- Remaining cleanup targets include pipeline-to-service direct imports,
-  transitional `backend/modules` wrappers, and hard-coded defaults that should
-  move behind strategies or explicit container-owned options.
+- Remaining cleanup targets include transitional `backend/modules` wrappers and
+  hard-coded defaults that should move behind strategies or explicit
+  container-owned options.
 
 ---
 
