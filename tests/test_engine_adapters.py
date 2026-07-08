@@ -77,8 +77,27 @@ class FakeRecognizeTextOcr:
     def __init__(self):
         self.calls = []
 
-    def recognize_text(self, image, blocks, engine=None):
-        self.calls.append({"image": image, "blocks": blocks, "engine": engine})
+    def recognize_text(
+        self,
+        image,
+        blocks,
+        engine=None,
+        padding=None,
+        crop_scale=None,
+        adaptive_binarization=None,
+        adaptive_binarization_strength=None,
+    ):
+        self.calls.append(
+            {
+                "image": image,
+                "blocks": blocks,
+                "engine": engine,
+                "padding": padding,
+                "crop_scale": crop_scale,
+                "adaptive_binarization": adaptive_binarization,
+                "adaptive_binarization_strength": adaptive_binarization_strength,
+            }
+        )
         for block in blocks:
             block.text = f"{engine}:{block.xyxy[0]}"
         return blocks
@@ -220,6 +239,28 @@ def test_ocr_adapter_wraps_recognize_text_legacy_engine():
     assert ocr.calls[0]["engine"] == "ppocr"
     assert ocr.calls[0]["blocks"][0].xyxy == [1, 2, 11, 12]
     assert result.regions[0].text == "ppocr:1"
+
+
+def test_ocr_adapter_passes_explicit_crop_options_to_legacy_engine():
+    ocr = FakeRecognizeTextOcr()
+    adapter = OcrEngineAdapter(engine=ocr)
+
+    adapter.recognize(
+        ImageData(array=object()),
+        [TextRegion(box=Box(1, 2, 11, 12))],
+        OcrOptions(
+            engine="ppocr",
+            padding=14,
+            crop_scale=2.5,
+            adaptive_binarization=False,
+            adaptive_binarization_strength=3.5,
+        ),
+    )
+
+    assert ocr.calls[0]["padding"] == 14
+    assert ocr.calls[0]["crop_scale"] == 2.5
+    assert ocr.calls[0]["adaptive_binarization"] is False
+    assert ocr.calls[0]["adaptive_binarization_strength"] == 3.5
 
 
 def test_translation_adapter_returns_translation_map():

@@ -25,6 +25,8 @@ class EngineSelectionStrategy:
             engine=settings.ocr_engine,
             padding=settings.ocr_padding,
             crop_scale=settings.ocr_crop_scale,
+            adaptive_binarization=settings.adaptive_binarization,
+            adaptive_binarization_strength=settings.adaptive_binarization_strength,
         )
 
     def translation_options(self, settings: AppConfigSnapshot) -> TranslationOptions:

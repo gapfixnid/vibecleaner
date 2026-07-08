@@ -22,7 +22,15 @@ class OcrEngineAdapter:
                 TextBlock(text_bbox=[region.box.x1, region.box.y1, region.box.x2, region.box.y2], text=region.text)
                 for region in regions
             ]
-            recognized_blocks = self.engine.recognize_text(image.array, blocks, engine=options.engine)
+            recognized_blocks = self.engine.recognize_text(
+                image.array,
+                blocks,
+                engine=options.engine,
+                padding=options.padding,
+                crop_scale=options.crop_scale,
+                adaptive_binarization=options.adaptive_binarization,
+                adaptive_binarization_strength=options.adaptive_binarization_strength,
+            )
             texts = [block.text for block in recognized_blocks]
         recognized = [
             replace(region, text=str(texts[index] if index < len(texts) else region.text))

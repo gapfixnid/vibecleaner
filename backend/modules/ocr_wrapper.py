@@ -53,6 +53,10 @@ class LocalOCR:
         text_blocks: list[TextBlock],
         *,
         engine: str | None = None,
+        padding: int | None = None,
+        crop_scale: float | None = None,
+        adaptive_binarization: bool | None = None,
+        adaptive_binarization_strength: float | None = None,
     ) -> list[TextBlock]:
         """
         Runs the real OCR engine on a list of TextBlock objects.
@@ -68,7 +72,14 @@ class LocalOCR:
                         engine = MangaOCRMobileONNXEngine()
                         engine.initialize()
                         self.japanese_engine = engine
-            return self.japanese_engine.process_image(image, text_blocks)
+            return self.japanese_engine.process_image(
+                image,
+                text_blocks,
+                padding=padding,
+                crop_scale=crop_scale,
+                adaptive_binarization=adaptive_binarization,
+                adaptive_binarization_strength=adaptive_binarization_strength,
+            )
         else:
             lang_code = self._ppocr_lang_code()
             if lang_code not in self.ppocr_engines:
@@ -79,4 +90,11 @@ class LocalOCR:
                         self.ppocr_engines[lang_code] = engine
                         if lang_code == "ko":
                             self.korean_engine = engine
-            return self.ppocr_engines[lang_code].process_image(image, text_blocks)
+            return self.ppocr_engines[lang_code].process_image(
+                image,
+                text_blocks,
+                padding=padding,
+                crop_scale=crop_scale,
+                adaptive_binarization=adaptive_binarization,
+                adaptive_binarization_strength=adaptive_binarization_strength,
+            )

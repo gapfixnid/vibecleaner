@@ -277,8 +277,7 @@ class AppConfig:
     # Legacy alias functions (keep old call sites working)
     # -----------------------------------------------------------------------
 
-    @staticmethod
-    def apply_adaptive_binarization(crop: np.ndarray) -> np.ndarray:
+    def apply_adaptive_binarization(self, crop: np.ndarray) -> np.ndarray:
         """Apply adaptive thresholding to an image crop to isolate text lines.
 
         Pipeline: RGB→Gray → CLAHe contrast enhancement → adaptive binarization.
@@ -286,31 +285,12 @@ class AppConfig:
         contrast so small / low-contrast Japanese kanas are more readable for
         the OCR engine.
         """
-        if crop is None or crop.size == 0:
-            return crop
-        try:
-            if len(crop.shape) == 3:
-                if crop.shape[2] == 3:
-                    gray = cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY)
-                elif crop.shape[2] == 4:
-                    gray = cv2.cvtColor(crop, cv2.COLOR_RGBA2GRAY)
-                else:
-                    gray = crop
-            else:
-                gray = crop
+        from modules.ocr.ppocr.preprocessing import apply_adaptive_binarization
 
-            clip_limit = float(getattr(config, "adaptive_binarization_strength", 2.0))
-            clip_limit = max(0.5, min(5.0, clip_limit))
-            clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(8, 8))
-            enhanced = clahe.apply(gray)
-
-            thresh = cv2.adaptiveThreshold(
-                enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
-            )
-            return cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
-        except Exception:
-            logger.exception("Adaptive binarization failed")
-            return crop
+        return apply_adaptive_binarization(
+            crop,
+            strength=self.adaptive_binarization_strength,
+        )
 
 
 # ---------------------------------------------------------------------------

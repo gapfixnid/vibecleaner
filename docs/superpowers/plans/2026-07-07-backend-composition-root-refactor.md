@@ -457,6 +457,10 @@ Expected: PASS.
   through `DetectionOptions`, `EngineSelectionStrategy`, and the detection
   adapter/service path; `DetectionPipeline` and heuristic line helpers no
   longer read the global config singleton.
+- PPOCR and Manga OCR crop preprocessing now receives explicit padding,
+  crop-scale, adaptive-binarization, and adaptive-binarization strength options
+  through `OcrOptions`, `OcrEngineAdapter`, and `LocalOCR`; the OCR engines no
+  longer read the global config singleton for crop preprocessing.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

@@ -12,6 +12,8 @@ class OcrOptions:
     engine: str = "balanced"
     padding: int = 8
     crop_scale: float = 1.5
+    adaptive_binarization: bool = True
+    adaptive_binarization_strength: float = 2.0
 
 
 @dataclass

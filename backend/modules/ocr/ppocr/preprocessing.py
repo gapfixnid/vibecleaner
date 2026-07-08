@@ -1,7 +1,39 @@
 from __future__ import annotations
 
+import logging
+
+import cv2
 import numpy as np
 import imkit as imk
+
+logger = logging.getLogger(__name__)
+
+
+def apply_adaptive_binarization(crop: np.ndarray, strength: float = 2.0) -> np.ndarray:
+	"""Apply CLAHE and adaptive thresholding to an OCR crop."""
+	if crop is None or crop.size == 0:
+		return crop
+	try:
+		if len(crop.shape) == 3:
+			if crop.shape[2] == 3:
+				gray = cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY)
+			elif crop.shape[2] == 4:
+				gray = cv2.cvtColor(crop, cv2.COLOR_RGBA2GRAY)
+			else:
+				gray = crop
+		else:
+			gray = crop
+
+		clip_limit = max(0.5, min(5.0, float(strength)))
+		clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(8, 8))
+		enhanced = clahe.apply(gray)
+		thresh = cv2.adaptiveThreshold(
+			enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+		)
+		return cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
+	except Exception:
+		logger.exception("Adaptive binarization failed")
+		return crop
 
 
 def resize_keep_stride(img: np.ndarray, limit_side_len: int = 960, limit_type: str = "min") -> np.ndarray:

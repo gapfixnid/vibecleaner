@@ -18,20 +18,26 @@ from modules.utils.textblock import TextBlock
 
 
 class FakeMangaEngine:
+    calls = []
+
     def initialize(self):
         pass
 
-    def process_image(self, image, blocks):
+    def process_image(self, image, blocks, **kwargs):
+        self.calls.append(kwargs)
         for block in blocks:
             block.text = "manga"
         return blocks
 
 
 class FakePPOCREngine:
+    calls = []
+
     def initialize(self, lang="ch"):
         self.lang = lang
 
-    def process_image(self, image, blocks):
+    def process_image(self, image, blocks, **kwargs):
+        self.calls.append(kwargs)
         for block in blocks:
             block.text = f"ppocr:{self.lang}"
         return blocks
@@ -73,6 +79,43 @@ class OcrPipelineOptionsTests(unittest.TestCase):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="fast")
 
         self.assertEqual(block.text, "ppocr:ch")
+
+    def test_local_ocr_passes_explicit_crop_options_to_ppocr(self):
+        block = TextBlock([1, 1, 10, 10])
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+        FakePPOCREngine.calls = []
+
+        with (
+            patch("modules.ocr_wrapper.MangaOCRMobileONNXEngine", FakeMangaEngine),
+            patch("modules.ocr_wrapper.PPOCRv5Engine", FakePPOCREngine),
+        ):
+            LocalOCR(lang="Japanese").recognize_text(
+                image,
+                [block],
+                engine="ppocr",
+                padding=13,
+                crop_scale=2.25,
+                adaptive_binarization=False,
+                adaptive_binarization_strength=3.5,
+            )
+
+        self.assertEqual(FakePPOCREngine.calls[0]["padding"], 13)
+        self.assertEqual(FakePPOCREngine.calls[0]["crop_scale"], 2.25)
+        self.assertIs(FakePPOCREngine.calls[0]["adaptive_binarization"], False)
+        self.assertEqual(FakePPOCREngine.calls[0]["adaptive_binarization_strength"], 3.5)
+
+    def test_ppocr_crop_line_uses_explicit_options_without_global_config(self):
+        image = np.zeros((80, 80, 3), dtype=np.uint8)
+
+        crop = ppocr_module._crop_line(
+            image,
+            [10, 10, 50, 50],
+            padding=2,
+            crop_scale=1.0,
+            adaptive_binarization=False,
+        )
+
+        self.assertEqual(crop.shape[:2], (44, 44))
 
     def test_adaptive_binarization_strength_controls_clahe_clip_limit(self):
         cfg = AppConfig(adaptive_binarization_strength=3.25)

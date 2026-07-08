@@ -11,7 +11,7 @@ from modules.utils.language_utils import is_no_space_lang
 from modules.utils.device import get_providers
 from modules.utils.download import ModelDownloader, ModelID
 from modules.utils.onnx import make_session
-from .preprocessing import det_preprocess, crop_quad, rec_resize_norm
+from .preprocessing import apply_adaptive_binarization, det_preprocess, crop_quad, rec_resize_norm
 from .postprocessing import DBPostProcessor, CTCLabelDecoder
 
 
@@ -153,14 +153,31 @@ class PPOCRv5Engine(OCREngine):
 				confs[oi] = float(s)
 		return texts, confs
 
-	def process_image(self, img: np.ndarray, blk_list: List[TextBlock]) -> List[TextBlock]:
-		from modules.config import config
+	def process_image(
+		self,
+		img: np.ndarray,
+		blk_list: List[TextBlock],
+		padding: int | None = None,
+		crop_scale: float | None = None,
+		adaptive_binarization: bool | None = None,
+		adaptive_binarization_strength: float | None = None,
+	) -> List[TextBlock]:
 		if self.rec_sess is None or self.decoder is None:
 			return blk_list
 		if self.use_text_lines and any(getattr(blk, 'lines', None) for blk in blk_list):
 			for blk in blk_list:
 				lines = getattr(blk, 'lines', None) or [blk.xyxy]
-				crops = [_crop_line(img, line) for line in lines]
+				crops = [
+					_crop_line(
+						img,
+						line,
+						padding=padding,
+						crop_scale=crop_scale,
+						adaptive_binarization=adaptive_binarization,
+						adaptive_binarization_strength=adaptive_binarization_strength,
+					)
+					for line in lines
+				]
 				texts, _ = self._rec_infer([crop for crop in crops if crop is not None and crop.size > 0])
 				texts = [text.strip() for text in texts if text and text.strip()]
 				blk.texts = texts
@@ -170,12 +187,13 @@ class PPOCRv5Engine(OCREngine):
 		if boxes is None or len(boxes) == 0:
 			return blk_list
 		
-		adaptive_bin = getattr(config, "adaptive_binarization", True)
+		adaptive_bin = True if adaptive_binarization is None else bool(adaptive_binarization)
+		strength = 2.0 if adaptive_binarization_strength is None else float(adaptive_binarization_strength)
 		crops = []
 		for quad in boxes:
 			crop = crop_quad(img, quad.astype(np.float32))
 			if crop is not None and adaptive_bin:
-				crop = config.apply_adaptive_binarization(crop)
+				crop = apply_adaptive_binarization(crop, strength=strength)
 			crops.append(crop)
 			
 		texts, _ = self._rec_infer(crops)
@@ -189,18 +207,25 @@ class PPOCRv5Engine(OCREngine):
 		return lists_to_blk_list(blk_list, bboxes, texts)
 
 
-def _crop_line(img: np.ndarray, line) -> np.ndarray | None:
-	from modules.config import config
-	base_padding = getattr(config, "ocr_padding", 8)
-	crop_scale = float(getattr(config, "ocr_crop_scale", 1.0) or 1.0)
+def _crop_line(
+	img: np.ndarray,
+	line,
+	padding: int | None = None,
+	crop_scale: float | None = None,
+	adaptive_binarization: bool | None = None,
+	adaptive_binarization_strength: float | None = None,
+) -> np.ndarray | None:
+	base_padding = 8 if padding is None else int(padding)
+	crop_scale = 1.5 if crop_scale is None else float(crop_scale or 1.5)
 	crop_scale = max(0.5, min(3.0, crop_scale))
-	adaptive_bin = getattr(config, "adaptive_binarization", True)
+	adaptive_bin = True if adaptive_binarization is None else bool(adaptive_binarization)
+	strength = 2.0 if adaptive_binarization_strength is None else float(adaptive_binarization_strength)
 
 	arr = np.asarray(line)
 	if arr.ndim == 2 and arr.shape[0] >= 4 and arr.shape[1] == 2:
 		crop = crop_quad(img, arr.astype(np.float32))
 		if crop is not None and adaptive_bin:
-			crop = config.apply_adaptive_binarization(crop)
+			crop = apply_adaptive_binarization(crop, strength=strength)
 		return crop
 	if arr.size != 4:
 		return None
@@ -226,7 +251,7 @@ def _crop_line(img: np.ndarray, line) -> np.ndarray | None:
 		return None
 	crop = img[y1:y2, x1:x2]
 	if adaptive_bin:
-		crop = config.apply_adaptive_binarization(crop)
+		crop = apply_adaptive_binarization(crop, strength=strength)
 	h, w = crop.shape[:2]
 	if h > 0 and w > 0 and h / float(w) >= 1.5:
 		crop = np.rot90(crop)

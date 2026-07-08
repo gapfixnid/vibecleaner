@@ -7,6 +7,7 @@ import onnxruntime as ort
 from PIL import Image
 
 from modules.ocr.base import OCREngine
+from modules.ocr.ppocr.preprocessing import apply_adaptive_binarization
 from modules.utils.download import ModelDownloader, ModelID
 from modules.utils.textblock import TextBlock, adjust_text_line_coordinates
 
@@ -52,12 +53,20 @@ class MangaOCRMobileONNXEngine(OCREngine):
         if self.model is None:
             self.model = MangaOCRMobileONNX()
 
-    def process_image(self, img: np.ndarray, blk_list: list[TextBlock]) -> list[TextBlock]:
-        from modules.config import config
-        base_padding = getattr(config, "ocr_padding", 8)
-        crop_scale = float(getattr(config, "ocr_crop_scale", 1.0) or 1.0)
+    def process_image(
+        self,
+        img: np.ndarray,
+        blk_list: list[TextBlock],
+        padding: int | None = None,
+        crop_scale: float | None = None,
+        adaptive_binarization: bool | None = None,
+        adaptive_binarization_strength: float | None = None,
+    ) -> list[TextBlock]:
+        base_padding = 8 if padding is None else int(padding)
+        crop_scale = 1.5 if crop_scale is None else float(crop_scale or 1.5)
         crop_scale = max(0.5, min(3.0, crop_scale))
-        adaptive_bin = getattr(config, "adaptive_binarization", True)
+        adaptive_bin = True if adaptive_binarization is None else bool(adaptive_binarization)
+        strength = 2.0 if adaptive_binarization_strength is None else float(adaptive_binarization_strength)
 
         crops: list[np.ndarray] = []
         crop_indices: list[int] = []
@@ -93,7 +102,7 @@ class MangaOCRMobileONNXEngine(OCREngine):
             if x1 < x2 and y1 < y2:
                 crop = img[y1:y2, x1:x2]
                 if adaptive_bin:
-                    crop = config.apply_adaptive_binarization(crop)
+                    crop = apply_adaptive_binarization(crop, strength=strength)
                 crops.append(crop)
                 crop_indices.append(idx)
             else:
