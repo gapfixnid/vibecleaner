@@ -3,15 +3,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from modules import config as config_module
-from modules.config import AppConfig
+from core.config import AppConfig
 
 
 class ConfigMigrationTests(unittest.TestCase):
@@ -27,10 +25,8 @@ class ConfigMigrationTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            cfg = AppConfig()
-
-            with patch.object(config_module, "SETTINGS_FILE_PATH", str(settings_path)):
-                cfg.load()
+            cfg = AppConfig(settings_path=str(settings_path))
+            cfg.load()
 
         self.assertEqual(cfg.ocr_engine, "balanced")
         self.assertEqual(cfg.inpaint_engine, "lama")
@@ -47,10 +43,8 @@ class ConfigMigrationTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            cfg = AppConfig()
-
-            with patch.object(config_module, "SETTINGS_FILE_PATH", str(settings_path)):
-                cfg.load()
+            cfg = AppConfig(settings_path=str(settings_path))
+            cfg.load()
 
         self.assertTrue(cfg.setup_completed)
 

@@ -1,4 +1,4 @@
-# modules/detection/wrapper.py
+# engines/detection/wrapper.py
 import logging
 
 import cv2

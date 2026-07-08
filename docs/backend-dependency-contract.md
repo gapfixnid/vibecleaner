@@ -52,11 +52,12 @@ state = ProjectState(...)
 config = AppConfig(...)
 ```
 
-Legacy modules are not part of the final architecture. If a legacy dependency
-still exists, treat it as cleanup debt and remove or absorb it behind a
-port-native engine/infrastructure implementation. API routes and pipeline stages
-must not reach into legacy modules directly for runtime state, settings, or
-concrete engine construction.
+The legacy `backend/modules` package has been fully removed: engine
+implementations live in `backend/engines/*`, shared engine domain types in
+`backend/engines/common`, and resource helpers in `backend/infrastructure/*`.
+`AppConfig` lives in `backend/core/config.py` and receives its settings path
+by injection from the container. New code must not reintroduce a
+`backend/modules` package or module-level runtime state/config singletons.
 
 ## Settings And Engine Options
 
@@ -115,7 +116,7 @@ rg "service_registry|state = ProjectState\(|config: AppConfig = AppConfig\(" bac
 rg "domain.project_state|legacy_state|from modules.config import config" backend tests
 rg "^service = .*Service\(|^[a-z_]+_service = [A-Z][A-Za-z]+Service\(" backend/services backend/pipeline
 rg "from services|import services" backend/pipeline
-rg "from modules|import modules" backend/pipeline
+rg "from modules|import modules" backend tests download_models.py scripts
 rg "modules.logging_config" backend download_models.py tests scripts
 ```
 

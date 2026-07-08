@@ -580,6 +580,22 @@ Expected: PASS.
   `engines/translation/service.py` → `modules.config.OLLAMA_API_URL`
   (also used by the settings route; resolves when `modules/config.py`
   moves to `core/config.py`).
+- `backend/modules` has been fully removed. `AppConfig` (with its legacy
+  settings migrations) and `OLLAMA_API_URL` moved into `core/config.py`;
+  `AppConfig` no longer reads a module-level `SETTINGS_FILE_PATH` — it takes
+  a `settings_path` constructor argument, injected by the container from
+  `infrastructure.storage.get_settings_file_path()` (this keeps `core` free
+  of infrastructure imports per the contract). The legacy
+  `AppConfig.apply_adaptive_binarization` method (which imported a concrete
+  OCR engine from config) was deleted; engines call
+  `engines.ocr.ppocr.preprocessing.apply_adaptive_binarization` directly.
+  Dead files deleted with no references anywhere: `modules/background.py`,
+  `modules/utils/common_utils.py`, `modules/utils/exceptions.py`,
+  `modules/utils/platform_utils.py`. Boundary tests now assert
+  `backend/modules` does not exist and that no backend code imports
+  `modules`. mypy/ruff legacy exemptions were repointed from `modules` to
+  `backend/engines` (legacy-origin code, quality debt to burn down
+  separately).
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

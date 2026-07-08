@@ -11,7 +11,8 @@ sys.path.append(os.path.join(current_dir, "backend"))
 
 from infrastructure.logging import configure_logging
 from infrastructure.downloads import ModelDownloader, ModelID
-from modules.config import AppConfig
+from infrastructure.storage import get_settings_file_path
+from core.config import AppConfig
 from services.model_requirements import get_required_model_ids
 from app.version import APP_NAME
 
@@ -37,7 +38,7 @@ ALL_CORE_MODEL_IDS = [
 
 
 def _load_current_settings() -> AppConfig:
-    settings = AppConfig()
+    settings = AppConfig(settings_path=get_settings_file_path())
     settings.load()
     return settings
 

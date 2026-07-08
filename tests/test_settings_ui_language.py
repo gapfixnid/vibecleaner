@@ -10,7 +10,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from api.routes import settings as settings_route
-from modules.config import AppConfig
+from core.config import AppConfig
 
 
 def make_translation_service():

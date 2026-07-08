@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from modules.config import AppConfig
+from core.config import AppConfig
 from infrastructure.downloads import ModelDownloader, ModelID
 
 

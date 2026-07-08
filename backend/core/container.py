@@ -27,7 +27,8 @@ class AppContainer:
 
 
 def build_container(config: Any | None = None) -> AppContainer:
-    from modules.config import AppConfig
+    from core.config import AppConfig
+    from infrastructure.storage import get_settings_file_path
     from pipeline.page_translation_stages import build_page_translation_runner
     from services.job_service import job_manager
     from services.bubble_analysis_service import BubbleAnalysisService
@@ -42,7 +43,7 @@ def build_container(config: Any | None = None) -> AppContainer:
     from services.review_state_service import refresh_page_status
     from engines.translation.service import TranslationService
 
-    runtime_config = config or AppConfig()
+    runtime_config = config or AppConfig(settings_path=get_settings_file_path())
     if config is None:
         runtime_config.load()
 

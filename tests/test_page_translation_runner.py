@@ -12,7 +12,7 @@ if str(BACKEND) not in sys.path:
 
 from app.models import MangaPage, TextBubble
 from core.state.project_state import ProjectState
-from modules.config import AppConfig
+from core.config import AppConfig
 from pipeline.page_translation import run_page_translation
 from pipeline.planner import PipelinePlanner
 from pipeline.page_translation_stages import build_page_translation_runner

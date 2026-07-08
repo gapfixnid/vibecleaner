@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from api.dependencies import get_container
 from app.version import APP_NAME
 from core.container import AppContainer
-from modules.config import OLLAMA_API_URL
+from core.config import OLLAMA_API_URL
 from services.model_requirements import download_required_models, get_model_status
 
 router = APIRouter()

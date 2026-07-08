@@ -9,7 +9,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from engines.translation import providers as translation_wrapper
-from modules.config import AppConfig
+from core.config import AppConfig
 from engines.common.textblock import TextBlock
 from engines.translation.service import TranslationService
 

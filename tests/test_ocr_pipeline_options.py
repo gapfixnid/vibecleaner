@@ -10,9 +10,10 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from modules.config import AppConfig
+from core.config import AppConfig
 from engines.ocr.ppocr import engine as ppocr_module
 from engines.ocr.ppocr.engine import PPOCRv5Engine
+from engines.ocr.ppocr.preprocessing import apply_adaptive_binarization
 from engines.ocr.local import LocalOCR
 from engines.common.textblock import TextBlock
 
@@ -127,7 +128,7 @@ class OcrPipelineOptionsTests(unittest.TestCase):
             patch("engines.ocr.ppocr.preprocessing.cv2.cvtColor", side_effect=lambda image, *_args: image[:, :, 0] if image.ndim == 3 else np.dstack([image] * 3)),
         ):
             create_clahe.return_value.apply.side_effect = lambda gray: gray
-            cfg.apply_adaptive_binarization(crop)
+            apply_adaptive_binarization(crop, strength=cfg.adaptive_binarization_strength)
 
         create_clahe.assert_called_once_with(clipLimit=3.25, tileGridSize=(8, 8))
 

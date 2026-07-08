@@ -49,3 +49,8 @@ def get_app_data_dir(app_name: str = APP_NAME) -> str:
     if platform.system() == "Darwin":
         return os.path.expanduser(f"~/Library/Application Support/{app_name}")
     return os.path.expanduser(f"~/.config/{app_name}")
+
+
+def get_settings_file_path(app_name: str = APP_NAME) -> str:
+    """Return the canonical settings.json path inside the roaming app-data dir."""
+    return os.path.join(get_app_data_dir(app_name), "settings.json")

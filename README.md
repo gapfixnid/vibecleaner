@@ -25,9 +25,8 @@ flowchart LR
 - `backend/api/`: FastAPI routes and dependency helpers. Routes receive application dependencies from the container instead of importing global services.
 - `backend/core/`: application configuration snapshots, models, ports, state contracts, and the composition root in `backend/core/container.py`.
 - `backend/pipeline/`: page-processing plans, runner, stages, strategies, validation, and provenance capture.
-- `backend/engines/`: concrete detection, OCR, translation, inpainting, and rendering adapters behind core ports.
-- `backend/infrastructure/`: image, font, cache, storage, download, and asset helpers.
-- `backend/modules/`: transitional model wrappers and low-level utilities. These are not part of the final architecture and should be removed or absorbed behind port-native engines as cleanup work continues.
+- `backend/engines/`: concrete detection, OCR, translation, inpainting, and rendering implementations and adapters behind core ports, plus shared engine domain types in `engines/common`.
+- `backend/infrastructure/`: image, font, runtime (device/ONNX), storage, download, and asset helpers.
 - `download_models.py`: downloads the core local model set into the user's app data directory.
 - `scripts/verify-packaging.py`: checks packaging prerequisites without downloading large model assets.
 - `scripts/build-runtime-sidecar.ps1`: builds the packaged backend sidecar from runtime-only dependencies.

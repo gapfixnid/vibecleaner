@@ -48,6 +48,7 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert not (backend / "modules" / "constants.py").exists()
     assert not (backend / "modules" / "utils" / "translator_utils.py").exists()
     assert not (backend / "services" / "translation_service.py").exists()
+    assert not (backend / "modules").exists()
 
     scanned_files = [
         path
@@ -96,6 +97,8 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert ("modules." + "constants") not in combined
     assert ("modules.utils." + "translator_utils") not in combined
     assert ("services." + "translation_service") not in combined
+    assert ("from " + "modules") not in combined
+    assert ("import " + "modules") not in combined
 
 
 def test_pipeline_and_api_do_not_import_concrete_engines():

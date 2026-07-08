@@ -7,7 +7,7 @@ exclude = [
     "dist",
     "venv",
     ".venv",
-    "modules",
+    "backend/engines",
     "backend/infrastructure/image",
 ]
 
