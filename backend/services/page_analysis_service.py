@@ -420,8 +420,8 @@ class PageAnalysisService:
     """Page-level analysis: panels, reading order, writing mode.
 
     Usage:
-        service = PageAnalysisService()
-        result = service.analyze(image, source_lang='japanese', text_blocks=blocks)
+        analyzer = PageAnalysisService()
+        result = analyzer.analyze(image, source_lang='japanese', text_blocks=blocks)
     """
 
     def __init__(self):
@@ -514,10 +514,3 @@ class PageAnalysisService:
                 rows.append([panel])
 
         return rows
-
-
-# ---------------------------------------------------------------------------
-# Singleton instance
-# ---------------------------------------------------------------------------
-
-service = PageAnalysisService()

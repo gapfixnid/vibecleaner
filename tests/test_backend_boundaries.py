@@ -1,4 +1,5 @@
 from pathlib import Path
+import ast
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,3 +48,46 @@ def test_pipeline_and_api_do_not_import_concrete_engines():
 
     assert "from engines" not in combined
     assert "import engines" not in combined
+
+
+def test_services_do_not_define_module_level_service_singletons():
+    services = ROOT / "backend" / "services"
+    offenders = []
+
+    for path in services.rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            target_names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+            if "service" not in target_names:
+                continue
+            if isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name):
+                if node.value.func.id.endswith("Service"):
+                    offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+
+    assert offenders == []
+
+
+def test_pipeline_does_not_create_module_level_service_instances():
+    pipeline = ROOT / "backend" / "pipeline"
+    offenders = []
+
+    for path in pipeline.rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            if not isinstance(node.value, ast.Call) or not isinstance(node.value.func, ast.Name):
+                continue
+            if not node.value.func.id.endswith("Service"):
+                continue
+            target_names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+            if any(name.endswith("_service") for name in target_names):
+                offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+
+    assert offenders == []

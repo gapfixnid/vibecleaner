@@ -462,7 +462,6 @@ def bubble_to_layout_input(
         max(10, text_box.width() - shrink),
         max(10, text_box.height() - shrink),
     )
-
     return BubbleLayoutInput(
         bubble_box=box,
         layout_box=layout_box,
@@ -473,10 +472,3 @@ def bubble_to_layout_input(
         user_alignment=getattr(bubble, 'alignment', None) or None,
         user_font_size=getattr(bubble, 'font_size', 0) or 0,
     )
-
-
-# ---------------------------------------------------------------------------
-# Singleton instance
-# ---------------------------------------------------------------------------
-
-service = LayoutPlannerService()

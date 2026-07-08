@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import numpy as np
 from PySide6.QtCore import QRectF
@@ -30,29 +29,27 @@ def test_bubbles_from_analysis_preserves_detected_font_color():
         font_color=(12, 34, 56),
     )
 
-    with (
-        patch.object(
-            page_analysis.page_analysis_service,
-            "analyze",
-            return_value=SimpleNamespace(reading_order=SimpleNamespace(direction="ltr"), writing_mode="horizontal"),
+    bubbles = page_analysis.bubbles_from_analysis(
+        image,
+        blocks=[],
+        source_lang="Japanese",
+        target_lang="Korean",
+        config=config,
+        page_analysis_service=SimpleNamespace(
+            analyze=lambda *args, **kwargs: SimpleNamespace(
+                reading_order=SimpleNamespace(direction="ltr"),
+                writing_mode="horizontal",
+            )
         ),
-        patch.object(
-            page_analysis.bubble_analysis_service,
-            "analyze",
-            return_value=BubbleAnalysisResult(bubbles=[bubble_data], reading_order="LTR", writing_mode="horizontal"),
+        bubble_analysis_service=SimpleNamespace(
+            analyze=lambda *args, **kwargs: BubbleAnalysisResult(
+                bubbles=[bubble_data],
+                reading_order="LTR",
+                writing_mode="horizontal",
+            )
         ),
-        patch.object(page_analysis.layout_planner_service, "plan", return_value=SimpleNamespace(alignment="center")),
-    ):
-        bubbles = page_analysis.bubbles_from_analysis(
-            image,
-            blocks=[],
-            source_lang="Japanese",
-            target_lang="Korean",
-            config=config,
-            page_analysis_service=page_analysis.page_analysis_service,
-            bubble_analysis_service=page_analysis.bubble_analysis_service,
-            layout_planner_service=page_analysis.layout_planner_service,
-        )
+        layout_planner_service=SimpleNamespace(plan=lambda *args, **kwargs: SimpleNamespace(alignment="center")),
+    )
 
     assert len(bubbles) == 1
     assert bubbles[0].color == "#0c2238"
@@ -69,21 +66,27 @@ def test_bubbles_from_analysis_preserves_layout_plan_metadata():
         text_class="text_bubble",
     )
 
-    with (
-        patch.object(
-            page_analysis.page_analysis_service,
-            "analyze",
-            return_value=SimpleNamespace(reading_order=SimpleNamespace(direction="rtl"), writing_mode="vertical"),
+    bubbles = page_analysis.bubbles_from_analysis(
+        image,
+        blocks=[],
+        source_lang="Japanese",
+        target_lang="Korean",
+        config=config,
+        page_analysis_service=SimpleNamespace(
+            analyze=lambda *args, **kwargs: SimpleNamespace(
+                reading_order=SimpleNamespace(direction="rtl"),
+                writing_mode="vertical",
+            )
         ),
-        patch.object(
-            page_analysis.bubble_analysis_service,
-            "analyze",
-            return_value=BubbleAnalysisResult(bubbles=[bubble_data], reading_order="RTL", writing_mode="vertical"),
+        bubble_analysis_service=SimpleNamespace(
+            analyze=lambda *args, **kwargs: BubbleAnalysisResult(
+                bubbles=[bubble_data],
+                reading_order="RTL",
+                writing_mode="vertical",
+            )
         ),
-        patch.object(
-            page_analysis.layout_planner_service,
-            "plan",
-            return_value=SimpleNamespace(
+        layout_planner_service=SimpleNamespace(
+            plan=lambda *args, **kwargs: SimpleNamespace(
                 alignment="right",
                 writing_mode="vertical",
                 text_direction="rtl",
@@ -92,19 +95,9 @@ def test_bubbles_from_analysis_preserves_layout_plan_metadata():
                 margin=Insets(top=5, right=6, bottom=7, left=8),
                 confidence=0.73,
                 reasoning="writing_mode=vertical; alignment=right",
-            ),
+            )
         ),
-    ):
-        bubbles = page_analysis.bubbles_from_analysis(
-            image,
-            blocks=[],
-            source_lang="Japanese",
-            target_lang="Korean",
-            config=config,
-            page_analysis_service=page_analysis.page_analysis_service,
-            bubble_analysis_service=page_analysis.bubble_analysis_service,
-            layout_planner_service=page_analysis.layout_planner_service,
-        )
+    )
 
     assert len(bubbles) == 1
     bubble = bubbles[0]

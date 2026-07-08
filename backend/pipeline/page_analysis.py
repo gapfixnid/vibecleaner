@@ -5,13 +5,6 @@ from typing import Any
 import numpy as np
 
 from app.models import TextBubble
-from services.bubble_analysis_service import BubbleAnalysisService
-from services.layout_planner_service import LayoutPlannerService
-from services.page_analysis_service import PageAnalysisService
-
-page_analysis_service = PageAnalysisService()
-bubble_analysis_service = BubbleAnalysisService()
-layout_planner_service = LayoutPlannerService()
 
 
 def inpaint_boxes(bubbles, *, use_textbox_only: bool = True) -> list:
