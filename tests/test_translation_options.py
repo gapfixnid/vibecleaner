@@ -47,8 +47,7 @@ class TranslationOptionsTests(unittest.TestCase):
             translation_retry_backoff_seconds=4,
         )
 
-        with patch("services.translation_service.config", cfg):
-            translator = TranslationService().translator
+        translator = TranslationService(config=cfg).translator
 
         self.assertEqual(translator.temperature, 0.15)
         self.assertEqual(translator.top_p, 0.85)
@@ -63,8 +62,7 @@ class TranslationOptionsTests(unittest.TestCase):
             translation_retry_backoff_seconds=5,
         )
 
-        with patch("services.translation_service.config", cfg):
-            translator = TranslationService().translator
+        translator = TranslationService(config=cfg).translator
 
         self.assertEqual(translator.max_retries, 4)
         self.assertEqual(translator.retry_backoff_seconds, 5)

@@ -12,8 +12,11 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-import services.auto_typeset_pipeline as pipeline_module
+import pipeline.auto_typeset as pipeline_module
 from app.models import MangaPage, TextBubble
+from domain.project_state import ProjectState
+from modules.config import AppConfig
+from services.job_service import job_manager
 from services.bubble_analysis_service import BubbleAnalysisResult, BubbleData
 from services.layout_planner_service import Insets
 
@@ -54,15 +57,11 @@ class FakeTranslationService:
 
 class AutoTypesetPipelineTests(unittest.TestCase):
     def setUp(self):
-        self.original_pages = list(pipeline_module.state.pages)
-        self.original_revision = pipeline_module.state.revision
-        self.original_current_page_idx = pipeline_module.state.current_page_idx
+        self.state = ProjectState()
+        self.config = AppConfig()
 
     def tearDown(self):
-        with pipeline_module.state.lock:
-            pipeline_module.state.pages = self.original_pages
-            pipeline_module.state.revision = self.original_revision
-            pipeline_module.state.current_page_idx = self.original_current_page_idx
+        pass
 
     def test_run_page_translates_existing_bubbles_and_updates_page_state(self):
         page = MangaPage(
@@ -80,22 +79,27 @@ class AutoTypesetPipelineTests(unittest.TestCase):
             bubble_counter=1,
         )
         page.page_id = "page_a"
-        with pipeline_module.state.lock:
-            pipeline_module.state.pages = [page]
-            pipeline_module.state.current_page_idx = 0
-            pipeline_module.state.revision = 0
+        with self.state.lock:
+            self.state.pages = [page]
+            self.state.current_page_idx = 0
+            self.state.revision = 0
 
         inpainting_service = FakeInpaintingService()
         translation_service = FakeTranslationService()
 
         with (
             patch.object(pipeline_module, "ensure_page_image", lambda page: None),
-            patch.object(pipeline_module, "inpainting_service", inpainting_service),
-            patch.object(pipeline_module, "translation_service", translation_service),
             patch.object(pipeline_module, "encode_preview_jpeg_bytes", lambda image: b"preview"),
             patch.object(pipeline_module, "encode_thumbnail_bytes", lambda image: b"thumb"),
         ):
-            result = pipeline_module.AutoTypesetPipeline().run_page(
+            result = pipeline_module.AutoTypesetPipeline(
+                state=self.state,
+                config=self.config,
+                job_manager=job_manager,
+                detection_service=SimpleNamespace(),
+                inpainting_service=inpainting_service,
+                translation_service=translation_service,
+            ).run_page(
                 {"cancel_requested": False},
                 "page_a",
                 show_progress=True,
@@ -151,6 +155,10 @@ class AutoTypesetPipelineTests(unittest.TestCase):
                 blocks=[],
                 source_lang="Japanese",
                 target_lang="Korean",
+                config=self.config,
+                page_analysis_service=pipeline_module.page_analysis_service,
+                bubble_analysis_service=pipeline_module.bubble_analysis_service,
+                layout_planner_service=pipeline_module.layout_planner_service,
             )
 
         self.assertEqual(len(bubbles), 1)
@@ -195,6 +203,10 @@ class AutoTypesetPipelineTests(unittest.TestCase):
                 blocks=[],
                 source_lang="Japanese",
                 target_lang="Korean",
+                config=self.config,
+                page_analysis_service=pipeline_module.page_analysis_service,
+                bubble_analysis_service=pipeline_module.bubble_analysis_service,
+                layout_planner_service=pipeline_module.layout_planner_service,
             )
 
         self.assertEqual(len(bubbles), 1)
@@ -240,6 +252,10 @@ class AutoTypesetPipelineTests(unittest.TestCase):
                 blocks=[],
                 source_lang="Japanese",
                 target_lang="Korean",
+                config=self.config,
+                page_analysis_service=pipeline_module.page_analysis_service,
+                bubble_analysis_service=pipeline_module.bubble_analysis_service,
+                layout_planner_service=pipeline_module.layout_planner_service,
             )
 
         self.assertEqual(len(bubbles), 1)
@@ -293,6 +309,10 @@ class AutoTypesetPipelineTests(unittest.TestCase):
                 blocks=[],
                 source_lang="Japanese",
                 target_lang="Korean",
+                config=self.config,
+                page_analysis_service=pipeline_module.page_analysis_service,
+                bubble_analysis_service=pipeline_module.bubble_analysis_service,
+                layout_planner_service=pipeline_module.layout_planner_service,
             )
 
         self.assertEqual(len(bubbles), 1)

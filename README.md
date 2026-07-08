@@ -10,21 +10,29 @@ The application is designed for local workflows. Images are loaded from the user
 flowchart LR
   UI["React frontend"] --> Tauri["Tauri commands"]
   Tauri --> API["FastAPI backend on 127.0.0.1"]
-  API --> Core["Project/page state"]
-  API --> Detect["Detection and OCR"]
-  API --> Translate["Translation providers"]
-  API --> Inpaint["Inpainting"]
-  API --> Render["Typesetting and render"]
-  API --> Export["Export service"]
+  API --> Pipeline["Pipeline runner and stages"]
+  Pipeline --> Ports["Core ports and models"]
+  Engines["Detection/OCR/translation/inpainting/rendering engines"] --> Ports
+  Infrastructure["Image, fonts, cache, storage, downloads"] --> Ports
+  Container["Composition root"] --> API
+  Container --> Pipeline
+  Container --> Engines
+  Container --> Infrastructure
 ```
 
 - `frontend/`: React UI, state stores, API adapter, canvas/editor views.
 - `desktop/src-tauri/`: Tauri shell, backend process launcher, command forwarding to the local API.
-- `backend/`: FastAPI routes, project state, image processing services, OCR/detection/inpainting/rendering pipeline.
-- `backend/modules/`: model wrappers and lower-level image/OCR/rendering utilities.
+- `backend/api/`: FastAPI routes and dependency helpers. Routes receive application dependencies from the container instead of importing global services.
+- `backend/core/`: application configuration snapshots, models, ports, state contracts, and the composition root in `backend/core/container.py`.
+- `backend/pipeline/`: page-processing plans, runner, stages, strategies, validation, and provenance capture.
+- `backend/engines/`: concrete detection, OCR, translation, inpainting, and rendering adapters behind core ports.
+- `backend/infrastructure/`: image, font, cache, storage, download, and asset helpers as the backend is migrated away from legacy utility modules.
+- `backend/modules/`: legacy model wrappers and low-level utilities still used behind adapters during migration.
 - `download_models.py`: downloads the core local model set into the user's app data directory.
 - `scripts/verify-packaging.py`: checks packaging prerequisites without downloading large model assets.
 - `scripts/build-runtime-sidecar.ps1`: builds the packaged backend sidecar from runtime-only dependencies.
+
+The backend uses a composition-root pattern: `backend/main.py` creates the FastAPI app, calls `build_container()`, stores the container on `app.state`, and routes access it through `api.dependencies.get_container`. Pipeline code depends on core ports and explicit option DTOs rather than importing concrete engines directly. Strategies convert settings into stage options, validation produces structured pipeline issues, and provenance records stage execution metadata.
 
 ## Translation Pipeline
 

@@ -6,7 +6,7 @@ import hashlib
 import shutil
 import numpy as np
 from typing import List, Optional, Any, Dict, cast
-from modules.config import config, APP_DATA_DIR, OLLAMA_API_URL
+from modules.config import APP_DATA_DIR, OLLAMA_API_URL
 from modules.translation_wrapper import (
     OllamaTranslator,
     OpenAICompatibleTranslator,
@@ -25,10 +25,11 @@ logger = logging.getLogger(__name__)
 class TranslationService:
     _TM_CACHE_MAX = 10000
 
-    def __init__(self, translator: Optional[BaseTranslator] = None) -> None:
+    def __init__(self, config, translator: Optional[BaseTranslator] = None) -> None:
+        self.config = config
         configured_translator = translator or self._build_configured_translator()
-        self.translators: Dict[str, BaseTranslator] = {config.translation_provider: configured_translator}
-        self.active_translator_name: str = config.translation_provider
+        self.translators: Dict[str, BaseTranslator] = {self.config.translation_provider: configured_translator}
+        self.active_translator_name: str = self.config.translation_provider
         self._cache: Dict[str, str] = {}  # In-memory translation cache (src_text -> translated_text)
         self._cache_lock = threading.RLock()
         self._translator_lock = threading.RLock()
@@ -99,7 +100,7 @@ class TranslationService:
         """
         with self._translator_lock:
             override = self.system_prompt  # preserve any custom prompt
-            provider = config.translation_provider
+            provider = self.config.translation_provider
             new_translator = self._build_configured_translator()
             if override and hasattr(new_translator, "system_prompt_override"):
                 new_translator.system_prompt_override = override
@@ -108,6 +109,7 @@ class TranslationService:
         logger.info("Translation service reloaded (provider=%s)", provider)
 
     def _build_configured_translator(self) -> BaseTranslator:
+        config = self.config
         provider = (config.translation_provider or "google").lower()
         if provider == "google":
             return GoogleTranslatorWrapper(
@@ -206,7 +208,7 @@ class TranslationService:
             for idx, block in enumerate(blocks):
                 cache_key = self._cache_key(blocks, idx)
                 block_cache_keys[id(block)] = cache_key
-                if config.translation_cache_enabled and cache_key in self._cache:
+                if self.config.translation_cache_enabled and cache_key in self._cache:
                     block.translation = self._cache[cache_key]
                 else:
                     to_translate.append(block)
@@ -220,7 +222,7 @@ class TranslationService:
             with self._cache_lock:
                 for block in to_translate:
                     translation = cast(str, getattr(block, "translation", ""))
-                    if config.translation_cache_enabled and translation:
+                    if self.config.translation_cache_enabled and translation:
                         self._cache[block_cache_keys[id(block)]] = translation
                 # Bound the in-memory TM (FIFO) to avoid unbounded growth.
                 if len(self._cache) > self._TM_CACHE_MAX:
@@ -230,7 +232,7 @@ class TranslationService:
 
     def _cache_key(self, blocks: List[Any], index: int) -> str:
         text = cast(str, blocks[index].text).strip()
-        if config.translation_cache_mode != "text_with_context":
+        if self.config.translation_cache_mode != "text_with_context":
             return text
 
         neighbor_parts = []
@@ -281,8 +283,8 @@ class TranslationService:
             "model": self.model,
             "connected": getattr(translator, "is_online", None),
             "last_error": getattr(translator, "last_error", None),
-            "cache_enabled": config.translation_cache_enabled,
-            "cache_mode": config.translation_cache_mode,
+            "cache_enabled": self.config.translation_cache_enabled,
+            "cache_mode": self.config.translation_cache_mode,
             "cache_entries": len(self._cache),
         }
 

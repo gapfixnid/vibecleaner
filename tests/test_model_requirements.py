@@ -116,10 +116,9 @@ class ModelRequirementsTests(unittest.TestCase):
         )
 
         with (
-            patch("api.routes.settings.config", cfg),
             patch("services.model_requirements.ModelDownloader.is_downloaded", return_value=True),
         ):
-            status = settings_route.get_models_status()
+            status = settings_route.get_models_status_for_config(cfg)
 
         self.assertTrue(status["all_ready"])
         self.assertEqual(

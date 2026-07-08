@@ -4,11 +4,12 @@ import json
 import logging
 import cv2
 import numpy as np
-from fastapi import APIRouter, HTTPException, Form
+from fastapi import APIRouter, Depends, HTTPException, Form
 from PIL import Image
+from api.dependencies import get_container
 from app.models import MangaPage
 from app.version import APP_NAME
-from domain.project_state import state
+from core.container import AppContainer
 from services.cache_service import submit_cache_task
 from services.image_encoding_service import encode_preview_jpeg_bytes
 from services.page_image_loader import load_cv_image, warm_original_thumbnail
@@ -19,7 +20,7 @@ logger = logging.getLogger(APP_NAME)
 PROJECT_CACHE_WARM_RADIUS = 2
 
 
-def _warm_inpainted_response_caches(page_indices: list[int]) -> None:
+def _warm_inpainted_response_caches(state, page_indices: list[int]) -> None:
     for page_idx in page_indices:
         with state.lock:
             if page_idx < 0 or page_idx >= len(state.pages):
@@ -57,7 +58,7 @@ def _start_original_thumbnail_warmup(pages: list[MangaPage]) -> None:
     submit_cache_task(lambda: _warm_original_thumbnail_caches(pages_snapshot))
 
 
-def _start_project_cache_warmup(page_count: int, current_index: int) -> None:
+def _start_project_cache_warmup(state, page_count: int, current_index: int) -> None:
     if page_count <= 0:
         return
 
@@ -67,15 +68,16 @@ def _start_project_cache_warmup(page_count: int, current_index: int) -> None:
             if 0 <= idx < page_count and idx not in warm_indices:
                 warm_indices.append(idx)
 
-    submit_cache_task(lambda: _warm_inpainted_response_caches(warm_indices))
+    submit_cache_task(lambda: _warm_inpainted_response_caches(state, warm_indices))
 
 @router.post("/api/project/new")
-def new_project():
+def new_project(container: AppContainer = Depends(get_container)):
     """Reset the in-memory project: clear all pages and selection.
 
     Used by the "New Project" action. The frontend is responsible for warning
     about unsaved changes before calling this; the backend simply clears state.
     """
+    state = container.legacy_state
     with state.lock:
         state.pages = []
         state.current_page_idx = -1
@@ -83,7 +85,7 @@ def new_project():
     return {"page_count": 0, "current_index": -1}
 
 @router.post("/api/project/open-directory")
-def open_directory(directory: str = Form(...)):
+def open_directory(directory: str = Form(...), container: AppContainer = Depends(get_container)):
     if not os.path.isdir(directory):
         raise HTTPException(status_code=400, detail="Invalid directory path")
     
@@ -112,6 +114,7 @@ def open_directory(directory: str = Form(...)):
         except Exception:
             continue
 
+    state = container.legacy_state
     with state.lock:
         # Append to existing pages (dedup by file path); keep the current page.
         existing_paths = {p.file_path for p in state.pages}
@@ -129,7 +132,7 @@ def open_directory(directory: str = Form(...)):
     return result
 
 @router.post("/api/project/open-files")
-def open_files(files_json: str = Form(...)):
+def open_files(files_json: str = Form(...), container: AppContainer = Depends(get_container)):
     try:
         files = json.loads(files_json)
     except Exception:
@@ -161,6 +164,7 @@ def open_files(files_json: str = Form(...)):
         except Exception:
             continue
 
+    state = container.legacy_state
     with state.lock:
         # Append to existing pages (dedup by file path); keep the current page.
         existing_paths = {p.file_path for p in state.pages}
@@ -178,7 +182,12 @@ def open_files(files_json: str = Form(...)):
     return result
 
 @router.post("/api/project/save")
-def save_project(file_path: str = Form(...), selected_indices: str = Form("")):
+def save_project(
+    file_path: str = Form(...),
+    selected_indices: str = Form(""),
+    container: AppContainer = Depends(get_container),
+):
+    state = container.legacy_state
     if not file_path:
         raise HTTPException(status_code=400, detail="file_path is required")
 
@@ -292,7 +301,8 @@ def save_project(file_path: str = Form(...), selected_indices: str = Form("")):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/api/project/load")
-def load_project(file_path: str = Form(...)):
+def load_project(file_path: str = Form(...), container: AppContainer = Depends(get_container)):
+    state = container.legacy_state
     if not file_path:
         raise HTTPException(status_code=400, detail="file_path is required")
             
@@ -387,7 +397,7 @@ def load_project(file_path: str = Form(...)):
             page_count = len(state.pages)
             current_index = state.current_page_idx
         _start_original_thumbnail_warmup(loaded_pages)
-        _start_project_cache_warmup(page_count, current_index)
+        _start_project_cache_warmup(state, page_count, current_index)
         return {
             "page_count": page_count,
             "current_index": current_index,

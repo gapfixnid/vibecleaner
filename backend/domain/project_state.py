@@ -16,5 +16,3 @@ class ProjectState:
             self.revision += 1
             return self.revision
 
-
-state = ProjectState()

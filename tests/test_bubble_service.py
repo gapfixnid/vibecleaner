@@ -2,7 +2,6 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import numpy as np
 from PySide6.QtCore import QRectF
@@ -14,17 +13,23 @@ if str(BACKEND) not in sys.path:
 
 import services.bubble_service as bubble_service
 from app.models import MangaPage, TextBubble
+from domain.project_state import ProjectState
+
+
+class FakeRenderService:
+    def __init__(self, layout):
+        self.layout = layout
+
+    def get_layout_for_bubble(self, *args, **kwargs):
+        return self.layout
 
 
 class BubbleServiceTests(unittest.TestCase):
     def setUp(self):
-        self.original_pages = list(bubble_service.state.pages)
-        self.original_current_page_idx = bubble_service.state.current_page_idx
+        self.state = ProjectState()
 
     def tearDown(self):
-        with bubble_service.state.lock:
-            bubble_service.state.pages = self.original_pages
-            bubble_service.state.current_page_idx = self.original_current_page_idx
+        pass
 
     def test_get_bubbles_response_exposes_text_and_layout_boxes(self):
         page = MangaPage(
@@ -43,18 +48,13 @@ class BubbleServiceTests(unittest.TestCase):
             ],
         )
         page.page_id = "page_a"
-        with bubble_service.state.lock:
-            bubble_service.state.pages = [page]
-            bubble_service.state.current_page_idx = 0
+        with self.state.lock:
+            self.state.pages = [page]
+            self.state.current_page_idx = 0
 
         fake_font = SimpleNamespace(pointSizeF=lambda: 14.0, family=lambda: "Resolved Font")
         fake_layout = SimpleNamespace(font=fake_font, line_layouts=[])
-        with patch.object(
-            bubble_service.render_service,
-            "get_layout_for_bubble",
-            return_value=fake_layout,
-        ):
-            response = bubble_service.get_bubbles_response("page_a")
+        response = bubble_service.get_bubbles_response(self.state, "page_a", FakeRenderService(fake_layout))
 
         bubble = response["bubbles"][0]
         self.assertEqual(bubble["text_box"], {"x": 3.0, "y": 4.0, "width": 20.0, "height": 22.0})
@@ -76,18 +76,13 @@ class BubbleServiceTests(unittest.TestCase):
             ],
         )
         page.page_id = "page_a"
-        with bubble_service.state.lock:
-            bubble_service.state.pages = [page]
-            bubble_service.state.current_page_idx = 0
+        with self.state.lock:
+            self.state.pages = [page]
+            self.state.current_page_idx = 0
 
         fake_font = SimpleNamespace(pointSizeF=lambda: 17.0, family=lambda: "Resolved Font")
         fake_layout = SimpleNamespace(font=fake_font, line_layouts=[])
-        with patch.object(
-            bubble_service.render_service,
-            "get_layout_for_bubble",
-            return_value=fake_layout,
-        ):
-            response = bubble_service.get_bubbles_response("page_a")
+        response = bubble_service.get_bubbles_response(self.state, "page_a", FakeRenderService(fake_layout))
 
         bubble = response["bubbles"][0]
         self.assertEqual(bubble["font_family"], "")
@@ -110,18 +105,13 @@ class BubbleServiceTests(unittest.TestCase):
             ],
         )
         page.page_id = "page_a"
-        with bubble_service.state.lock:
-            bubble_service.state.pages = [page]
-            bubble_service.state.current_page_idx = 0
+        with self.state.lock:
+            self.state.pages = [page]
+            self.state.current_page_idx = 0
 
         fake_font = SimpleNamespace(pointSizeF=lambda: 8.0, family=lambda: "Resolved Font")
         fake_layout = SimpleNamespace(font=fake_font, line_layouts=[], is_overflow=True, reached_min_font=True)
-        with patch.object(
-            bubble_service.render_service,
-            "get_layout_for_bubble",
-            return_value=fake_layout,
-        ):
-            response = bubble_service.get_bubbles_response("page_a")
+        response = bubble_service.get_bubbles_response(self.state, "page_a", FakeRenderService(fake_layout))
 
         bubble = response["bubbles"][0]
         self.assertEqual(bubble["status"], "layout_overflow")

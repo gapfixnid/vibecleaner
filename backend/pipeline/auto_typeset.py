@@ -7,33 +7,29 @@ from fastapi import HTTPException
 
 from app.models import TextBubble
 from app.version import APP_NAME
-from domain.project_state import state
-from modules.config import config
 from modules.utils.textblock import TextBlock
 from services.image_encoding_service import encode_preview_jpeg_bytes, encode_thumbnail_bytes
-from services.job_service import job_manager
 from services.page_image_loader import ensure_page_image, invalidate_page_caches
 from services.review_state_service import refresh_page_status
-from services.service_registry import (
-    bubble_analysis_service,
-    detection_service,
-    inpainting_service,
-    layout_planner_service,
-    page_analysis_service,
-    translation_service,
-)
+from services.bubble_analysis_service import BubbleAnalysisService
+from services.layout_planner_service import LayoutPlannerService
+from services.page_analysis_service import PageAnalysisService
 
 
 logger = logging.getLogger(APP_NAME)
 
+page_analysis_service = PageAnalysisService()
+bubble_analysis_service = BubbleAnalysisService()
+layout_planner_service = LayoutPlannerService()
 
-def inpaint_boxes(bubbles) -> list:
+
+def inpaint_boxes(bubbles, *, use_textbox_only: bool = True) -> list:
     """Boxes to inpaint per bubble.
 
     When INPAINT_USE_TEXTBOX_ONLY is on, clean only the detected text area
     (source_xyxy); otherwise clean the full speech-bubble box.
     """
-    if config.inpaint_use_textbox_only:
+    if use_textbox_only:
         return [b.source_xyxy() for b in bubbles]
     boxes = []
     for b in bubbles:
@@ -100,6 +96,11 @@ def _bubbles_from_analysis(
     blocks: list,
     source_lang: str,
     target_lang: str,
+    *,
+    config,
+    page_analysis_service,
+    bubble_analysis_service,
+    layout_planner_service,
 ) -> list:
     """Create TextBubbles using the full analysis pipeline."""
     from services.layout_planner_service import BubbleLayoutInput
@@ -242,19 +243,42 @@ def _merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float =
 
 
 class AutoTypesetPipeline:
+    def __init__(
+        self,
+        *,
+        state,
+        config,
+        job_manager,
+        detection_service,
+        inpainting_service,
+        translation_service,
+        page_analysis_service=None,
+        bubble_analysis_service=None,
+        layout_planner_service=None,
+    ) -> None:
+        self.state = state
+        self.config = config
+        self.job_manager = job_manager
+        self.detection_service = detection_service
+        self.inpainting_service = inpainting_service
+        self.translation_service = translation_service
+        self.page_analysis_service = page_analysis_service or PageAnalysisService()
+        self.bubble_analysis_service = bubble_analysis_service or BubbleAnalysisService()
+        self.layout_planner_service = layout_planner_service or LayoutPlannerService()
+
     def _resolve_page_index(self, page_id: str) -> int:
         if page_id.isdigit():
             idx = int(page_id)
-            if 0 <= idx < len(state.pages):
+            if 0 <= idx < len(self.state.pages):
                 return idx
             raise HTTPException(status_code=404, detail="Page not found")
-        for idx, page in enumerate(state.pages):
+        for idx, page in enumerate(self.state.pages):
             if page.page_id == page_id:
                 return idx
         raise HTTPException(status_code=404, detail="Page not found")
 
     def _ensure_project_revision(self, start_revision: int) -> None:
-        if state.revision != start_revision:
+        if self.state.revision != start_revision:
             raise RuntimeError("Project changed while the operation was running. Please retry.")
 
     def run_page(self, job: dict, page_id: str, *, show_progress: bool = True) -> dict[str, int]:
@@ -268,9 +292,9 @@ class AutoTypesetPipeline:
         for page_id in page_ids:
             page_idx = None
             try:
-                with state.lock:
+                with self.state.lock:
                     page_idx = self._resolve_page_index(page_id)
-                job_manager.update(
+                self.job_manager.update(
                     job,
                     progress=int((completed / total) * 100),
                     message=f"Translating page {completed + 1}/{total}...",
@@ -289,9 +313,9 @@ class AutoTypesetPipeline:
             completed += 1
             if page_idx is not None:
                 completed_page_indices.append(page_idx)
-            job_manager.ensure_not_cancelled(job)
+                self.job_manager.ensure_not_cancelled(job)
 
-        job_manager.update(job, progress=100, message="Batch translation complete")
+        self.job_manager.update(job, progress=100, message="Batch translation complete")
         return {"translated_pages": completed, "total_pages": total, "completed_pages": completed_page_indices}
 
     def _run_page_core(
@@ -301,35 +325,42 @@ class AutoTypesetPipeline:
         *,
         show_progress: bool = False,
     ) -> dict[str, int]:
-        with state.lock:
+        with self.state.lock:
             page_idx = self._resolve_page_index(page_id)
-            page = state.pages[page_idx]
+            page = self.state.pages[page_idx]
             ensure_page_image(page)
-            start_revision = state.revision
+            start_revision = self.state.revision
             image = page.cv_image.copy()
             inpainted_image = page.inpainted_image.copy() if page.inpainted_image is not None else None
             local_bubbles = [bubble.without_item() for bubble in page.bubbles]
             bubble_counter = page.bubble_counter
 
-        job_manager.ensure_not_cancelled(job)
+        self.job_manager.ensure_not_cancelled(job)
         if not local_bubbles:
             if show_progress:
-                job_manager.update(job, progress=15, message="Detecting and reading text")
-            blocks = detection_service.detect_and_ocr(image, lang=config.source_language)
-            job_manager.ensure_not_cancelled(job)
+                self.job_manager.update(job, progress=15, message="Detecting and reading text")
+            blocks = self.detection_service.detect_and_ocr(image, lang=self.config.source_language)
+            self.job_manager.ensure_not_cancelled(job)
 
             if show_progress:
-                job_manager.update(job, progress=30, message="Analyzing page layout")
+                self.job_manager.update(job, progress=30, message="Analyzing page layout")
             local_bubbles = _bubbles_from_analysis(
-                image, blocks, config.source_language, config.target_language
+                image,
+                blocks,
+                self.config.source_language,
+                self.config.target_language,
+                config=self.config,
+                page_analysis_service=self.page_analysis_service,
+                bubble_analysis_service=self.bubble_analysis_service,
+                layout_planner_service=self.layout_planner_service,
             )
-            job_manager.ensure_not_cancelled(job)
+            self.job_manager.ensure_not_cancelled(job)
 
             local_bubbles = _merge_overlapping_bubbles(local_bubbles)
             for idx, bubble in enumerate(local_bubbles, 1):
                 bubble.id = idx
             bubble_counter = len(local_bubbles)
-            job_manager.ensure_not_cancelled(job)
+            self.job_manager.ensure_not_cancelled(job)
 
         untranslated = [b for b in local_bubbles if not b.translated]
         temp_blocks = []
@@ -337,9 +368,9 @@ class AutoTypesetPipeline:
         def task_inpaint():
             nonlocal inpainted_image
             if inpainted_image is None:
-                boxes = inpaint_boxes(local_bubbles)
+                boxes = inpaint_boxes(local_bubbles, use_textbox_only=self.config.inpaint_use_textbox_only)
                 bubble_boxes = bubble_clip_boxes(local_bubbles)
-                inpainted_image = inpainting_service.clean_background(image, boxes, bubble_boxes, protect_edges=True)
+                inpainted_image = self.inpainting_service.clean_background(image, boxes, bubble_boxes, protect_edges=True)
 
         def task_translate():
             nonlocal temp_blocks
@@ -348,10 +379,10 @@ class AutoTypesetPipeline:
                     TextBlock(text_bbox=np.array(b.source_xyxy()).astype(np.int32), text=b.text)
                     for b in untranslated
                 ]
-                translation_service.translate_blocks(temp_blocks, config.source_language, config.target_language, image)
+                self.translation_service.translate_blocks(temp_blocks, self.config.source_language, self.config.target_language, image)
 
         if show_progress:
-            job_manager.update(job, progress=45, message="Translating text and cleaning backgrounds in parallel")
+            self.job_manager.update(job, progress=45, message="Translating text and cleaning backgrounds in parallel")
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             futures = [
@@ -359,22 +390,22 @@ class AutoTypesetPipeline:
                 executor.submit(task_translate),
             ]
             for future in concurrent.futures.as_completed(futures):
-                job_manager.ensure_not_cancelled(job)
+                self.job_manager.ensure_not_cancelled(job)
                 future.result()
 
         if untranslated and temp_blocks:
             for bubble, text_block in zip(untranslated, temp_blocks):
                 bubble.translated = text_block.translation
 
-        job_manager.ensure_not_cancelled(job)
+        self.job_manager.ensure_not_cancelled(job)
         inpainted_preview_bytes = encode_preview_jpeg_bytes(inpainted_image) if inpainted_image is not None else None
-        job_manager.ensure_not_cancelled(job)
+        self.job_manager.ensure_not_cancelled(job)
 
-        with state.lock:
+        with self.state.lock:
             self._ensure_project_revision(start_revision)
-            job_manager.ensure_not_cancelled(job)
+            self.job_manager.ensure_not_cancelled(job)
             page_idx = self._resolve_page_index(page_id)
-            page = state.pages[page_idx]
+            page = self.state.pages[page_idx]
             page.bubbles = local_bubbles
             page.bubble_counter = bubble_counter
             page.inpainted_image = inpainted_image
@@ -383,8 +414,5 @@ class AutoTypesetPipeline:
             page._thumbnail_original_bytes = encode_thumbnail_bytes(page.cv_image)
             if inpainted_preview_bytes is not None:
                 page._preview_inpainted_bytes = inpainted_preview_bytes
-            state.touch()
+            self.state.touch()
         return {"translated_count": len(page.bubbles)}
-
-
-auto_typeset_pipeline = AutoTypesetPipeline()

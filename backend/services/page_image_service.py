@@ -7,7 +7,6 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from app.models import MangaPage
 from app.version import APP_NAME
-from domain.project_state import state
 from services.image_encoding_service import (
     encode_jpeg_bytes,
     encode_png_bytes,
@@ -23,39 +22,40 @@ logger = logging.getLogger(APP_NAME)
 IMAGE_CACHE_HEADERS = {"Cache-Control": "public, max-age=3600"}
 
 
-def _get_page_by_id(page_id: str) -> MangaPage:
+def _get_page_by_id(state, page_id: str) -> MangaPage:
     for page in state.pages:
         if page.page_id == page_id:
             return page
     raise HTTPException(status_code=404, detail="Page not found")
 
 
-def _get_page_index_by_id(page_id: str) -> int:
+def _get_page_index_by_id(state, page_id: str) -> int:
     for idx, page in enumerate(state.pages):
         if page.page_id == page_id:
             return idx
     raise HTTPException(status_code=404, detail="Page not found")
 
 
-def _resolve_page(page_id: str) -> MangaPage:
+def _resolve_page(state, page_id: str) -> MangaPage:
     if page_id.isdigit():
         idx = int(page_id)
         if 0 <= idx < len(state.pages):
             return state.pages[idx]
         raise HTTPException(status_code=404, detail="Page not found")
-    return _get_page_by_id(page_id)
+    return _get_page_by_id(state, page_id)
 
 
-def _resolve_page_index(page_id: str) -> int:
+def _resolve_page_index(state, page_id: str) -> int:
     if page_id.isdigit():
         idx = int(page_id)
         if 0 <= idx < len(state.pages):
             return idx
         raise HTTPException(status_code=404, detail="Page not found")
-    return _get_page_index_by_id(page_id)
+    return _get_page_index_by_id(state, page_id)
 
 
 def get_page_image_response(
+    state,
     page_id: str,
     image_type: str = "original",
     thumbnail: bool = False,
@@ -63,8 +63,8 @@ def get_page_image_response(
 ):
     # Fast paths / source capture: hold the project lock only briefly.
     with state.lock:
-        page = _resolve_page(page_id)
-        page_idx = _resolve_page_index(page_id)
+        page = _resolve_page(state, page_id)
+        page_idx = _resolve_page_index(state, page_id)
 
         if thumbnail:
             if image_type == "inpainted" and page.inpainted_image is not None:

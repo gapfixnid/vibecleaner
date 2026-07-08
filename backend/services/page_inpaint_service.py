@@ -1,24 +1,22 @@
 from fastapi import HTTPException
 
-from domain.project_state import state
-from services.auto_typeset_pipeline import bubble_clip_boxes, inpaint_boxes
+from pipeline.auto_typeset import bubble_clip_boxes, inpaint_boxes
 from services.image_encoding_service import encode_preview_jpeg_bytes
 from services.job_service import job_manager
 from services.page_crud_service import resolve_page, resolve_page_index
 from services.page_image_loader import ensure_page_image, invalidate_page_caches
 from services.review_state_service import refresh_page_status
-from services.service_registry import inpainting_service
 
 
-def _ensure_project_revision(start_revision: int) -> None:
+def _ensure_project_revision(state, start_revision: int) -> None:
     if state.revision != start_revision:
         raise RuntimeError("Project changed while the operation was running. Please retry.")
 
 
-def start_inpaint_bubble(page_id: str, bubble_id: int):
+def start_inpaint_bubble(state, page_id: str, bubble_id: int, inpainting_service):
     with state.lock:
-        page = resolve_page(page_id)
-        page_idx = resolve_page_index(page_id)
+        page = resolve_page(state, page_id)
+        page_idx = resolve_page_index(state, page_id)
         ensure_page_image(page)
         bubble = next((b for b in page.bubbles if b.id == bubble_id), None)
         if not bubble:
@@ -28,19 +26,19 @@ def start_inpaint_bubble(page_id: str, bubble_id: int):
         "inpaint-bubble",
         page_idx,
         f"inpaint-bubble:{page_id}:{bubble_id}",
-        lambda job: _inpaint_single_bubble_job(job, page_id, bubble_id),
+        lambda job: _inpaint_single_bubble_job(state, job, page_id, bubble_id, inpainting_service),
     )
 
 
-def start_inpaint_page(page_id: str):
+def start_inpaint_page(state, page_id: str, inpainting_service):
     with state.lock:
-        page_idx = resolve_page_index(page_id)
-    return job_manager.start("inpaint", page_idx, f"inpaint:{page_id}", lambda job: _inpaint_job(job, page_id))
+        page_idx = resolve_page_index(state, page_id)
+    return job_manager.start("inpaint", page_idx, f"inpaint:{page_id}", lambda job: _inpaint_job(state, job, page_id, inpainting_service))
 
 
-def _inpaint_single_bubble_job(job: dict, page_id: str, bubble_id: int):
+def _inpaint_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, inpainting_service):
     with state.lock:
-        page_idx = resolve_page_index(page_id)
+        page_idx = resolve_page_index(state, page_id)
         page = state.pages[page_idx]
         ensure_page_image(page)
         bubble = next((b for b in page.bubbles if b.id == bubble_id), None)
@@ -62,9 +60,9 @@ def _inpaint_single_bubble_job(job: dict, page_id: str, bubble_id: int):
     job_manager.ensure_not_cancelled(job)
 
     with state.lock:
-        _ensure_project_revision(start_revision)
+        _ensure_project_revision(state, start_revision)
         job_manager.ensure_not_cancelled(job)
-        page_idx = resolve_page_index(page_id)
+        page_idx = resolve_page_index(state, page_id)
         page = state.pages[page_idx]
         page.inpainted_image = inpainted_image
         refresh_page_status(page)
@@ -74,9 +72,9 @@ def _inpaint_single_bubble_job(job: dict, page_id: str, bubble_id: int):
         return {"status": "ok"}
 
 
-def _inpaint_job(job: dict, page_id: str):
+def _inpaint_job(state, job: dict, page_id: str, inpainting_service):
     with state.lock:
-        page_idx = resolve_page_index(page_id)
+        page_idx = resolve_page_index(state, page_id)
         page = state.pages[page_idx]
         ensure_page_image(page)
         start_revision = state.revision
@@ -93,9 +91,9 @@ def _inpaint_job(job: dict, page_id: str):
     job_manager.ensure_not_cancelled(job)
 
     with state.lock:
-        _ensure_project_revision(start_revision)
+        _ensure_project_revision(state, start_revision)
         job_manager.ensure_not_cancelled(job)
-        page_idx = resolve_page_index(page_id)
+        page_idx = resolve_page_index(state, page_id)
         page = state.pages[page_idx]
         page.inpainted_image = inpainted_image
         refresh_page_status(page)

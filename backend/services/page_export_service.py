@@ -7,10 +7,8 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.models import MangaPage
-from domain.project_state import state
 from services.page_crud_service import resolve_page
 from services.page_image_loader import ensure_page_image
-from services.service_registry import export_service
 
 
 @lru_cache(maxsize=64)
@@ -25,9 +23,9 @@ def resolve_font_path(font_family: str | None) -> str | None:
     return resolved.path
 
 
-def export_page_response(page_id: str, save_path: Optional[str] = None):
+def export_page_response(state, page_id: str, export_service, save_path: Optional[str] = None):
     with state.lock:
-        source = resolve_page(page_id)
+        source = resolve_page(state, page_id)
         ensure_page_image(source)
 
         if source.inpainted_image is None:

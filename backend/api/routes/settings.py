@@ -2,13 +2,13 @@ import ipaddress
 import logging
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from api.dependencies import get_container
 from app.version import APP_NAME
-from modules.config import config, OLLAMA_API_URL
-from services.job_service import job_manager
+from core.container import AppContainer
+from modules.config import OLLAMA_API_URL
 from services.model_requirements import download_required_models, get_model_status
-from services.service_registry import translation_service
 
 router = APIRouter()
 logger = logging.getLogger(APP_NAME)
@@ -54,7 +54,11 @@ class SettingsSchema(BaseModel):
     setup_completed: bool = False
 
 @router.get("/api/settings")
-def get_settings():
+def get_settings(container: AppContainer = Depends(get_container)):
+    return get_settings_payload(container.config, container.translation_service)
+
+
+def get_settings_payload(config, translation_service):
     return {
         "translation_model": config.translation_model,
         "translation_provider": config.translation_provider,
@@ -97,7 +101,11 @@ def get_settings():
     }
 
 @router.post("/api/settings")
-def update_settings(settings: SettingsSchema):
+def update_settings(settings: SettingsSchema, container: AppContainer = Depends(get_container)):
+    return update_settings_payload(settings, container.config, container.translation_service)
+
+
+def update_settings_payload(settings: SettingsSchema, config, translation_service):
     config.translation_model = settings.translation_model
     config.translation_provider = settings.translation_provider
     config.translation_api_base_url = settings.translation_api_base_url
@@ -156,7 +164,7 @@ def update_settings(settings: SettingsSchema):
     success = config.save()
     if not success:
         raise HTTPException(status_code=500, detail="Failed to save settings")
-    return get_settings()
+    return get_settings_payload(config, translation_service)
 
 @router.get("/api/ollama/models")
 def get_ollama_models():
@@ -283,15 +291,19 @@ def get_translation_models(req: ModelListRequest):
 
 
 @router.get("/api/models/status")
-def get_models_status():
+def get_models_status(container: AppContainer = Depends(get_container)):
+    return get_model_status(container.config)
+
+
+def get_models_status_for_config(config):
     return get_model_status(config)
 
 
 @router.post("/api/models/download")
-def download_models():
-    return job_manager.start(
+def download_models(container: AppContainer = Depends(get_container)):
+    return container.job_manager.start(
         kind="download_models",
         page_idx=-1,
         key="download_models",
-        worker=lambda job: download_required_models(config, job),
+        worker=lambda job: download_required_models(container.config, job),
     )

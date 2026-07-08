@@ -5,49 +5,48 @@ from fastapi import HTTPException
 from PIL import Image
 
 from app.models import MangaPage
-from domain.project_state import state
 from services.page_image_loader import ensure_page_image
 from services.review_state_service import derive_page_status
 
 
-def get_page_by_id(page_id: str) -> MangaPage:
+def get_page_by_id(state, page_id: str) -> MangaPage:
     for page in state.pages:
         if page.page_id == page_id:
             return page
     raise HTTPException(status_code=404, detail="Page not found")
 
 
-def get_page_index_by_id(page_id: str) -> int:
+def get_page_index_by_id(state, page_id: str) -> int:
     for idx, page in enumerate(state.pages):
         if page.page_id == page_id:
             return idx
     raise HTTPException(status_code=404, detail="Page not found")
 
 
-def resolve_page(page_id: str) -> MangaPage:
+def resolve_page(state, page_id: str) -> MangaPage:
     if page_id.isdigit():
         idx = int(page_id)
         if 0 <= idx < len(state.pages):
             return state.pages[idx]
         raise HTTPException(status_code=404, detail="Page not found")
-    return get_page_by_id(page_id)
+    return get_page_by_id(state, page_id)
 
 
-def resolve_page_index(page_id: str) -> int:
+def resolve_page_index(state, page_id: str) -> int:
     if page_id.isdigit():
         idx = int(page_id)
         if 0 <= idx < len(state.pages):
             return idx
         raise HTTPException(status_code=404, detail="Page not found")
-    return get_page_index_by_id(page_id)
+    return get_page_index_by_id(state, page_id)
 
 
-def resolve_indices_from_request(req) -> List[int]:
+def resolve_indices_from_request(state, req) -> List[int]:
     indices = []
     if req.page_ids:
         for page_id in req.page_ids:
             try:
-                indices.append(resolve_page_index(page_id))
+                indices.append(resolve_page_index(state, page_id))
             except HTTPException:
                 pass
     if req.page_indices:
@@ -57,7 +56,7 @@ def resolve_indices_from_request(req) -> List[int]:
     return indices
 
 
-def get_pages_response():
+def get_pages_response(state):
     with state.lock:
         pages_list = []
         for idx, page in enumerate(state.pages):
@@ -90,10 +89,10 @@ def get_pages_response():
         return {"pages": pages_list, "current_index": state.current_page_idx}
 
 
-def select_page_response(index=None, page_id=None):
+def select_page_response(state, index=None, page_id=None):
     with state.lock:
         if page_id is not None:
-            index = get_page_index_by_id(page_id)
+            index = get_page_index_by_id(state, page_id)
         elif index is None:
             raise HTTPException(status_code=400, detail="Either index or page_id must be provided")
 
@@ -103,13 +102,13 @@ def select_page_response(index=None, page_id=None):
         return {"status": "ok", "current_index": state.current_page_idx}
 
 
-def rename_page_response(page_id: str, name: str):
+def rename_page_response(state, page_id: str, name: str):
     cleaned = (name or "").strip().replace("/", "").replace("\\", "")
     if not cleaned:
         raise HTTPException(status_code=400, detail="Name must not be empty")
 
     with state.lock:
-        page = resolve_page(page_id)
+        page = resolve_page(state, page_id)
         current = page.display_name or os.path.basename(page.file_path)
         ext = os.path.splitext(current)[1]
         page.display_name = f"{cleaned}{ext}"
@@ -134,10 +133,10 @@ def _clone_page(source: MangaPage) -> MangaPage:
     return clone
 
 
-def duplicate_page_response(index=None, page_id=None):
+def duplicate_page_response(state, index=None, page_id=None):
     with state.lock:
         if page_id is not None:
-            index = resolve_page_index(page_id)
+            index = resolve_page_index(state, page_id)
         elif index is None:
             raise HTTPException(status_code=400, detail="Either index or page_id must be provided")
         if index < 0 or index >= len(state.pages):
@@ -148,9 +147,9 @@ def duplicate_page_response(index=None, page_id=None):
         return {"status": "ok", "current_index": state.current_page_idx}
 
 
-def duplicate_page_batch_response(req):
+def duplicate_page_batch_response(state, req):
     with state.lock:
-        valid_indices = sorted(set(resolve_indices_from_request(req)))
+        valid_indices = sorted(set(resolve_indices_from_request(state, req)))
         if not valid_indices:
             raise HTTPException(status_code=400, detail="No valid pages to duplicate")
         for idx in sorted(valid_indices, reverse=True):
@@ -164,38 +163,38 @@ def duplicate_page_batch_response(req):
         }
 
 
-def _clamp_current_index() -> None:
+def _clamp_current_index(state) -> None:
     if state.current_page_idx >= len(state.pages):
         state.current_page_idx = len(state.pages) - 1
 
 
-def delete_page_response(index=None, page_id=None):
+def delete_page_response(state, index=None, page_id=None):
     with state.lock:
         if page_id is not None:
-            index = resolve_page_index(page_id)
+            index = resolve_page_index(state, page_id)
         elif index is None:
             raise HTTPException(status_code=400, detail="Either index or page_id must be provided")
         if index < 0 or index >= len(state.pages):
             raise HTTPException(status_code=404, detail="Page index out of bounds")
         state.pages.pop(index)
-        _clamp_current_index()
+        _clamp_current_index(state)
         state.touch()
         return {"status": "ok", "current_index": state.current_page_idx}
 
 
-def delete_page_batch_response(req):
+def delete_page_batch_response(state, req):
     with state.lock:
-        valid_indices = resolve_indices_from_request(req)
+        valid_indices = resolve_indices_from_request(state, req)
         if not valid_indices:
             raise HTTPException(status_code=400, detail="No valid pages to delete")
         for idx in sorted(set(valid_indices), reverse=True):
             state.pages.pop(idx)
-        _clamp_current_index()
+        _clamp_current_index(state)
         state.touch()
         return {"status": "ok", "current_index": state.current_page_idx, "deleted_count": len(valid_indices)}
 
 
-def reorder_pages_response(from_index: int, to_index: int):
+def reorder_pages_response(state, from_index: int, to_index: int):
     with state.lock:
         if from_index < 0 or from_index >= len(state.pages) or to_index < 0 or to_index >= len(state.pages):
             raise HTTPException(status_code=404, detail="Indices out of bounds")

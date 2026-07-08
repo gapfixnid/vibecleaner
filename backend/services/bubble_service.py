@@ -6,13 +6,10 @@ from pydantic import BaseModel
 from PySide6.QtCore import QRectF
 
 from app.models import TextBubble
-from domain.project_state import state
-from modules.config import config
 from modules.utils.textblock import TextBlock
 from services.job_service import job_manager
 from services.page_image_loader import ensure_page_image, invalidate_page_caches, load_cv_image
 from services.review_state_service import derive_bubble_status, refresh_bubble_status, refresh_page_status
-from services.service_registry import detection_service, render_service, translation_service
 from app.version import APP_NAME
 
 import logging
@@ -55,39 +52,39 @@ def _layout_overflow_problems(bubble: TextBubble, layout: dict) -> list[str]:
     return problems
 
 
-def _get_page_by_id(page_id: str):
+def _get_page_by_id(state, page_id: str):
     for page in state.pages:
         if page.page_id == page_id:
             return page
     raise HTTPException(status_code=404, detail="Page not found")
 
 
-def _get_page_index_by_id(page_id: str) -> int:
+def _get_page_index_by_id(state, page_id: str) -> int:
     for idx, page in enumerate(state.pages):
         if page.page_id == page_id:
             return idx
     raise HTTPException(status_code=404, detail="Page not found")
 
 
-def _resolve_page(page_id: str):
+def _resolve_page(state, page_id: str):
     if page_id.isdigit():
         idx = int(page_id)
         if 0 <= idx < len(state.pages):
             return state.pages[idx]
         raise HTTPException(status_code=404, detail="Page not found")
-    return _get_page_by_id(page_id)
+    return _get_page_by_id(state, page_id)
 
 
-def _resolve_page_index(page_id: str) -> int:
+def _resolve_page_index(state, page_id: str) -> int:
     if page_id.isdigit():
         idx = int(page_id)
         if 0 <= idx < len(state.pages):
             return idx
         raise HTTPException(status_code=404, detail="Page not found")
-    return _get_page_index_by_id(page_id)
+    return _get_page_index_by_id(state, page_id)
 
 
-def _ensure_project_revision(start_revision: int) -> None:
+def _ensure_project_revision(state, start_revision: int) -> None:
     if state.revision != start_revision:
         raise RuntimeError("Project changed while the operation was running. Please retry.")
 
@@ -127,7 +124,7 @@ def _layout_cache_key(bubble: TextBubble) -> tuple:
     )
 
 
-def _compute_bubble_layout(bubble: TextBubble, image) -> dict:
+def _compute_bubble_layout(bubble: TextBubble, image, render_service) -> dict:
     layout = render_service.get_layout_for_bubble(
         bubble.translated or bubble.text or "",
         bubble,
@@ -153,9 +150,9 @@ def _compute_bubble_layout(bubble: TextBubble, image) -> dict:
     }
 
 
-def get_bubbles_response(page_id: str):
+def get_bubbles_response(state, page_id: str, render_service):
     with state.lock:
-        page = _resolve_page(page_id)
+        page = _resolve_page(state, page_id)
         loaded = getattr(page, "_loaded", True) and page.cv_image is not None and page.cv_image.size > 0
         source_img = page.cv_image if loaded else None
         load_path = page.file_path
@@ -180,7 +177,7 @@ def get_bubbles_response(page_id: str):
     for bubble in bubbles_snapshot:
         cached_layout = cached_layouts.get(bubble.id)
         if cached_layout is None:
-            cached_layout = _compute_bubble_layout(bubble, source_img)
+            cached_layout = _compute_bubble_layout(bubble, source_img, render_service)
             computed_layouts[_layout_cache_key(bubble)] = cached_layout
 
         problems = _layout_overflow_problems(bubble, cached_layout)
@@ -246,9 +243,9 @@ def get_bubbles_response(page_id: str):
     return {"bubbles": bubbles_list}
 
 
-def update_bubbles_response(page_id: str, bubbles: List[BubbleUpdateSchema]):
+def update_bubbles_response(state, page_id: str, bubbles: List[BubbleUpdateSchema]):
     with state.lock:
-        page = _resolve_page(page_id)
+        page = _resolve_page(state, page_id)
 
         updated_bubbles = []
         for b_schema in bubbles:
@@ -318,9 +315,9 @@ def update_bubbles_response(page_id: str, bubbles: List[BubbleUpdateSchema]):
         return {"status": "ok"}
 
 
-def re_ocr_bubble_response(page_id: str, bubble_id: int):
+def re_ocr_bubble_response(state, page_id: str, bubble_id: int, detection_service, config):
     with state.lock:
-        page = _resolve_page(page_id)
+        page = _resolve_page(state, page_id)
         ensure_page_image(page)
 
         bubble = next((b for b in page.bubbles if b.id == bubble_id), None)
@@ -338,7 +335,7 @@ def re_ocr_bubble_response(page_id: str, bubble_id: int):
         logger.warning("Failed to re-OCR bubble %s: %s", bubble_id, e)
 
     with state.lock:
-        page = _resolve_page(page_id)
+        page = _resolve_page(state, page_id)
         bubble = next((b for b in page.bubbles if b.id == bubble_id), None)
         if not bubble:
             raise HTTPException(status_code=404, detail="Bubble not found")
@@ -350,10 +347,10 @@ def re_ocr_bubble_response(page_id: str, bubble_id: int):
         return {"status": "ok", "text": bubble.text}
 
 
-def start_translate_bubble(page_id: str, bubble_id: int):
+def start_translate_bubble(state, page_id: str, bubble_id: int, translation_service, config):
     with state.lock:
-        page = _resolve_page(page_id)
-        page_idx = _resolve_page_index(page_id)
+        page = _resolve_page(state, page_id)
+        page_idx = _resolve_page_index(state, page_id)
         if not any(b.id == bubble_id for b in page.bubbles):
             raise HTTPException(status_code=404, detail="Bubble not found")
 
@@ -361,13 +358,13 @@ def start_translate_bubble(page_id: str, bubble_id: int):
         "translate-bubble",
         page_idx,
         f"translate-bubble:{page_id}:{bubble_id}",
-        lambda job: _translate_single_bubble_job(job, page_id, bubble_id),
+        lambda job: _translate_single_bubble_job(state, job, page_id, bubble_id, translation_service, config),
     )
 
 
-def _translate_single_bubble_job(job: dict, page_id: str, bubble_id: int):
+def _translate_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, translation_service, config):
     with state.lock:
-        page_idx = _resolve_page_index(page_id)
+        page_idx = _resolve_page_index(state, page_id)
         page = state.pages[page_idx]
         ensure_page_image(page)
         bubble = next((b for b in page.bubbles if b.id == bubble_id), None)
@@ -387,9 +384,9 @@ def _translate_single_bubble_job(job: dict, page_id: str, bubble_id: int):
     job_manager.ensure_not_cancelled(job)
 
     with state.lock:
-        _ensure_project_revision(start_revision)
+        _ensure_project_revision(state, start_revision)
         job_manager.ensure_not_cancelled(job)
-        page_idx = _resolve_page_index(page_id)
+        page_idx = _resolve_page_index(state, page_id)
         page = state.pages[page_idx]
         bubble = next((b for b in page.bubbles if b.id == bubble_id), None)
         if not bubble:

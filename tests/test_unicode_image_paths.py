@@ -14,7 +14,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from app.models import MangaPage
-from core import ensure_original_thumbnail, ensure_page_image
+from services.page_image_loader import ensure_original_thumbnail, ensure_page_image
 
 
 class UnicodeImagePathTests(unittest.TestCase):
