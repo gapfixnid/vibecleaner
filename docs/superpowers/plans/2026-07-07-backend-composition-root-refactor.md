@@ -507,12 +507,12 @@ Expected: PASS after tests are updated to new names and injected fakes.
 - Consumes: completed refactor.
 - Produces: passing verification and updated architecture docs.
 
-- [ ] **Step 1: Run full tests**
+- [x] **Step 1: Run full tests**
 
 Run: `pytest -v`
 Expected: PASS.
 
-- [ ] **Step 2: Run import boundary checks**
+- [x] **Step 2: Run import boundary checks**
 
 Run:
 
@@ -524,12 +524,12 @@ rg "service_registry|auto_typeset_pipeline =|state = ProjectState\\(|config: App
 Expected: first command finds no pipeline/API imports of concrete engines;
 second command finds no active legacy singleton definitions.
 
-- [ ] **Step 3: Update README architecture section**
+- [x] **Step 3: Update README architecture section**
 
 Replace the backend bullet with the new layer description and mention that the
 pipeline uses injected ports, strategies, validation, and provenance.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 
@@ -539,6 +539,13 @@ git commit -m "refactor: introduce backend composition root architecture"
 ```
 
 Expected: commit succeeds once local Git user identity is configured.
+
+Verification result:
+
+- `python -m pytest -q`: 76 passed.
+- `rg "from engines|import engines" backend/pipeline backend/api`: no matches.
+- `rg "service_registry|auto_typeset_pipeline =|state = ProjectState\\(|config: AppConfig = AppConfig\\(" backend`: no matches.
+- Extended singleton scan for direct `modules.config config`, legacy `load_settings`/`save_settings`, adaptive-binarization alias, `auto_typeset_pipeline`, and global `ProjectState`: no matches.
 
 ---
 

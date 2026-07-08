@@ -34,6 +34,15 @@ flowchart LR
 
 The backend uses a composition-root pattern: `backend/main.py` creates the FastAPI app, calls `build_container()`, stores the container on `app.state`, and routes access it through `api.dependencies.get_container`. Pipeline code depends on core ports and explicit option DTOs rather than importing concrete engines directly. Strategies convert settings into stage options, validation produces structured pipeline issues, and provenance records stage execution metadata.
 
+Backend dependency direction is intentionally one-way:
+
+- `backend/api` may depend on `backend/core` and container-owned application services.
+- `backend/pipeline` may depend on `backend/core` contracts, pipeline stages, strategies, validation, and provenance.
+- `backend/engines` and `backend/infrastructure` adapt concrete libraries and legacy helpers behind core ports.
+- `backend/core/container.py` is the only place that wires API-facing services, pipeline stages, concrete engines, infrastructure, configuration, and project state together.
+
+Routes must not import concrete engines, `services.service_registry`, module-level project state, or module-level config singletons. Runtime state and settings are container-owned instances, so tests can assemble fake ports and run the pipeline without local model files.
+
 ## Translation Pipeline
 
 The current page translation flow is:
