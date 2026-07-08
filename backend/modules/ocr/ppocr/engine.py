@@ -8,9 +8,9 @@ from ..base import OCREngine
 from modules.utils.textblock import TextBlock
 from modules.utils.textblock import lists_to_blk_list
 from modules.utils.language_utils import is_no_space_lang
-from modules.utils.device import get_providers
+from infrastructure.runtime.device import get_providers
 from infrastructure.downloads import ModelDownloader, ModelID
-from modules.utils.onnx import make_session
+from infrastructure.runtime.onnx import make_session
 from .preprocessing import apply_adaptive_binarization, det_preprocess, crop_quad, rec_resize_norm
 from .postprocessing import DBPostProcessor, CTCLabelDecoder
 

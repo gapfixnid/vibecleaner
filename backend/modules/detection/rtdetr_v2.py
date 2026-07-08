@@ -6,9 +6,9 @@ from PIL import Image
 from .base import DetectionEngine
 from modules.utils.textblock import TextBlock
 from modules.detection.utils.slicer import ImageSlicer
-from modules.utils.device import tensors_to_device
+from infrastructure.runtime.device import tensors_to_device
 from infrastructure.downloads import models_base_dir
-from modules.utils.torch_autocast import TorchAutocastMixin
+from infrastructure.runtime.torch_autocast import TorchAutocastMixin
 
 logger = logging.getLogger(__name__)
 

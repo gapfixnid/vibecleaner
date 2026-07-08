@@ -3,7 +3,7 @@ from infrastructure import image as imk
 import onnxruntime as ort
 from PIL import Image
 import logging
-from modules.utils.device import get_providers
+from infrastructure.runtime.device import get_providers
 
 from .base import InpaintModel
 from .schema import Config
@@ -12,8 +12,8 @@ from modules.utils.inpainting import (
     load_jit_model,
 )
 from infrastructure.downloads import ModelDownloader, ModelID
-from modules.utils.onnx import make_session
-from modules.utils.torch_autocast import TorchAutocastMixin
+from infrastructure.runtime.onnx import make_session
+from infrastructure.runtime.torch_autocast import TorchAutocastMixin
 
 logger = logging.getLogger(__name__)
 

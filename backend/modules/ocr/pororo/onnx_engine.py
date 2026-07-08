@@ -9,8 +9,8 @@ from typing import Optional
 
 from infrastructure.downloads import ModelDownloader, ModelID
 from modules.ocr.base import OCREngine
-from modules.utils.device import get_providers
-from modules.utils.onnx import make_session
+from infrastructure.runtime.device import get_providers
+from infrastructure.runtime.onnx import make_session
 from modules.utils.textblock import TextBlock
 from modules.utils.language_utils import is_no_space_lang
 from modules.utils.textblock import adjust_text_line_coordinates

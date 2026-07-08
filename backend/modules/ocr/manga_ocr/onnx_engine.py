@@ -4,8 +4,8 @@ import jaconv
 import numpy as np
 from PIL import Image
 from typing import Any
-from modules.utils.device import get_providers
-from modules.utils.onnx import make_session
+from infrastructure.runtime.device import get_providers
+from infrastructure.runtime.onnx import make_session
 
 from modules.ocr.base import OCREngine
 from modules.utils.textblock import TextBlock, adjust_text_line_coordinates

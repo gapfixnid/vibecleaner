@@ -11,9 +11,9 @@ from ..utils.inpainting import (
     norm_img,
 )
 from infrastructure.downloads import ModelDownloader, ModelID
-from modules.utils.device import get_providers
-from modules.utils.onnx import make_session
-from modules.utils.torch_autocast import TorchAutocastMixin
+from infrastructure.runtime.device import get_providers
+from infrastructure.runtime.onnx import make_session
+from infrastructure.runtime.torch_autocast import TorchAutocastMixin
 from .base import InpaintModel
 from .schema import Config
 

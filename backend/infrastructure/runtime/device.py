@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any, Mapping, Optional
 import onnxruntime as ort
-from .paths import get_user_data_dir
+from infrastructure.storage import get_user_data_dir
 
 
 def torch_available() -> bool:

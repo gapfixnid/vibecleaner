@@ -5,10 +5,10 @@ import numpy as np
 from PIL import Image
 from infrastructure import image as imk
 from . import config
-from modules.utils.device import resolve_device, get_providers
+from infrastructure.runtime.device import resolve_device, get_providers
 from infrastructure.downloads import ModelDownloader, ModelID
-from modules.utils.onnx import make_session
-from modules.utils.torch_autocast import TorchAutocastMixin
+from infrastructure.runtime.onnx import make_session
+from infrastructure.runtime.torch_autocast import TorchAutocastMixin
 
 logger = logging.getLogger(__name__)
 

@@ -496,6 +496,16 @@ Expected: PASS.
   and was deleted. `tests/test_backend_boundaries.py` asserts the legacy
   modules stay deleted and that `backend/infrastructure` never imports
   `modules`, `services`, `api`, `pipeline`, or `engines`.
+- Shared ML runtime helpers (`device`, `onnx`, `torch_autocast`) moved from
+  `backend/modules/utils` into `backend/infrastructure/runtime` (facade at
+  `infrastructure.runtime`). These are used across the detection, OCR, and
+  inpainting engine implementations. The duplicate `modules/utils/paths.py`
+  was deleted in favor of the existing `infrastructure/storage/paths.py`
+  (`device.py` now imports `get_user_data_dir` from `infrastructure.storage`).
+  Remaining `modules/utils` files (`textblock`, `translator_utils`,
+  `inpainting`, `language_utils`, `platform_utils`, `common_utils`,
+  `exceptions`) are engine/domain-coupled and will move with their vertical
+  engine slices.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

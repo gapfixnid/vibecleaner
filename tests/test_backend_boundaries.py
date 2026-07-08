@@ -23,6 +23,10 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert not (backend / "modules" / "utils" / "download_file.py").exists()
     assert not (backend / "imkit").exists()
     assert not (backend / "modules" / "utils" / "image_utils.py").exists()
+    assert not (backend / "modules" / "utils" / "device.py").exists()
+    assert not (backend / "modules" / "utils" / "onnx.py").exists()
+    assert not (backend / "modules" / "utils" / "torch_autocast.py").exists()
+    assert not (backend / "modules" / "utils" / "paths.py").exists()
 
     scanned_files = [
         path
@@ -49,6 +53,10 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert ("import " + "imkit") not in combined
     assert ("from " + "imkit") not in combined
     assert ("modules.utils." + "image_utils") not in combined
+    assert ("modules.utils." + "device") not in combined
+    assert ("modules.utils." + "onnx") not in combined
+    assert ("modules.utils." + "torch_autocast") not in combined
+    assert ("modules.utils." + "paths") not in combined
 
 
 def test_pipeline_and_api_do_not_import_concrete_engines():

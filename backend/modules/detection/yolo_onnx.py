@@ -4,9 +4,9 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 
-from modules.utils.device import get_providers
+from infrastructure.runtime.device import get_providers
 from infrastructure.downloads import ModelDownloader, ModelID, models_base_dir
-from modules.utils.onnx import make_session
+from infrastructure.runtime.onnx import make_session
 from modules.utils.textblock import TextBlock
 from modules.detection.utils.slicer import ImageSlicer
 from .base import DetectionEngine
