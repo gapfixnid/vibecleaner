@@ -6,8 +6,8 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 
-from modules.ocr.base import OCREngine
-from modules.ocr.ppocr.preprocessing import apply_adaptive_binarization
+from engines.ocr.base import OCREngine
+from engines.ocr.ppocr.preprocessing import apply_adaptive_binarization
 from infrastructure.downloads import ModelDownloader, ModelID
 from engines.common.textblock import TextBlock, adjust_text_line_coordinates
 

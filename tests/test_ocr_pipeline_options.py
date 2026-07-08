@@ -11,9 +11,9 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from modules.config import AppConfig
-from modules.ocr.ppocr import engine as ppocr_module
-from modules.ocr.ppocr.engine import PPOCRv5Engine
-from modules.ocr_wrapper import LocalOCR
+from engines.ocr.ppocr import engine as ppocr_module
+from engines.ocr.ppocr.engine import PPOCRv5Engine
+from engines.ocr.local import LocalOCR
 from engines.common.textblock import TextBlock
 
 
@@ -49,8 +49,8 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         image = np.zeros((16, 16, 3), dtype=np.uint8)
 
         with (
-            patch("modules.ocr_wrapper.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("modules.ocr_wrapper.PPOCRv5Engine", FakePPOCREngine),
+            patch("engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
+            patch("engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="ppocr")
 
@@ -61,8 +61,8 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         image = np.zeros((16, 16, 3), dtype=np.uint8)
 
         with (
-            patch("modules.ocr_wrapper.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("modules.ocr_wrapper.PPOCRv5Engine", FakePPOCREngine),
+            patch("engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
+            patch("engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="ppocr")
 
@@ -73,8 +73,8 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         image = np.zeros((16, 16, 3), dtype=np.uint8)
 
         with (
-            patch("modules.ocr_wrapper.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("modules.ocr_wrapper.PPOCRv5Engine", FakePPOCREngine),
+            patch("engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
+            patch("engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="fast")
 
@@ -86,8 +86,8 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         FakePPOCREngine.calls = []
 
         with (
-            patch("modules.ocr_wrapper.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("modules.ocr_wrapper.PPOCRv5Engine", FakePPOCREngine),
+            patch("engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
+            patch("engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(
                 image,
@@ -122,9 +122,9 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         crop = np.full((12, 12, 3), 128, dtype=np.uint8)
 
         with (
-            patch("modules.ocr.ppocr.preprocessing.cv2.createCLAHE") as create_clahe,
-            patch("modules.ocr.ppocr.preprocessing.cv2.adaptiveThreshold", return_value=np.zeros((12, 12), dtype=np.uint8)),
-            patch("modules.ocr.ppocr.preprocessing.cv2.cvtColor", side_effect=lambda image, *_args: image[:, :, 0] if image.ndim == 3 else np.dstack([image] * 3)),
+            patch("engines.ocr.ppocr.preprocessing.cv2.createCLAHE") as create_clahe,
+            patch("engines.ocr.ppocr.preprocessing.cv2.adaptiveThreshold", return_value=np.zeros((12, 12), dtype=np.uint8)),
+            patch("engines.ocr.ppocr.preprocessing.cv2.cvtColor", side_effect=lambda image, *_args: image[:, :, 0] if image.ndim == 3 else np.dstack([image] * 3)),
         ):
             create_clahe.return_value.apply.side_effect = lambda gray: gray
             cfg.apply_adaptive_binarization(crop)

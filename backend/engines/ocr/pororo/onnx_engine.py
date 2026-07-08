@@ -8,13 +8,13 @@ from infrastructure import image as imk
 from typing import Optional
 
 from infrastructure.downloads import ModelDownloader, ModelID
-from modules.ocr.base import OCREngine
+from engines.ocr.base import OCREngine
 from infrastructure.runtime.device import get_providers
 from infrastructure.runtime.onnx import make_session
 from engines.common.textblock import TextBlock
 from engines.common.language_utils import is_no_space_lang
 from engines.common.textblock import adjust_text_line_coordinates
-from modules.ocr.ppocr.preprocessing import crop_quad
+from engines.ocr.ppocr.preprocessing import crop_quad
 from .pororo.models.brainOCR.brainocr import Reader
 from .pororo.models.brainOCR.detection import (
     resize_aspect_ratio,

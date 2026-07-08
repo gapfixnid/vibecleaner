@@ -5,8 +5,8 @@ from typing import Any
 
 import numpy as np
 
-from modules.ocr.ppocr.preprocessing import det_preprocess
-from modules.ocr.ppocr.postprocessing import DBPostProcessor
+from engines.ocr.ppocr.preprocessing import det_preprocess
+from engines.ocr.ppocr.postprocessing import DBPostProcessor
 from infrastructure.downloads import ModelDownloader, ModelID
 from infrastructure.runtime.device import get_providers
 from infrastructure.runtime.onnx import make_session, make_session_options
@@ -36,7 +36,7 @@ class PPOCRLineDetector:
         self.det_model = det_model
 
         if backend == "torch":
-            from modules.ocr.ppocr.torch.inference_engine.torch_session import TorchInferSession
+            from engines.ocr.ppocr.torch.inference_engine.torch_session import TorchInferSession
 
             det_id = ModelID.PPOCR_V5_DET_MOBILE_TORCH
             ModelDownloader.ensure([det_id])

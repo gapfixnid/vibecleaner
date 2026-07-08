@@ -7,7 +7,7 @@ from typing import Any
 from infrastructure.runtime.device import get_providers
 from infrastructure.runtime.onnx import make_session
 
-from modules.ocr.base import OCREngine
+from engines.ocr.base import OCREngine
 from engines.common.textblock import TextBlock, adjust_text_line_coordinates
 from infrastructure.downloads import ModelDownloader, ModelID
 

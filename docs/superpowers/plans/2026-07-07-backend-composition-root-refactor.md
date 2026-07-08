@@ -551,6 +551,14 @@ Expected: PASS.
   OCR slice move will remove: `engines/detection/ppocr_lines.py` →
   `modules.ocr.ppocr.{preprocessing,postprocessing,torch}` and
   `engines/detection/service.py` → `modules.ocr_wrapper.LocalOCR`.
+- The OCR engine slice moved into `backend/engines/ocr`: `modules/ocr/*`
+  (base, `manga_ocr/`, `pororo/`, `ppocr/`) and `modules/ocr_wrapper.py`
+  (→ `local.py`, `LocalOCR`). This removed the transitional legacy imports
+  in `engines/detection`; `backend/modules` no longer contains any engine
+  implementations. Note: the `backend == "torch"` branch in
+  `engines/detection/ppocr_lines.py` references `engines.ocr.ppocr.torch`,
+  which does not exist in the repo — that branch was equally broken before
+  the move (pre-existing dead branch, kept as-is).
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

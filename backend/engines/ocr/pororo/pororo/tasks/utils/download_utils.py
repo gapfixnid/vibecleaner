@@ -10,7 +10,7 @@ from typing import Tuple, Union
 
 import wget
 
-from modules.ocr.pororo.pororo.tasks.utils.config import CONFIGS
+from engines.ocr.pororo.pororo.tasks.utils.config import CONFIGS
 from infrastructure.downloads import models_base_dir as shared_models_base_dir
 
 # Get the directory of the current file

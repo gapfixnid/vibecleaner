@@ -8,7 +8,7 @@ import time
 import numpy as np
 from typing import List, Optional, Any, Dict
 from .wrapper import RTDETRv2Detector
-from modules.ocr_wrapper import LocalOCR
+from engines.ocr.local import LocalOCR
 
 logger = logging.getLogger(__name__)
 

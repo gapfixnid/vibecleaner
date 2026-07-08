@@ -267,7 +267,7 @@ class AppConfig:
         contrast so small / low-contrast Japanese kanas are more readable for
         the OCR engine.
         """
-        from modules.ocr.ppocr.preprocessing import apply_adaptive_binarization
+        from engines.ocr.ppocr.preprocessing import apply_adaptive_binarization
 
         return apply_adaptive_binarization(
             crop,

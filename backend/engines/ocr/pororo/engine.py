@@ -2,12 +2,12 @@ import logging
 
 import numpy as np
 
-from modules.ocr.base import OCREngine
+from engines.ocr.base import OCREngine
 from engines.common.textblock import TextBlock, adjust_text_line_coordinates
 from infrastructure.downloads import ModelDownloader, ModelID
 from engines.common.language_utils import is_no_space_lang
 from .pororo.models.brainOCR.utils import reformat_input
-from modules.ocr.ppocr.preprocessing import crop_quad
+from engines.ocr.ppocr.preprocessing import crop_quad
 
 logger = logging.getLogger(__name__)
 

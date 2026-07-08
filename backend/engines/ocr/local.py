@@ -1,9 +1,9 @@
-# modules/ocr_wrapper.py
+# engines/ocr/local.py
 import numpy as np
 import threading
 from engines.common.textblock import TextBlock
-from modules.ocr.manga_ocr.mobile.onnx_engine import MangaOCRMobileONNXEngine
-from modules.ocr.ppocr.engine import PPOCRv5Engine
+from engines.ocr.manga_ocr.mobile.onnx_engine import MangaOCRMobileONNXEngine
+from engines.ocr.ppocr.engine import PPOCRv5Engine
 
 class DummySettings:
     def is_gpu_enabled(self):
