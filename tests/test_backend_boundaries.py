@@ -29,6 +29,7 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert not (backend / "modules" / "utils" / "paths.py").exists()
     assert not (backend / "modules" / "inpainting").exists()
     assert not (backend / "modules" / "inpainting_wrapper.py").exists()
+    assert not (backend / "modules" / "rendering").exists()
     assert not (backend / "modules" / "utils" / "inpainting.py").exists()
     assert not (backend / "services" / "inpainting_service.py").exists()
 
