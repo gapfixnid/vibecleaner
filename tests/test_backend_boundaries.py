@@ -32,6 +32,7 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert not (backend / "modules" / "rendering").exists()
     assert not (backend / "modules" / "utils" / "inpainting.py").exists()
     assert not (backend / "services" / "inpainting_service.py").exists()
+    assert not (backend / "services" / "font_resolver_service.py").exists()
 
     scanned_files = [
         path
@@ -65,6 +66,7 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert ("modules." + "inpainting") not in combined
     assert ("modules.utils." + "inpainting") not in combined
     assert ("services." + "inpainting_service") not in combined
+    assert ("services." + "font_resolver_service") not in combined
 
 
 def test_pipeline_and_api_do_not_import_concrete_engines():

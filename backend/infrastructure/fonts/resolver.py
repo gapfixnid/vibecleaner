@@ -1,4 +1,4 @@
-# font_resolver_service.py
+# infrastructure/fonts/resolver.py
 # Font resolution with 6-level fallback chain.
 #
 # Fallback order:
