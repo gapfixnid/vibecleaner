@@ -33,3 +33,19 @@ def get_user_data_dir(app_name: str = APP_NAME) -> str:
 def get_default_project_autosave_dir(folder_name: str = APP_NAME) -> str:
     """Return a user-facing default folder for project auto-save files."""
     return os.path.join(os.path.expanduser("~"), "Documents", folder_name)
+
+
+def get_app_data_dir(app_name: str = APP_NAME) -> str:
+    """
+    Returns the OS-specific roaming application data directory.
+
+    Windows: %APPDATA%/<app_name>
+    macOS: ~/Library/Application Support/<app_name>
+    Linux: ~/.config/<app_name>
+    """
+    if platform.system() == "Windows":
+        base_dir = os.environ.get("APPDATA") or os.path.expanduser("~")
+        return os.path.join(base_dir, app_name)
+    if platform.system() == "Darwin":
+        return os.path.expanduser(f"~/Library/Application Support/{app_name}")
+    return os.path.expanduser(f"~/.config/{app_name}")

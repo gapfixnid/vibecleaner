@@ -534,6 +534,23 @@ Expected: PASS.
   `TextBubble` type (transitional; `app/models.py` is mapped to
   `core/models/*` in a later step). Boundary tests assert the legacy
   rendering locations stay deleted.
+- Shared engine domain types moved into `backend/engines/common`:
+  `modules/utils/textblock.py` (TextBlock, used by detection/OCR/translation/
+  bubble paths) plus its algorithm dependencies `detection/utils/geometry.py`,
+  `detection/utils/text_lines.py`, `detection/utils/orientation.py`, and
+  `modules/utils/language_utils.py`.
+- The detection engine slice moved into `backend/engines/detection`:
+  all of `modules/detection/*` (backend, base, factory, pipeline,
+  ppocr_lines, processor, rtdetr_v2, rtdetr_v2_onnx, wrapper, yolo_onnx,
+  `font/`, `heuristic_lines/`, remaining `utils/`) and
+  `services/detection_service.py` (→ `service.py`, `DetectionService`).
+  The dead `detection/utils/bubbles.py` (no importers) was deleted.
+  `get_app_data_dir` (roaming app-data path) moved into
+  `infrastructure/storage`; `modules/config.py` and the detection service
+  OCR cache now source it from there. Transitional legacy imports that the
+  OCR slice move will remove: `engines/detection/ppocr_lines.py` →
+  `modules.ocr.ppocr.{preprocessing,postprocessing,torch}` and
+  `engines/detection/service.py` → `modules.ocr_wrapper.LocalOCR`.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

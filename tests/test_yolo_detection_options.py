@@ -9,8 +9,8 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-import modules.detection.yolo_onnx as yolo_module
-from modules.detection.yolo_onnx import YoloONNXDetection
+import engines.detection.yolo_onnx as yolo_module
+from engines.detection.yolo_onnx import YoloONNXDetection
 
 
 class FakeSession:

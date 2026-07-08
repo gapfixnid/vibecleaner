@@ -9,7 +9,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from core.config import AppConfigSnapshot
-from modules.detection.pipeline import DetectionPipeline
+from engines.detection.pipeline import DetectionPipeline
 from pipeline.strategies.engine_selection import EngineSelectionStrategy
 
 

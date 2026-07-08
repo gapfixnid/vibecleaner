@@ -9,7 +9,7 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from services.detection_service import DetectionService
+from engines.detection.service import DetectionService
 
 
 class FakeBlock:

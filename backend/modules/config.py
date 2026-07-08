@@ -11,11 +11,10 @@ from __future__ import annotations
 import json
 import logging
 import os
-import platform
 from dataclasses import dataclass, field, asdict
 from typing import Any
 
-from app.version import APP_NAME
+from infrastructure.storage import get_app_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -25,19 +24,7 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_API_URL = "http://127.0.0.1:11434"
 
-
-def _get_app_data_dir() -> str:
-    """Return the OS-specific application data directory."""
-    if platform.system() == "Windows":
-        base_dir = os.environ.get("APPDATA") or os.path.expanduser("~")
-        return os.path.join(base_dir, APP_NAME)
-    if platform.system() == "Darwin":
-        return os.path.expanduser(f"~/Library/Application Support/{APP_NAME}")
-    # Linux / Unix
-    return os.path.expanduser(f"~/.config/{APP_NAME}")
-
-
-APP_DATA_DIR: str = _get_app_data_dir()
+APP_DATA_DIR: str = get_app_data_dir()
 os.makedirs(APP_DATA_DIR, exist_ok=True)
 SETTINGS_FILE_PATH: str = os.path.join(APP_DATA_DIR, "settings.json")
 

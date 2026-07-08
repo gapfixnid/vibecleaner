@@ -31,7 +31,7 @@ def build_container(config: Any | None = None) -> AppContainer:
     from pipeline.page_translation_stages import build_page_translation_runner
     from services.job_service import job_manager
     from services.bubble_analysis_service import BubbleAnalysisService
-    from services.detection_service import DetectionService
+    from engines.detection.service import DetectionService
     from services.export_service import ExportService
     from services.image_encoding_service import encode_preview_jpeg_bytes, encode_thumbnail_bytes
     from engines.inpainting.service import InpaintingService

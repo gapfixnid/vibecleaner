@@ -7,7 +7,7 @@ import threading
 import time
 import numpy as np
 from typing import List, Optional, Any, Dict
-from modules.detection.wrapper import RTDETRv2Detector
+from .wrapper import RTDETRv2Detector
 from modules.ocr_wrapper import LocalOCR
 
 logger = logging.getLogger(__name__)
@@ -74,11 +74,9 @@ class DetectionService:
 
     def _cache_file_path(self) -> str:
         """Return the path for the persistent OCR cache file."""
-        try:
-            from modules.config import APP_DATA_DIR
-        except ImportError:
-            return ""
-        return os.path.join(APP_DATA_DIR, "ocr_cache.json")
+        from infrastructure.storage import get_app_data_dir
+
+        return os.path.join(get_app_data_dir(), "ocr_cache.json")
 
     def _load_cache_from_disk(self) -> None:
         """Load OCR cache from disk (survives app restart)."""
