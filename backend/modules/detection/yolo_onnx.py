@@ -31,12 +31,18 @@ class YoloONNXDetection(DetectionEngine):
             min_slice_height_ratio=0.7
         )
 
-    def initialize(self, device: str = 'cpu', confidence_threshold: float = 0.45) -> None:
+    def initialize(
+        self,
+        device: str = 'cpu',
+        confidence_threshold: float = 0.45,
+        model_name: str | None = None,
+        tiling_enabled: bool | None = None,
+    ) -> None:
         self.device = device
         self.confidence_threshold = confidence_threshold
-
-        from modules.config import config
-        model_name = getattr(config, "DETECT_MODEL", "ysgyolo.onnx")
+        model_name = model_name or "ysgyolo.onnx"
+        self.current_loaded_model = model_name
+        self.tiling_enabled = True if tiling_enabled is None else bool(tiling_enabled)
         
         # Resolve file path
         # Check if the exact filename exists in models/detection
@@ -58,11 +64,26 @@ class YoloONNXDetection(DetectionEngine):
         providers = get_providers(self.device)
         self.session = make_session(file_path, sess_options=None, providers=providers)
 
-    def detect(self, image: np.ndarray) -> list[TextBlock]:
-        from modules.config import config
-        self.confidence_threshold = getattr(config, "CONFIDENCE_THRESHOLD", self.confidence_threshold)
+    def detect(
+        self,
+        image: np.ndarray,
+        model_name: str | None = None,
+        confidence_threshold: float | None = None,
+        tiling_enabled: bool | None = None,
+    ) -> list[TextBlock]:
+        model_name = model_name or getattr(self, "current_loaded_model", "ysgyolo.onnx")
+        if getattr(self, "current_loaded_model", None) != model_name:
+            self.initialize(
+                device=self.device,
+                confidence_threshold=self.confidence_threshold,
+                model_name=model_name,
+                tiling_enabled=tiling_enabled,
+            )
 
-        tiling_enabled = getattr(config, "TILING_ENABLED", True)
+        if confidence_threshold is not None:
+            self.confidence_threshold = confidence_threshold
+
+        tiling_enabled = getattr(self, "tiling_enabled", True) if tiling_enabled is None else bool(tiling_enabled)
         if not tiling_enabled:
             bubble_boxes, text_boxes = self._detect_single_image(image)
         else:

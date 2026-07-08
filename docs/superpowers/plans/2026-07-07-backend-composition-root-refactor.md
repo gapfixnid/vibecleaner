@@ -449,6 +449,9 @@ Expected: PASS.
   confidence-threshold, and tiling options into `detect_bubbles`; the RT-DETR
   ONNX detection engine no longer reads the global config singleton for those
   options on the runner path.
+- The YOLO ONNX detection engine now receives explicit model,
+  confidence-threshold, and tiling options through `initialize` and `detect`
+  instead of reading the global config singleton.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 
