@@ -28,6 +28,9 @@ class InpaintingEngineAdapter:
             boxes,
             bubble_boxes=bubble_boxes or None,
             protect_edges=False,
+            engine=options.engine,
+            mask_dilation=options.mask_dilation,
+            clip_to_bubble=options.clip_to_bubble,
         )
         if output is image.array:
             return InpaintResult(image=image, engine=self.engine_name)

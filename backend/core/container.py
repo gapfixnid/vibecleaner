@@ -59,7 +59,7 @@ def build_container() -> AppContainer:
 
     translation_service = TranslationService(config=config)
     detection_service = DetectionService()
-    inpainting_service = InpaintingService()
+    inpainting_service = InpaintingService(config=config)
     render_service = RenderService()
     export_service = ExportService(render_service)
 

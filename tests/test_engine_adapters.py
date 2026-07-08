@@ -37,7 +37,29 @@ class FakeLegacyTranslator:
 
 
 class FakeLegacyInpainter:
-    def inpaint(self, image, boxes, bubble_boxes=None, protect_edges=False):
+    def __init__(self):
+        self.calls = []
+
+    def inpaint(
+        self,
+        image,
+        boxes,
+        bubble_boxes=None,
+        protect_edges=False,
+        engine=None,
+        mask_dilation=None,
+        clip_to_bubble=None,
+    ):
+        self.calls.append(
+            {
+                "boxes": boxes,
+                "bubble_boxes": bubble_boxes,
+                "protect_edges": protect_edges,
+                "engine": engine,
+                "mask_dilation": mask_dilation,
+                "clip_to_bubble": clip_to_bubble,
+            }
+        )
         return image
 
 
@@ -76,12 +98,30 @@ def test_translation_adapter_returns_translation_map():
 
 
 def test_inpainting_adapter_converts_regions_to_boxes():
-    adapter = InpaintingEngineAdapter(engine=FakeLegacyInpainter())
+    inpainter = FakeLegacyInpainter()
+    adapter = InpaintingEngineAdapter(engine=inpainter)
     image = ImageData(array=object(), explicit_width=100, explicit_height=100)
 
     result = adapter.inpaint(image, [InpaintRegion(box=Box(1, 2, 11, 12))], InpaintOptions())
 
     assert result.image is image
+
+
+def test_inpainting_adapter_passes_explicit_options_to_legacy_engine():
+    inpainter = FakeLegacyInpainter()
+    adapter = InpaintingEngineAdapter(engine=inpainter)
+    image = ImageData(array=object(), explicit_width=100, explicit_height=100)
+
+    adapter.inpaint(
+        image,
+        [InpaintRegion(box=Box(1, 2, 11, 12), bubble_box=Box(0, 1, 12, 13))],
+        InpaintOptions(engine="opencv", mask_dilation=5, clip_to_bubble=False),
+    )
+
+    assert inpainter.calls[0]["engine"] == "opencv"
+    assert inpainter.calls[0]["mask_dilation"] == 5
+    assert inpainter.calls[0]["clip_to_bubble"] is False
+    assert inpainter.calls[0]["bubble_boxes"] == [[0, 1, 12, 13]]
 
 
 def test_rendering_adapter_returns_render_result():

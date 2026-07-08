@@ -1,7 +1,6 @@
 # modules/inpainting_wrapper.py
 import numpy as np
 import cv2
-from modules.config import config
 
 class HybridInpainter:
     def __init__(self):
@@ -16,8 +15,8 @@ class HybridInpainter:
         self.settings = DummySettings()
         self.lama_model = None
 
-    def _resolve_engine_name(self) -> str:
-        requested = str(getattr(config, "inpaint_engine", "lama") or "lama").strip().lower()
+    def _resolve_engine_name(self, engine: str | None = None) -> str:
+        requested = str(engine or "lama").strip().lower()
         if requested in {"opencv", "fast", "speed", "telea"}:
             return "opencv"
         return "lama"
@@ -37,13 +36,16 @@ class HybridInpainter:
         boxes: list[list[int]],
         bubble_boxes: list[list[int]] | None = None,
         protect_edges: bool = False,
+        engine: str = "lama",
+        mask_dilation: int = 2,
+        clip_to_bubble: bool = True,
     ) -> np.ndarray:
         """
-        Clears text areas using the configured inpainting engine on text stroke masks.
+        Clears text areas using the selected inpainting engine on text stroke masks.
         """
         inpainted = image.copy()
         h, w = image.shape[:2]
-        engine_name = self._resolve_engine_name()
+        engine_name = self._resolve_engine_name(engine)
         
         for index, box in enumerate(boxes):
             x1, y1, x2, y2 = [int(v) for v in box]
@@ -110,12 +112,12 @@ class HybridInpainter:
                 # 4. Adaptive dilation based on estimated stroke width using Distance Transform
                 dist_transform = cv2.distanceTransform(final_mask, cv2.DIST_L2, 3)
                 max_dist = np.percentile(dist_transform[dist_transform > 0], 90) if np.any(dist_transform > 0) else 1.0
-                configured_dilation = max(1, int(config.inpaint_mask_dilation))
+                configured_dilation = max(1, int(mask_dilation))
                 radius = max(configured_dilation + 1, int(round(max_dist * 1.8)))
                 kernel_size = 2 * radius + 1
                 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
                 mask = cv2.dilate(final_mask, kernel, iterations=1)
-                if config.inpaint_clip_to_bubble and bubble_boxes and index < len(bubble_boxes):
+                if clip_to_bubble and bubble_boxes and index < len(bubble_boxes):
                     bx1, by1, bx2, by2 = [int(v) for v in bubble_boxes[index]]
                     bx1, by1 = max(0, bx1), max(0, by1)
                     bx2, by2 = min(w, bx2), min(h, by2)

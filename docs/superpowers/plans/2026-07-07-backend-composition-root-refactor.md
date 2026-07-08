@@ -436,6 +436,9 @@ Expected: PASS.
   the same runner/provenance path.
 - `tests/test_auto_typeset_pipeline.py` asserts that `run_page` records stage
   provenance for the legacy-compatible auto-typeset workflow.
+- The inpainting legacy wrapper now receives explicit engine, dilation, and
+  bubble-clipping options through `InpaintingService` and
+  `InpaintingEngineAdapter` instead of reading the global config singleton.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 
