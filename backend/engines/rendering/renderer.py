@@ -1,4 +1,4 @@
-# modules/rendering_wrapper.py
+# engines/rendering/renderer.py
 from dataclasses import dataclass
 from typing import Callable, Optional as OptNone, Tuple
 
@@ -6,7 +6,7 @@ import numpy as np
 from PySide6.QtGui import QFont, QFontMetricsF
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QRectF, Qt
-from services.typesetting_service import dp_wrap_text, fit_font_size
+from .typesetting import dp_wrap_text, fit_font_size
 from infrastructure.fonts import resolver as font_resolver
 import logging
 

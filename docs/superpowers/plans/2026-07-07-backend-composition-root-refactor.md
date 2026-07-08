@@ -515,6 +515,25 @@ Expected: PASS.
   slice absorbed out of `backend/modules`; detection, OCR, and rendering
   follow the same pattern. Boundary tests assert all legacy inpainting
   locations stay deleted.
+- The dead `backend/modules/rendering` package was removed: `render.py` had
+  no importers and imported a nonexistent module
+  (`app.ui.canvas.text.vertical_layout`), and `hyphen_textwrap.py` was used
+  only by that dead file.
+- Font resolution moved from `services/font_resolver_service.py` into
+  `backend/infrastructure/fonts` (facade `infrastructure.fonts`, singleton
+  `resolver` preserved) — it is shared foundation used by both the rendering
+  path and `page_export_service`.
+- The rendering engine slice moved into `backend/engines/rendering`:
+  `services/typesetting_service.py` (→ `typesetting.py`),
+  `modules/rendering_wrapper.py` (→ `renderer.py`, `TextRenderer`),
+  `services/render_service.py` (→ `service.py`, `RenderService`), and
+  `services/layout_planner_service.py` (→ `layout_planner.py`,
+  `LayoutPlannerService`) — the last matches the design's explicit mapping.
+  The composition root wires `RenderService` and `LayoutPlannerService` from
+  `engines.rendering`. `render_service` still imports the `app.models`
+  `TextBubble` type (transitional; `app/models.py` is mapped to
+  `core/models/*` in a later step). Boundary tests assert the legacy
+  rendering locations stay deleted.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

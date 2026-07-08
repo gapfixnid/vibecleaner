@@ -1,4 +1,4 @@
-# layout_planner_service.py
+# engines/rendering/layout_planner.py
 # Layout Planner — decide layout properties before typesetting.
 #
 # Pipeline:

@@ -1,4 +1,4 @@
-# typesetting_service.py
+# engines/rendering/typesetting.py
 # DP-based line breaking and font fitting with cost functions.
 #
 # Replaces greedy wrapping with dynamic programming that minimizes:

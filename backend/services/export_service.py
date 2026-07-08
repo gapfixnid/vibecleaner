@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 from PySide6.QtGui import QFontMetricsF
 from typing import Optional, Any, Callable
 from app.models import MangaPage
-from services.render_service import RenderService
+from engines.rendering.service import RenderService
 
 logger = logging.getLogger(__name__)
 

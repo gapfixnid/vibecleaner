@@ -12,7 +12,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from app.models import TextBubble
-from services.render_service import RenderService
+from engines.rendering.service import RenderService
 
 
 class FakeRenderer:
