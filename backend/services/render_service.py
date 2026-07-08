@@ -1,4 +1,4 @@
-from typing import Tuple, List, Optional, cast
+from typing import Any, Tuple, List, Optional, cast
 import logging
 import numpy as np
 from PySide6.QtCore import QRectF
@@ -12,8 +12,18 @@ logger = logging.getLogger(__name__)
 
 
 class RenderService:
-    def __init__(self, renderer: Optional[TextRenderer] = None) -> None:
-        self.renderer: TextRenderer = renderer or TextRenderer()
+    def __init__(self, renderer: Optional[TextRenderer] = None, config: Any = None) -> None:
+        self.config = config
+        self.renderer: TextRenderer = renderer or TextRenderer(
+            min_font_size=self._min_font_size(),
+            max_font_size=self._max_font_size(),
+        )
+
+    def _min_font_size(self) -> float:
+        return float(getattr(self.config, "min_font_size", 6.0))
+
+    def _max_font_size(self) -> float:
+        return float(getattr(self.config, "max_font_size", 48.0))
 
     def get_optimal_font(
         self, text: str, rect: QRectF, font_family: str | None = None
@@ -22,7 +32,13 @@ class RenderService:
         if font_family is None:
             app = QApplication.instance()
             font_family = cast(QApplication, app).font().family() if app else "Segoe UI"
-        return self.renderer.find_optimal_font_size(text, rect, font_family=font_family)
+        return self.renderer.find_optimal_font_size(
+            text,
+            rect,
+            font_family=font_family,
+            min_size=self._min_font_size(),
+            max_size=self._max_font_size(),
+        )
 
     def get_layout_for_bubble(
         self,
@@ -34,9 +50,22 @@ class RenderService:
         layout_rect = self._text_layout_rect(bubble)
         mask = self._build_bubble_layout_mask(bubble, image)
         if mask is not None:
-            return self.renderer.find_optimal_font_size_for_mask(text, bubble.box, mask, font_family=font_family)
+            return self.renderer.find_optimal_font_size_for_mask(
+                text,
+                bubble.box,
+                mask,
+                font_family=font_family,
+                min_size=self._min_font_size(),
+                max_size=self._max_font_size(),
+            )
 
-        font, lines, render_width = self.renderer.find_optimal_font_size(text, layout_rect, font_family=font_family)
+        font, lines, render_width = self.renderer.find_optimal_font_size(
+            text,
+            layout_rect,
+            font_family=font_family,
+            min_size=self._min_font_size(),
+            max_size=self._max_font_size(),
+        )
         alignment = getattr(bubble, 'alignment', 'center') or 'center'
         return self.renderer.layout_lines_in_rect(lines, layout_rect, font, render_width, alignment=alignment)
 

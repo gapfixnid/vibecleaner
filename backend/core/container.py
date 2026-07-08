@@ -60,7 +60,7 @@ def build_container() -> AppContainer:
     translation_service = TranslationService(config=config)
     detection_service = DetectionService(config=config)
     inpainting_service = InpaintingService(config=config)
-    render_service = RenderService()
+    render_service = RenderService(config=config)
     export_service = ExportService(render_service)
 
     settings = AppConfigSnapshot.from_object(config)

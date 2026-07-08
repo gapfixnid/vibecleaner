@@ -6,7 +6,6 @@ import numpy as np
 from PySide6.QtGui import QFont, QFontMetricsF
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QRectF, Qt
-from modules.config import config
 from services.typesetting_service import dp_wrap_text, fit_font_size
 from services.font_resolver_service import resolver as font_resolver
 import logging
@@ -35,8 +34,9 @@ class TextLayoutResult:
 
 
 class TextRenderer:
-    def __init__(self):
-        pass
+    def __init__(self, min_font_size: float = 6.0, max_font_size: float = 48.0):
+        self.min_font_size = float(min_font_size)
+        self.max_font_size = float(max_font_size)
         
     def wrap_text(self, text: str, width: float, font: QFont, allow_char_break: bool = False) -> list[str] | None:
         """Wrap text using DP for optimal line breaking; falls back to greedy."""
@@ -184,8 +184,8 @@ class TextRenderer:
             app = QApplication.instance()
             if app is None or not app.font().family():
                 font_family = "Segoe UI"
-        min_size = float(config.min_font_size if min_size is None else min_size)
-        max_size = float(config.max_font_size if max_size is None else max_size)
+        min_size = float(self.min_font_size if min_size is None else min_size)
+        max_size = float(self.max_font_size if max_size is None else max_size)
 
         padding_x = min(8.0, rect.width() * 0.08)
         padding_y = min(6.0, rect.height() * 0.08)
@@ -274,7 +274,9 @@ class TextRenderer:
         font: QFont,
         render_width: float,
         alignment: str = 'center',
+        min_size: float | None = None,
     ) -> TextLayoutResult:
+        min_size = float(self.min_font_size if min_size is None else min_size)
         metrics = QFontMetricsF(font)
         line_height = metrics.height()
         total_height = line_height * len(lines)
@@ -305,7 +307,7 @@ class TextRenderer:
             render_width=render_width,
             line_layouts=line_layouts,
             is_overflow=is_overflow,
-            reached_min_font=font.pointSizeF() <= float(config.min_font_size) + 0.1,
+            reached_min_font=font.pointSizeF() <= min_size + 0.1,
         )
 
     def make_ellipse_mask(self, width: int, height: int, inset: int = 0) -> np.ndarray:
@@ -334,8 +336,8 @@ class TextRenderer:
             resolved_font, chain = font_resolver.resolve(text, target_lang="Korean")
             font_family = resolved_font.name
             logger.debug(f"Font resolved (mask): {font_family} (chain: {' → '.join(chain)})")
-        min_size = float(config.min_font_size if min_size is None else min_size)
-        max_size = float(config.max_font_size if max_size is None else max_size)
+        min_size = float(self.min_font_size if min_size is None else min_size)
+        max_size = float(self.max_font_size if max_size is None else max_size)
 
         # Preprocess mask: Erode to reserve padding away from speech bubble outlines
         if mask is not None and mask.ndim == 2 and np.any(mask):
@@ -348,7 +350,7 @@ class TextRenderer:
         mask_bool = np.asarray(mask) > 0
         if mask_bool.ndim != 2 or not bool(mask_bool.any()):
             font, lines, render_width = self.find_optimal_font_size(text, rect, font_family, min_size, max_size)
-            return self.layout_lines_in_rect(lines, rect, font, render_width)
+            return self.layout_lines_in_rect(lines, rect, font, render_width, min_size=min_size)
 
         dynamic_max = min(max_size, max(min_size, rect.height() * 0.85, rect.width() * 0.65))
         candidate_sizes = self._candidate_font_sizes(min_size, dynamic_max)
@@ -360,6 +362,7 @@ class TextRenderer:
             candidate_sizes,
             allow_char_break=False,
             dynamic_max=dynamic_max,
+            min_size=min_size,
         )
 
         if best_layout is None:
@@ -371,13 +374,14 @@ class TextRenderer:
                 candidate_sizes,
                 allow_char_break=True,
                 dynamic_max=dynamic_max,
+                min_size=min_size,
             )
 
         if best_layout is not None:
             return best_layout
 
         font, lines, render_width = self.find_optimal_font_size(text, rect, font_family, min_size, max_size)
-        return self.layout_lines_in_rect(lines, rect, font, render_width)
+        return self.layout_lines_in_rect(lines, rect, font, render_width, min_size=min_size)
 
     def _candidate_font_sizes(self, min_size: float, max_size: float) -> list[float]:
         if max_size <= min_size:
@@ -401,6 +405,7 @@ class TextRenderer:
         candidate_sizes: list[float],
         allow_char_break: bool,
         dynamic_max: float,
+        min_size: float,
     ) -> TextLayoutResult | None:
         best_layout = None
         best_score = float("inf")
@@ -408,7 +413,14 @@ class TextRenderer:
         for size in candidate_sizes:
             font = QFont(font_family)
             font.setPointSizeF(size)
-            layout = self._layout_text_in_mask(text, rect, mask, font, allow_char_break=allow_char_break)
+            layout = self._layout_text_in_mask(
+                text,
+                rect,
+                mask,
+                font,
+                allow_char_break=allow_char_break,
+                min_size=min_size,
+            )
             if layout is None:
                 continue
 
@@ -427,6 +439,7 @@ class TextRenderer:
         mask: np.ndarray,
         font: QFont,
         allow_char_break: bool,
+        min_size: float,
     ) -> TextLayoutResult | None:
         metrics = QFontMetricsF(font)
         line_height = max(1.0, metrics.height())
@@ -466,7 +479,7 @@ class TextRenderer:
                     line_layouts=line_layouts,
                     score=score,
                     is_overflow=False,
-                    reached_min_font=font.pointSizeF() <= float(config.min_font_size) + 0.1,
+                    reached_min_font=font.pointSizeF() <= min_size + 0.1,
                 )
 
         return best_result

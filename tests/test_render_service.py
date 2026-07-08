@@ -22,10 +22,14 @@ class FakeRenderer:
         self.font_family = "not-called"
         self.mask_rect = None
         self.mask_shape = None
+        self.min_size = None
+        self.max_size = None
 
-    def find_optimal_font_size(self, text, rect, font_family=None):
+    def find_optimal_font_size(self, text, rect, font_family=None, min_size=None, max_size=None):
         self.font_rect = QRectF(rect)
         self.font_family = font_family
+        self.min_size = min_size
+        self.max_size = max_size
         return SimpleNamespace(pointSizeF=lambda: 18.0), [text], rect.width()
 
     def layout_lines_in_rect(self, lines, rect, font, render_width, alignment="center"):
@@ -35,10 +39,12 @@ class FakeRenderer:
             line_layouts=[],
         )
 
-    def find_optimal_font_size_for_mask(self, text, rect, mask, font_family=None):
+    def find_optimal_font_size_for_mask(self, text, rect, mask, font_family=None, min_size=None, max_size=None):
         self.mask_rect = QRectF(rect)
         self.mask_shape = mask.shape
         self.font_family = font_family
+        self.min_size = min_size
+        self.max_size = max_size
         return SimpleNamespace(
             font=SimpleNamespace(pointSizeF=lambda: 18.0, family=lambda: "Resolved Font"),
             line_layouts=[],
@@ -49,6 +55,21 @@ class FakeRenderer:
 
 
 class RenderServiceTests(unittest.TestCase):
+    def test_render_service_passes_explicit_font_size_options_to_renderer(self):
+        renderer = FakeRenderer()
+        service = RenderService(renderer=renderer, config=SimpleNamespace(min_font_size=9.0, max_font_size=27.0))
+        bubble = TextBubble(
+            id=1,
+            box=QRectF(0, 0, 100, 80),
+            layout_box=QRectF(20, 12, 40, 24),
+            text="hello",
+        )
+
+        service.get_layout_for_bubble("translated", bubble, image=None, font_family="Test")
+
+        self.assertEqual(renderer.min_size, 9.0)
+        self.assertEqual(renderer.max_size, 27.0)
+
     def test_text_bubble_uses_full_bubble_box_for_mask_layout(self):
         renderer = FakeRenderer()
         service = RenderService(renderer=renderer)

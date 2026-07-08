@@ -442,6 +442,9 @@ Expected: PASS.
 - The OCR legacy wrapper now receives explicit engine selection through
   `DetectionService` and `OcrEngineAdapter`; `LocalOCR` no longer reads the
   global config singleton to choose Manga OCR vs PPOCR.
+- The rendering wrapper now receives explicit min/max font-size options through
+  `RenderService`; `TextRenderer` no longer reads the global config singleton
+  for font sizing.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 
