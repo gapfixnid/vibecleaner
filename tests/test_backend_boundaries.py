@@ -27,6 +27,10 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert not (backend / "modules" / "utils" / "onnx.py").exists()
     assert not (backend / "modules" / "utils" / "torch_autocast.py").exists()
     assert not (backend / "modules" / "utils" / "paths.py").exists()
+    assert not (backend / "modules" / "inpainting").exists()
+    assert not (backend / "modules" / "inpainting_wrapper.py").exists()
+    assert not (backend / "modules" / "utils" / "inpainting.py").exists()
+    assert not (backend / "services" / "inpainting_service.py").exists()
 
     scanned_files = [
         path
@@ -57,6 +61,9 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert ("modules.utils." + "onnx") not in combined
     assert ("modules.utils." + "torch_autocast") not in combined
     assert ("modules.utils." + "paths") not in combined
+    assert ("modules." + "inpainting") not in combined
+    assert ("modules.utils." + "inpainting") not in combined
+    assert ("services." + "inpainting_service") not in combined
 
 
 def test_pipeline_and_api_do_not_import_concrete_engines():

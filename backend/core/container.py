@@ -34,7 +34,7 @@ def build_container(config: Any | None = None) -> AppContainer:
     from services.detection_service import DetectionService
     from services.export_service import ExportService
     from services.image_encoding_service import encode_preview_jpeg_bytes, encode_thumbnail_bytes
-    from services.inpainting_service import InpaintingService
+    from engines.inpainting.service import InpaintingService
     from services.layout_planner_service import LayoutPlannerService
     from services.page_analysis_service import PageAnalysisService
     from services.page_image_loader import ensure_page_image, invalidate_page_caches

@@ -2,7 +2,7 @@ import numpy as np
 import logging
 from infrastructure.runtime.device import get_providers
 
-from ..utils.inpainting import (
+from .helpers import (
     norm_img,
     load_jit_model,
 )

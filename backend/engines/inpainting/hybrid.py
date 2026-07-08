@@ -1,4 +1,4 @@
-# modules/inpainting_wrapper.py
+# engines/inpainting/hybrid.py
 import numpy as np
 import cv2
 
@@ -26,7 +26,7 @@ class HybridInpainter:
         if self.lama_model is None:
             import logging
             logging.info("Initializing LaMa inpainting model...")
-            from modules.inpainting.lama import LaMa
+            from .lama import LaMa
             self.lama_model = LaMa(device=device, backend="onnx")
         return self.lama_model
 
@@ -134,7 +134,7 @@ class HybridInpainter:
                     inpainted_crop = cv2.inpaint(crop, mask, 3, cv2.INPAINT_TELEA)
                 else:
                     try:
-                        from modules.inpainting.schema import Config as InpaintConfig
+                        from .schema import Config as InpaintConfig
                         # Convert BGR crop to RGB for the deep inpainting models.
                         crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
                         model = self._get_deep_model(engine_name)

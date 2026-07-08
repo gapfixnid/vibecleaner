@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Any, List, Optional
-from modules.inpainting_wrapper import HybridInpainter
+from .hybrid import HybridInpainter
 
 
 class InpaintingService:

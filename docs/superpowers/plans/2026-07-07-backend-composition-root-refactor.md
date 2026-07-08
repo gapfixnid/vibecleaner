@@ -503,9 +503,18 @@ Expected: PASS.
   was deleted in favor of the existing `infrastructure/storage/paths.py`
   (`device.py` now imports `get_user_data_dir` from `infrastructure.storage`).
   Remaining `modules/utils` files (`textblock`, `translator_utils`,
-  `inpainting`, `language_utils`, `platform_utils`, `common_utils`,
-  `exceptions`) are engine/domain-coupled and will move with their vertical
-  engine slices.
+  `language_utils`, `platform_utils`, `common_utils`, `exceptions`) are
+  engine/domain-coupled and will move with their vertical engine slices.
+- The inpainting engine slice moved into `backend/engines/inpainting`:
+  `modules/inpainting/{base,lama,aot,mi_gan,schema}.py`,
+  `modules/inpainting_wrapper.py` (→ `hybrid.py`, `HybridInpainter`),
+  `services/inpainting_service.py` (→ `service.py`, `InpaintingService`), and
+  the inpainting-private helper `modules/utils/inpainting.py` (→ `helpers.py`).
+  The composition root now wires `InpaintingService` from
+  `engines.inpainting.service`. This is the first complete vertical engine
+  slice absorbed out of `backend/modules`; detection, OCR, and rendering
+  follow the same pattern. Boundary tests assert all legacy inpainting
+  locations stay deleted.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

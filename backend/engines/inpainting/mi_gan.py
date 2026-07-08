@@ -4,7 +4,7 @@ from PIL import Image
 import numpy as np
 import logging
 
-from ..utils.inpainting import (
+from .helpers import (
     load_jit_model,
     boxes_from_mask,
     resize_max_size,

@@ -8,7 +8,7 @@ from infrastructure.runtime.device import get_providers
 from .base import InpaintModel
 from .schema import Config
 
-from modules.utils.inpainting import (
+from .helpers import (
     load_jit_model,
 )
 from infrastructure.downloads import ModelDownloader, ModelID

@@ -9,7 +9,7 @@ from contextlib import nullcontext
 
 logger = logging.getLogger(__name__)
 
-from ..utils.inpainting import (
+from .helpers import (
     boxes_from_mask,
     resize_max_size,
     pad_img_to_modulo,
