@@ -11,7 +11,7 @@ from typing import Tuple, Union
 import wget
 
 from modules.ocr.pororo.pororo.tasks.utils.config import CONFIGS
-from modules.utils.download import models_base_dir as shared_models_base_dir
+from infrastructure.downloads import models_base_dir as shared_models_base_dir
 
 # Get the directory of the current file
 models_base_dir = os.path.join(shared_models_base_dir, 'ocr', 'pororo')

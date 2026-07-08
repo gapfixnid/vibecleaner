@@ -11,7 +11,7 @@ from .schema import Config
 from modules.utils.inpainting import (
     load_jit_model,
 )
-from modules.utils.download import ModelDownloader, ModelID
+from infrastructure.downloads import ModelDownloader, ModelID
 from modules.utils.onnx import make_session
 from modules.utils.torch_autocast import TorchAutocastMixin
 

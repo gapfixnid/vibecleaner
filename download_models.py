@@ -10,7 +10,7 @@ sys.path.append(current_dir)
 sys.path.append(os.path.join(current_dir, "backend"))
 
 from infrastructure.logging import configure_logging
-from modules.utils.download import ModelDownloader, ModelID
+from infrastructure.downloads import ModelDownloader, ModelID
 from modules.config import AppConfig
 from services.model_requirements import get_required_model_ids
 from app.version import APP_NAME

@@ -7,7 +7,7 @@ from .base import DetectionEngine
 from modules.utils.textblock import TextBlock
 from modules.detection.utils.slicer import ImageSlicer
 from modules.utils.device import tensors_to_device
-from modules.utils.download import models_base_dir
+from infrastructure.downloads import models_base_dir
 from modules.utils.torch_autocast import TorchAutocastMixin
 
 logger = logging.getLogger(__name__)

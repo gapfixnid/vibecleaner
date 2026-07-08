@@ -4,7 +4,7 @@ import onnxruntime as ort
 from PIL import Image
 
 from modules.utils.device import get_providers
-from modules.utils.download import ModelDownloader, ModelID, models_base_dir
+from infrastructure.downloads import ModelDownloader, ModelID, models_base_dir
 from modules.utils.onnx import make_session
 from modules.utils.textblock import TextBlock
 from modules.detection.utils.slicer import ImageSlicer

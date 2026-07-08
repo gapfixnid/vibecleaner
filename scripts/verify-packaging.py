@@ -87,7 +87,7 @@ def _model_ids(profile: str):
 
 def _check_model_registry(profile: str, errors: list[str]) -> None:
     _add_backend_to_path()
-    from modules.utils.download import ModelDownloader
+    from infrastructure.downloads import ModelDownloader
 
     for model_id in _model_ids(profile):
         spec = ModelDownloader.registry.get(model_id)
@@ -109,7 +109,7 @@ def _check_model_registry(profile: str, errors: list[str]) -> None:
 
 def _check_model_files(profile: str, errors: list[str]) -> None:
     _add_backend_to_path()
-    from modules.utils.download import ModelDownloader
+    from infrastructure.downloads import ModelDownloader
 
     for model_id in _model_ids(profile):
         if not ModelDownloader.is_downloaded(model_id):

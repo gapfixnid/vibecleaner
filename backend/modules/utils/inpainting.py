@@ -12,8 +12,11 @@ from urllib.parse import urlparse
 from PIL import Image, ImageOps, PngImagePlugin
 from app.version import APP_NAME
 
-from .download_file import download_url_to_file
-from .download import notify_download_event, models_base_dir
+from infrastructure.downloads import (
+    download_url_to_file,
+    models_base_dir,
+    notify_download_event,
+)
 
 logger = logging.getLogger(__name__)
 

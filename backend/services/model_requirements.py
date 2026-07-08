@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from modules.config import AppConfig
-from modules.utils.download import ModelDownloader, ModelID
+from infrastructure.downloads import ModelDownloader, ModelID
 
 
 MODEL_LABELS: dict[ModelID, tuple[str, str]] = {

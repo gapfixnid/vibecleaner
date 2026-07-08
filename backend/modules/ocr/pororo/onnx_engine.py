@@ -7,7 +7,7 @@ from PIL import Image
 import imkit as imk
 from typing import Optional
 
-from modules.utils.download import ModelDownloader, ModelID
+from infrastructure.downloads import ModelDownloader, ModelID
 from modules.ocr.base import OCREngine
 from modules.utils.device import get_providers
 from modules.utils.onnx import make_session

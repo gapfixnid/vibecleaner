@@ -6,7 +6,7 @@ import logging
 
 from modules.ocr.base import OCREngine
 from modules.utils.textblock import TextBlock, adjust_text_line_coordinates
-from modules.utils.download import ModelDownloader, ModelID, models_base_dir
+from infrastructure.downloads import ModelDownloader, ModelID, models_base_dir
 from modules.utils.torch_autocast import TorchAutocastMixin
 
 logger = logging.getLogger(__name__)

@@ -4,7 +4,7 @@ import numpy as np
 
 from modules.ocr.base import OCREngine
 from modules.utils.textblock import TextBlock, adjust_text_line_coordinates
-from modules.utils.download import ModelDownloader, ModelID
+from infrastructure.downloads import ModelDownloader, ModelID
 from modules.utils.language_utils import is_no_space_lang
 from .pororo.models.brainOCR.utils import reformat_input
 from modules.ocr.ppocr.preprocessing import crop_quad

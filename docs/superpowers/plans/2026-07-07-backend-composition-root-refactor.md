@@ -484,6 +484,10 @@ Expected: PASS.
 - `backend/infrastructure` now exists as a concrete package. Logging setup and
   user-data path helpers moved from `backend/modules` into
   `backend/infrastructure/logging` and `backend/infrastructure/storage`.
+- Model download helpers (`ModelDownloader`, `ModelID`, `download_url_to_file`)
+  moved from `backend/modules/utils/download*.py` into
+  `backend/infrastructure/downloads`. `tests/test_backend_boundaries.py` now
+  asserts the legacy download modules stay deleted.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

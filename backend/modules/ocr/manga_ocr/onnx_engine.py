@@ -9,7 +9,7 @@ from modules.utils.onnx import make_session
 
 from modules.ocr.base import OCREngine
 from modules.utils.textblock import TextBlock, adjust_text_line_coordinates
-from modules.utils.download import ModelDownloader, ModelID
+from infrastructure.downloads import ModelDownloader, ModelID
 
 
 class MangaOCREngineONNX(OCREngine):

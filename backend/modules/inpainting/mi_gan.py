@@ -10,7 +10,7 @@ from ..utils.inpainting import (
     resize_max_size,
     norm_img,
 )
-from modules.utils.download import ModelDownloader, ModelID
+from infrastructure.downloads import ModelDownloader, ModelID
 from modules.utils.device import get_providers
 from modules.utils.onnx import make_session
 from modules.utils.torch_autocast import TorchAutocastMixin

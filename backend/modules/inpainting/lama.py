@@ -6,7 +6,7 @@ from ..utils.inpainting import (
     norm_img,
     load_jit_model,
 )
-from ..utils.download import ModelDownloader, ModelID
+from infrastructure.downloads import ModelDownloader, ModelID
 from modules.utils.onnx import make_session
 from modules.utils.torch_autocast import TorchAutocastMixin
 from .base import InpaintModel

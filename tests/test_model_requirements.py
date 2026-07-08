@@ -9,7 +9,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from modules.config import AppConfig
-from modules.utils.download import ModelID
+from infrastructure.downloads import ModelID
 from services.model_requirements import get_required_model_ids, get_model_status
 from api.routes import settings as settings_route
 from download_models import get_model_ids
