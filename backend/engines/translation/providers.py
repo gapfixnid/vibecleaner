@@ -1,4 +1,4 @@
-# modules/translation_wrapper.py
+# engines/translation/providers.py
 import base64
 import logging
 import time
@@ -7,19 +7,19 @@ import cv2
 import numpy as np
 import requests
 
-from modules.base_translator import BaseTranslator
-from modules.constants import (
-    OLLAMA_CONNECTION_TIMEOUT_SECONDS,
-    OLLAMA_REQUEST_TIMEOUT_SECONDS,
-)
 from engines.common.textblock import TextBlock
-from modules.utils.translator_utils import (
+
+from .base import BaseTranslator
+from .helpers import (
     TranslationParseError,
     get_raw_text,
     set_texts_from_json,
 )
 
 logger = logging.getLogger(__name__)
+
+OLLAMA_REQUEST_TIMEOUT_SECONDS = 90
+OLLAMA_CONNECTION_TIMEOUT_SECONDS = 5.0
 
 
 class OpenAICompatibleTranslator(BaseTranslator):

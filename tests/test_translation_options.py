@@ -8,10 +8,10 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from modules import translation_wrapper
+from engines.translation import providers as translation_wrapper
 from modules.config import AppConfig
 from engines.common.textblock import TextBlock
-from services.translation_service import TranslationService
+from engines.translation.service import TranslationService
 
 
 class TranslationOptionsTests(unittest.TestCase):

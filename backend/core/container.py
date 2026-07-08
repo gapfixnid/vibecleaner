@@ -40,7 +40,7 @@ def build_container(config: Any | None = None) -> AppContainer:
     from services.page_image_loader import ensure_page_image, invalidate_page_caches
     from engines.rendering.service import RenderService
     from services.review_state_service import refresh_page_status
-    from services.translation_service import TranslationService
+    from engines.translation.service import TranslationService
 
     runtime_config = config or AppConfig()
     if config is None:

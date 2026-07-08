@@ -6,8 +6,9 @@ import hashlib
 import shutil
 import numpy as np
 from typing import List, Optional, Any, Dict, cast
-from modules.config import APP_DATA_DIR, OLLAMA_API_URL
-from modules.translation_wrapper import (
+from infrastructure.storage import get_app_data_dir
+from modules.config import OLLAMA_API_URL
+from .providers import (
     OllamaTranslator,
     OpenAICompatibleTranslator,
     GoogleTranslatorWrapper,
@@ -17,7 +18,7 @@ from modules.translation_wrapper import (
     PapagoTranslatorWrapper,
     BaiduTranslatorWrapper
 )
-from modules.base_translator import BaseTranslator
+from .base import BaseTranslator
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,9 @@ class TranslationService:
         self._translator_lock = threading.RLock()
 
         # Save TM and system prompt in user's AppData directory to prevent permission issues
-        self.tm_path = os.path.join(APP_DATA_DIR, "translation_memory.json")
-        self.system_prompt_path = os.path.join(APP_DATA_DIR, "system_prompt.txt")
+        app_data_dir = get_app_data_dir()
+        self.tm_path = os.path.join(app_data_dir, "translation_memory.json")
+        self.system_prompt_path = os.path.join(app_data_dir, "system_prompt.txt")
 
         # Load Translation Memory (TM) on startup
         self._load_tm()

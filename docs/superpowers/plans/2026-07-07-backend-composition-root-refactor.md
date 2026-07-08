@@ -568,6 +568,18 @@ Expected: PASS.
   `ppocr/engine.py`, dispatched by `engines/ocr/local.py`. The PORORO /
   MANGA_OCR_BASE / MANGA_OCR_INT8_ONNX entries remain in the download
   registry (data only, no code references).
+- The translation engine slice moved into `backend/engines/translation`:
+  `modules/base_translator.py` (→ `base.py`), `modules/translation_wrapper.py`
+  (→ `providers.py`, the 8 provider translator classes),
+  `modules/utils/translator_utils.py` (→ `helpers.py`), and
+  `services/translation_service.py` (→ `service.py`, `TranslationService`).
+  `modules/constants.py` was deleted — its two live OLLAMA timeout
+  constants were inlined into `providers.py`; the other four constants had
+  no references. The service now uses `infrastructure.storage.get_app_data_dir`
+  for TM/system-prompt paths. Transitional import remaining:
+  `engines/translation/service.py` → `modules.config.OLLAMA_API_URL`
+  (also used by the settings route; resolves when `modules/config.py`
+  moves to `core/config.py`).
 
 - [ ] **Step 1: Find remaining forbidden imports**
 
