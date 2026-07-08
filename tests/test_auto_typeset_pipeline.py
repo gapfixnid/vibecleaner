@@ -115,6 +115,51 @@ class AutoTypesetPipelineTests(unittest.TestCase):
         self.assertEqual(inpainting_service.calls[0]["boxes"], [[3.0, 4.0, 11.0, 10.0]])
         self.assertEqual(inpainting_service.calls[0]["bubble_boxes"], [[2.0, 3.0, 12.0, 11.0]])
 
+    def test_run_page_records_stage_provenance(self):
+        page = MangaPage(
+            file_path="sample.png",
+            cv_image=np.zeros((24, 32, 3), dtype=np.uint8),
+            bubbles=[
+                TextBubble(
+                    id=1,
+                    box=QRectF(2, 3, 10, 8),
+                    text_box=QRectF(3, 4, 8, 6),
+                    text="hello",
+                    translated="",
+                )
+            ],
+            bubble_counter=1,
+        )
+        page.page_id = "page_a"
+        with self.state.lock:
+            self.state.pages = [page]
+            self.state.current_page_idx = 0
+            self.state.revision = 0
+
+        pipeline = pipeline_module.AutoTypesetPipeline(
+            state=self.state,
+            config=self.config,
+            job_manager=job_manager,
+            detection_service=SimpleNamespace(),
+            inpainting_service=FakeInpaintingService(),
+            translation_service=FakeTranslationService(),
+        )
+
+        with (
+            patch.object(pipeline_module, "ensure_page_image", lambda page: None),
+            patch.object(pipeline_module, "encode_preview_jpeg_bytes", lambda image: b"preview"),
+            patch.object(pipeline_module, "encode_thumbnail_bytes", lambda image: b"thumb"),
+        ):
+            pipeline.run_page({"cancel_requested": False}, "page_a", show_progress=False)
+
+        assert pipeline.last_result is not None
+        assert [stage.stage for stage in pipeline.last_result.context.provenance.stages] == [
+            "load_page",
+            "detect_analyze",
+            "inpaint_translate",
+            "commit_page",
+        ]
+
     def test_bubbles_from_analysis_preserves_detected_font_color(self):
         image = np.zeros((40, 40, 3), dtype=np.uint8)
         bubble_data = BubbleData(

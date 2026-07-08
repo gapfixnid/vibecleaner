@@ -428,6 +428,15 @@ Expected: PASS.
 - Consumes: new container, repository, pipeline runner.
 - Produces: no direct imports of removed singleton modules from backend application code.
 
+**Progress note, 2026-07-08:**
+- `backend/pipeline/auto_typeset.py` now executes page translation through
+  `PipelineRunner` stages: `load_page`, `detect_analyze`,
+  `inpaint_translate`, and `commit_page`.
+- `run_batch` delegates to `run_page`, so both single-page and batch paths share
+  the same runner/provenance path.
+- `tests/test_auto_typeset_pipeline.py` asserts that `run_page` records stage
+  provenance for the legacy-compatible auto-typeset workflow.
+
 - [ ] **Step 1: Find remaining forbidden imports**
 
 Run:

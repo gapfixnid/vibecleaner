@@ -7,7 +7,12 @@ from fastapi import HTTPException
 
 from app.models import TextBubble
 from app.version import APP_NAME
+from core.models.image import ImageData
 from modules.utils.textblock import TextBlock
+from pipeline.context import PipelineContext
+from pipeline.plan import PipelinePlan
+from pipeline.registry import StageRegistry
+from pipeline.runner import PipelineResult, PipelineRunner
 from services.image_encoding_service import encode_preview_jpeg_bytes, encode_thumbnail_bytes
 from services.page_image_loader import ensure_page_image, invalidate_page_caches
 from services.review_state_service import refresh_page_status
@@ -242,7 +247,26 @@ def _merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float =
     return current
 
 
+class _AutoTypesetStage:
+    def __init__(self, name: str, method_name: str) -> None:
+        self.name = name
+        self.method_name = method_name
+
+    def run(self, context: PipelineContext) -> PipelineContext:
+        pipeline = context.artifacts["pipeline"]
+        return getattr(pipeline, self.method_name)(context)
+
+
 class AutoTypesetPipeline:
+    _PAGE_PLAN = PipelinePlan(
+        stages=[
+            "load_page",
+            "detect_analyze",
+            "inpaint_translate",
+            "commit_page",
+        ]
+    )
+
     def __init__(
         self,
         *,
@@ -265,6 +289,15 @@ class AutoTypesetPipeline:
         self.page_analysis_service = page_analysis_service or PageAnalysisService()
         self.bubble_analysis_service = bubble_analysis_service or BubbleAnalysisService()
         self.layout_planner_service = layout_planner_service or LayoutPlannerService()
+        self.last_result: PipelineResult | None = None
+
+    def _build_page_runner(self) -> PipelineRunner:
+        registry = StageRegistry()
+        registry.register(_AutoTypesetStage("load_page", "_stage_load_page"))
+        registry.register(_AutoTypesetStage("detect_analyze", "_stage_detect_analyze"))
+        registry.register(_AutoTypesetStage("inpaint_translate", "_stage_inpaint_translate"))
+        registry.register(_AutoTypesetStage("commit_page", "_stage_commit_page"))
+        return PipelineRunner(registry)
 
     def _resolve_page_index(self, page_id: str) -> int:
         if page_id.isdigit():
@@ -282,7 +315,23 @@ class AutoTypesetPipeline:
             raise RuntimeError("Project changed while the operation was running. Please retry.")
 
     def run_page(self, job: dict, page_id: str, *, show_progress: bool = True) -> dict[str, int]:
-        return self._run_page_core(job, page_id, show_progress=show_progress)
+        context = PipelineContext(
+            page_id=page_id,
+            page=None,
+            image=ImageData(array=None),
+            settings=self.config,
+            artifacts={
+                "job": job,
+                "show_progress": show_progress,
+                "pipeline": self,
+            },
+        )
+        result = self._build_page_runner().run(context, self._PAGE_PLAN)
+        self.last_result = result
+        if not result.succeeded:
+            message = result.issues[0].message if result.issues else "Auto typeset pipeline failed"
+            raise RuntimeError(message)
+        return result.context.artifacts["result"]
 
     def run_batch(self, job: dict, page_ids: List[str]) -> dict:
         total = len(page_ids)
@@ -300,7 +349,7 @@ class AutoTypesetPipeline:
                     message=f"Translating page {completed + 1}/{total}...",
                 )
                 job["result"] = {"completed_pages": list(completed_page_indices), "total_pages": total}
-                self._run_page_core(job, page_id, show_progress=False)
+                self.run_page(job, page_id, show_progress=False)
             except HTTPException:
                 logger.warning("Batch: page_id %s not found (may have been deleted)", page_id)
             except RuntimeError as e:
@@ -318,13 +367,8 @@ class AutoTypesetPipeline:
         self.job_manager.update(job, progress=100, message="Batch translation complete")
         return {"translated_pages": completed, "total_pages": total, "completed_pages": completed_page_indices}
 
-    def _run_page_core(
-        self,
-        job: dict,
-        page_id: str,
-        *,
-        show_progress: bool = False,
-    ) -> dict[str, int]:
+    def _stage_load_page(self, context: PipelineContext) -> PipelineContext:
+        page_id = context.page_id
         with self.state.lock:
             page_idx = self._resolve_page_index(page_id)
             page = self.state.pages[page_idx]
@@ -334,6 +378,32 @@ class AutoTypesetPipeline:
             inpainted_image = page.inpainted_image.copy() if page.inpainted_image is not None else None
             local_bubbles = [bubble.without_item() for bubble in page.bubbles]
             bubble_counter = page.bubble_counter
+
+        context.page = page
+        context.image = ImageData(
+            array=image,
+            mode="BGR",
+            explicit_width=image.shape[1],
+            explicit_height=image.shape[0],
+        )
+        context.artifacts.update(
+            {
+                "page_idx": page_idx,
+                "start_revision": start_revision,
+                "image": image,
+                "inpainted_image": inpainted_image,
+                "local_bubbles": local_bubbles,
+                "bubble_counter": bubble_counter,
+            }
+        )
+        return context
+
+    def _stage_detect_analyze(self, context: PipelineContext) -> PipelineContext:
+        job = context.artifacts["job"]
+        show_progress = context.artifacts["show_progress"]
+        image = context.artifacts["image"]
+        local_bubbles = context.artifacts["local_bubbles"]
+        bubble_counter = context.artifacts["bubble_counter"]
 
         self.job_manager.ensure_not_cancelled(job)
         if not local_bubbles:
@@ -362,6 +432,16 @@ class AutoTypesetPipeline:
             bubble_counter = len(local_bubbles)
             self.job_manager.ensure_not_cancelled(job)
 
+        context.artifacts["local_bubbles"] = local_bubbles
+        context.artifacts["bubble_counter"] = bubble_counter
+        return context
+
+    def _stage_inpaint_translate(self, context: PipelineContext) -> PipelineContext:
+        job = context.artifacts["job"]
+        show_progress = context.artifacts["show_progress"]
+        image = context.artifacts["image"]
+        inpainted_image = context.artifacts["inpainted_image"]
+        local_bubbles = context.artifacts["local_bubbles"]
         untranslated = [b for b in local_bubbles if not b.translated]
         temp_blocks = []
 
@@ -397,6 +477,19 @@ class AutoTypesetPipeline:
             for bubble, text_block in zip(untranslated, temp_blocks):
                 bubble.translated = text_block.translation
 
+        context.artifacts["inpainted_image"] = inpainted_image
+        context.artifacts["temp_blocks"] = temp_blocks
+        return context
+
+    def _stage_commit_page(self, context: PipelineContext) -> PipelineContext:
+        job = context.artifacts["job"]
+        page_id = context.page_id
+        image = context.artifacts["image"]
+        inpainted_image = context.artifacts["inpainted_image"]
+        local_bubbles = context.artifacts["local_bubbles"]
+        bubble_counter = context.artifacts["bubble_counter"]
+        start_revision = context.artifacts["start_revision"]
+
         self.job_manager.ensure_not_cancelled(job)
         inpainted_preview_bytes = encode_preview_jpeg_bytes(inpainted_image) if inpainted_image is not None else None
         self.job_manager.ensure_not_cancelled(job)
@@ -415,4 +508,5 @@ class AutoTypesetPipeline:
             if inpainted_preview_bytes is not None:
                 page._preview_inpainted_bytes = inpainted_preview_bytes
             self.state.touch()
-        return {"translated_count": len(page.bubbles)}
+        context.artifacts["result"] = {"translated_count": len(page.bubbles)}
+        return context
