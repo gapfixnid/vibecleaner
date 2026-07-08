@@ -559,6 +559,15 @@ Expected: PASS.
   `engines/detection/ppocr_lines.py` references `engines.ocr.ppocr.torch`,
   which does not exist in the repo — that branch was equally broken before
   the move (pre-existing dead branch, kept as-is).
+- Dead OCR engine variants were deleted after the move: the entire vendored
+  `engines/ocr/pororo/` tree (no importers; depends on `wget`, which is in
+  no requirements file, and on a `pororo.models.brainOCR` module that does
+  not exist in the repo, so it could never import) and the unused
+  `manga_ocr/engine.py` (Torch) and `manga_ocr/onnx_engine.py` (int8)
+  variants. The live OCR engines are `manga_ocr/mobile/onnx_engine.py` and
+  `ppocr/engine.py`, dispatched by `engines/ocr/local.py`. The PORORO /
+  MANGA_OCR_BASE / MANGA_OCR_INT8_ONNX entries remain in the download
+  registry (data only, no code references).
 
 - [ ] **Step 1: Find remaining forbidden imports**
 
