@@ -26,7 +26,7 @@ class AppContainer:
     legacy_state: Any
     job_manager: Any
     translation_service: Any
-    auto_typeset_pipeline: Any
+    auto_typeset_runner: Any
     detection_service: Any
     inpainting_service: Any
     render_service: Any
@@ -39,7 +39,7 @@ class AppContainer:
     pipeline_planner: PipelinePlanner
 
 
-def build_container() -> AppContainer:
+def build_container(config: Any | None = None) -> AppContainer:
     # Existing services still own the concrete model wrappers during the first
     # composition-root pass; later tasks replace these with direct adapters.
     from engines.detection.adapter import DetectionEngineAdapter
@@ -47,8 +47,8 @@ def build_container() -> AppContainer:
     from engines.ocr.adapter import OcrEngineAdapter
     from engines.rendering.adapter import RenderingEngineAdapter
     from engines.translation.adapter import TranslationEngineAdapter
-    from modules.config import config
-    from domain.project_state import ProjectState
+    from modules.config import AppConfig
+    from domain.project_state import ProjectState as LegacyProjectState
     from pipeline.auto_typeset import AutoTypesetPipeline
     from services.job_service import job_manager
     from services.detection_service import DetectionService
@@ -57,13 +57,17 @@ def build_container() -> AppContainer:
     from services.render_service import RenderService
     from services.translation_service import TranslationService
 
-    translation_service = TranslationService(config=config)
-    detection_service = DetectionService(config=config)
-    inpainting_service = InpaintingService(config=config)
-    render_service = RenderService(config=config)
+    runtime_config = config or AppConfig()
+    if config is None:
+        runtime_config.load()
+
+    translation_service = TranslationService(config=runtime_config)
+    detection_service = DetectionService(config=runtime_config)
+    inpainting_service = InpaintingService(config=runtime_config)
+    render_service = RenderService(config=runtime_config)
     export_service = ExportService(render_service)
 
-    settings = AppConfigSnapshot.from_object(config)
+    settings = AppConfigSnapshot.from_object(runtime_config)
     strategy = EngineSelectionStrategy()
     registry = StageRegistry()
 
@@ -74,16 +78,16 @@ def build_container() -> AppContainer:
     registry.register(LayoutStage())
     registry.register(RenderingStage(RenderingEngineAdapter(render_service), strategy))
 
-    state = ProjectState()
+    legacy_project_state = LegacyProjectState()
     project_state = NewProjectState()
     return AppContainer(
-        config=config,
-        legacy_state=state,
+        config=runtime_config,
+        legacy_state=legacy_project_state,
         job_manager=job_manager,
         translation_service=translation_service,
-        auto_typeset_pipeline=AutoTypesetPipeline(
-            state=state,
-            config=config,
+        auto_typeset_runner=AutoTypesetPipeline(
+            state=legacy_project_state,
+            config=runtime_config,
             job_manager=job_manager,
             detection_service=detection_service,
             inpainting_service=inpainting_service,

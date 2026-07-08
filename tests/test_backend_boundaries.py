@@ -20,13 +20,14 @@ def test_removed_singleton_modules_and_imports_stay_removed():
         path
         for path in backend.rglob("*.py")
         if "__pycache__" not in path.parts
-        and path.relative_to(backend).as_posix() != "core/container.py"
     ]
     combined = "\n".join(path.read_text(encoding="utf-8") for path in scanned_files)
 
     assert "services.auto_typeset_pipeline" not in combined
+    assert "auto_typeset_pipeline" not in combined
     assert "from domain.project_state import state" not in combined
     assert "state = ProjectState()" not in combined
+    assert "from modules.config import config" not in combined
     assert "from services.service_registry import" not in combined
 
 

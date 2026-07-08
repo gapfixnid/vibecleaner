@@ -461,6 +461,10 @@ Expected: PASS.
   crop-scale, adaptive-binarization, and adaptive-binarization strength options
   through `OcrOptions`, `OcrEngineAdapter`, and `LocalOCR`; the OCR engines no
   longer read the global config singleton for crop preprocessing.
+- The composition root now builds a container-owned `AppConfig` instance instead
+  of importing the global config singleton, and page translation routes use the
+  container-owned `auto_typeset_runner` field instead of the legacy
+  `auto_typeset_pipeline` name.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

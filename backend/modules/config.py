@@ -2,7 +2,7 @@
 # Centralized application configuration.
 #
 # Usage:
-#   from modules.config import config          # AppConfig singleton
+#   from modules.config import AppConfig       # AppConfig settings model
 #   from modules.config import APP_DATA_DIR    # module-level constants
 #   config.TRANSLATION_PROVIDER = "google"     # read / write settings
 #   config.load()                              # reload from disk

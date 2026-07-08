@@ -131,7 +131,7 @@ def run_translate_all(page_id: str, container: AppContainer = Depends(get_contai
         "auto-typeset",
         page_idx,
         f"auto-typeset:{page_id}",
-        lambda job: container.auto_typeset_pipeline.run_page(job, page_id, show_progress=True),
+        lambda job: container.auto_typeset_runner.run_page(job, page_id, show_progress=True),
     )
 
 @router.post("/api/pages/translate-batch")
@@ -149,7 +149,7 @@ def run_translate_batch(req: TranslateBatchRequest, container: AppContainer = De
         "auto-typeset-batch",
         first_idx,
         key,
-        lambda job: container.auto_typeset_pipeline.run_batch(job, page_ids),
+        lambda job: container.auto_typeset_runner.run_batch(job, page_ids),
     )
 
 
