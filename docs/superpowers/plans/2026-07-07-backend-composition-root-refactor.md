@@ -445,6 +445,10 @@ Expected: PASS.
 - The rendering wrapper now receives explicit min/max font-size options through
   `RenderService`; `TextRenderer` no longer reads the global config singleton
   for font sizing.
+- The detection adapter/service path now carries explicit model,
+  confidence-threshold, and tiling options into `detect_bubbles`; the RT-DETR
+  ONNX detection engine no longer reads the global config singleton for those
+  options on the runner path.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

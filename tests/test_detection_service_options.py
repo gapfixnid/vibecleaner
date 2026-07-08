@@ -1,0 +1,71 @@
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[1]
+BACKEND = ROOT / "backend"
+if str(BACKEND) not in sys.path:
+    sys.path.insert(0, str(BACKEND))
+
+from services.detection_service import DetectionService
+
+
+class FakeBlock:
+    def __init__(self):
+        self.xyxy = [1, 2, 11, 12]
+        self.text = ""
+
+
+class FakeDetector:
+    def __init__(self):
+        self.calls = []
+
+    def detect_bubbles(
+        self,
+        image,
+        model_name=None,
+        confidence_threshold=None,
+        tiling_enabled=None,
+    ):
+        self.calls.append(
+            {
+                "image": image,
+                "model_name": model_name,
+                "confidence_threshold": confidence_threshold,
+                "tiling_enabled": tiling_enabled,
+            }
+        )
+        return [FakeBlock()]
+
+
+class FakeOcr:
+    def __init__(self):
+        self.lang = None
+
+    def recognize_text(self, image, blocks, engine=None):
+        for block in blocks:
+            block.text = f"{engine}:text"
+        return blocks
+
+
+def test_detection_service_passes_explicit_detection_options_from_config():
+    detector = FakeDetector()
+    service = DetectionService(
+        detector=detector,
+        ocr_engine=FakeOcr(),
+        config=SimpleNamespace(
+            detect_model="Small (INT8)",
+            confidence_threshold=0.61,
+            tiling_enabled=False,
+            ocr_engine="ppocr",
+        ),
+    )
+
+    blocks = service.detect_and_ocr(np.zeros((16, 16, 3), dtype=np.uint8), lang="Japanese")
+
+    assert detector.calls[0]["model_name"] == "Small (INT8)"
+    assert detector.calls[0]["confidence_threshold"] == 0.61
+    assert detector.calls[0]["tiling_enabled"] is False
+    assert blocks[0].text == "ppocr:text"

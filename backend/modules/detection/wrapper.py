@@ -33,7 +33,13 @@ class RTDETRv2Detector:
             logger.exception("Failed to initialize RT-DETR-v2 detection engine")
             self.engine = None
         
-    def detect_bubbles(self, image: np.ndarray) -> list[TextBlock]:
+    def detect_bubbles(
+        self,
+        image: np.ndarray,
+        model_name: str | None = None,
+        confidence_threshold: float | None = None,
+        tiling_enabled: bool | None = None,
+    ) -> list[TextBlock]:
         """
         Detect text bubble and free text areas.
         Returns a list of TextBlock objects.
@@ -45,7 +51,12 @@ class RTDETRv2Detector:
         try:
             # Convert BGR to RGB for detection
             rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            blocks = self.engine.detect(rgb_image)
+            blocks = self.engine.detect(
+                rgb_image,
+                model_name=model_name,
+                confidence_threshold=confidence_threshold,
+                tiling_enabled=tiling_enabled,
+            )
             return blocks
         except Exception as exc:
             logger.exception("RT-DETR detection failed")

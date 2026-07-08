@@ -46,14 +46,15 @@ class RTDetrV2ONNXDetection(DetectionEngine):
     def initialize(
         self, 
         device: str = 'cpu', 
-        confidence_threshold: float = 0.3, 
+        confidence_threshold: float = 0.3,
+        model_name: str | None = None,
+        tiling_enabled: bool | None = None,
     ) -> None:
         self.device = device
         self.confidence_threshold = confidence_threshold
-
-        from modules.config import config
-        model_name = getattr(config, "detect_model", "High Precision (FP32)")
+        model_name = model_name or "High Precision (FP32)"
         self.current_loaded_model = model_name
+        self.tiling_enabled = True if tiling_enabled is None else bool(tiling_enabled)
 
         if model_name in {"Small (INT8)", "Small (INT8) [기본값]"}:
             model_id = ModelID.RTDETR_INT8_ONNX
@@ -67,17 +68,26 @@ class RTDetrV2ONNXDetection(DetectionEngine):
         providers = get_providers(self.device)
         self.session = make_session(file_path, sess_options=_make_rtdetr_session_options(), providers=providers)
 
-    def detect(self, image: np.ndarray) -> list[TextBlock]:
-        from modules.config import config
-        model_name = getattr(config, "detect_model", "High Precision (FP32)")
+    def detect(
+        self,
+        image: np.ndarray,
+        model_name: str | None = None,
+        confidence_threshold: float | None = None,
+        tiling_enabled: bool | None = None,
+    ) -> list[TextBlock]:
+        model_name = model_name or getattr(self, "current_loaded_model", "High Precision (FP32)")
         if getattr(self, "current_loaded_model", None) != model_name:
-            self.initialize(device=self.device, confidence_threshold=self.confidence_threshold)
+            self.initialize(
+                device=self.device,
+                confidence_threshold=self.confidence_threshold,
+                model_name=model_name,
+                tiling_enabled=tiling_enabled,
+            )
 
-        # Synchronize confidence threshold from global config
-        self.confidence_threshold = getattr(config, "confidence_threshold", self.confidence_threshold)
+        if confidence_threshold is not None:
+            self.confidence_threshold = confidence_threshold
 
-        # Check if tiling is enabled
-        tiling_enabled = getattr(config, "tiling_enabled", True)
+        tiling_enabled = getattr(self, "tiling_enabled", True) if tiling_enabled is None else bool(tiling_enabled)
         if not tiling_enabled:
             bubble_boxes, text_boxes = self._detect_single_image(image)
         else:

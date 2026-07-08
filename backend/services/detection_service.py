@@ -37,6 +37,19 @@ class DetectionService:
     def _ocr_engine_name(self, engine: str | None = None) -> str:
         return engine or getattr(self.config, "ocr_engine", "auto")
 
+    def _detect_model_name(self, model_name: str | None = None) -> str:
+        return model_name or getattr(self.config, "detect_model", "High Precision (FP32)")
+
+    def _confidence_threshold(self, confidence_threshold: float | None = None) -> float:
+        if confidence_threshold is not None:
+            return float(confidence_threshold)
+        return float(getattr(self.config, "confidence_threshold", 0.45))
+
+    def _tiling_enabled(self, tiling_enabled: bool | None = None) -> bool:
+        if tiling_enabled is not None:
+            return bool(tiling_enabled)
+        return bool(getattr(self.config, "tiling_enabled", True))
+
     # ------------------------------------------------------------------ #
     #  Cache persistence (disk)
     # ------------------------------------------------------------------ #
@@ -119,7 +132,15 @@ class DetectionService:
     #  Public API
     # ------------------------------------------------------------------ #
 
-    def detect_and_ocr(self, image: np.ndarray, lang: str = "Japanese", engine: str | None = None) -> List[Any]:
+    def detect_and_ocr(
+        self,
+        image: np.ndarray,
+        lang: str = "Japanese",
+        engine: str | None = None,
+        model_name: str | None = None,
+        confidence_threshold: float | None = None,
+        tiling_enabled: bool | None = None,
+    ) -> List[Any]:
         """Detect text blocks and run OCR on them, utilizing OCR cache."""
         t0 = time.perf_counter()
         with self._lock:
@@ -127,7 +148,12 @@ class DetectionService:
             t_detect = time.perf_counter()
             try:
                 self.ocr_engine.lang = lang
-                blocks = self.detector.detect_bubbles(image)
+                blocks = self.detector.detect_bubbles(
+                    image,
+                    model_name=self._detect_model_name(model_name),
+                    confidence_threshold=self._confidence_threshold(confidence_threshold),
+                    tiling_enabled=self._tiling_enabled(tiling_enabled),
+                )
             except Exception as exc:
                 self.last_error = str(exc)
                 logger.exception("Detection failed. lang=%s", lang)

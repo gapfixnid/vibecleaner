@@ -16,9 +16,28 @@ class DetectionEngineAdapter:
     def detect(self, image: ImageData, options: DetectionOptions) -> DetectionResult:
         if hasattr(self.engine, "initialize"):
             self.engine.initialize(
+                model_name=options.model_name,
                 confidence_threshold=options.confidence_threshold,
+                tiling_enabled=options.tiling_enabled,
             )
-        legacy_blocks = self.engine.detect(image.array)
+        if hasattr(self.engine, "detect"):
+            legacy_blocks = self.engine.detect(image.array)
+        elif hasattr(self.engine, "detect_bubbles"):
+            legacy_blocks = self.engine.detect_bubbles(
+                image.array,
+                model_name=options.model_name,
+                confidence_threshold=options.confidence_threshold,
+                tiling_enabled=options.tiling_enabled,
+            )
+        elif hasattr(self.engine, "detector") and hasattr(self.engine.detector, "detect_bubbles"):
+            legacy_blocks = self.engine.detector.detect_bubbles(
+                image.array,
+                model_name=options.model_name,
+                confidence_threshold=options.confidence_threshold,
+                tiling_enabled=options.tiling_enabled,
+            )
+        else:
+            raise TypeError("Detection engine must provide detect or detect_bubbles")
         regions = [self._to_region(block) for block in legacy_blocks]
         return DetectionResult(regions=regions, engine=self.engine_name)
 

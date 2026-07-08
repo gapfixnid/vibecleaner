@@ -22,8 +22,38 @@ class FakeLegacyBlock:
 
 
 class FakeLegacyDetector:
+    def __init__(self):
+        self.initialize_calls = []
+        self.detect_calls = []
+
+    def initialize(self, **kwargs):
+        self.initialize_calls.append(kwargs)
+
     def detect(self, image):
+        self.detect_calls.append({"image": image})
         return [FakeLegacyBlock([1, 2, 11, 12])]
+
+
+class FakeDetectBubblesDetector:
+    def __init__(self):
+        self.calls = []
+
+    def detect_bubbles(
+        self,
+        image,
+        model_name=None,
+        confidence_threshold=None,
+        tiling_enabled=None,
+    ):
+        self.calls.append(
+            {
+                "image": image,
+                "model_name": model_name,
+                "confidence_threshold": confidence_threshold,
+                "tiling_enabled": tiling_enabled,
+            }
+        )
+        return [FakeLegacyBlock([3, 4, 13, 14])]
 
 
 class FakeLegacyOcr:
@@ -84,12 +114,48 @@ class FakeLegacyRenderer:
 
 
 def test_detection_adapter_converts_legacy_blocks_to_regions():
-    adapter = DetectionEngineAdapter(engine=FakeLegacyDetector())
+    detector = FakeLegacyDetector()
+    adapter = DetectionEngineAdapter(engine=detector)
     image = ImageData(array=None, explicit_width=100, explicit_height=100, mode="RGB")
 
     result = adapter.detect(image, DetectionOptions())
 
     assert result.regions[0].box == Box(x1=1, y1=2, x2=11, y2=12)
+
+
+def test_detection_adapter_passes_explicit_options_to_legacy_engine():
+    detector = FakeLegacyDetector()
+    adapter = DetectionEngineAdapter(engine=detector)
+    options = DetectionOptions(
+        model_name="Small (INT8)",
+        confidence_threshold=0.67,
+        tiling_enabled=False,
+    )
+
+    adapter.detect(ImageData(array=object()), options)
+
+    assert detector.initialize_calls[0]["model_name"] == "Small (INT8)"
+    assert detector.initialize_calls[0]["confidence_threshold"] == 0.67
+    assert detector.initialize_calls[0]["tiling_enabled"] is False
+
+
+def test_detection_adapter_wraps_detect_bubbles_legacy_engine():
+    detector = FakeDetectBubblesDetector()
+    adapter = DetectionEngineAdapter(engine=detector)
+
+    result = adapter.detect(
+        ImageData(array=object()),
+        DetectionOptions(
+            model_name="Small (INT8)",
+            confidence_threshold=0.52,
+            tiling_enabled=False,
+        ),
+    )
+
+    assert detector.calls[0]["model_name"] == "Small (INT8)"
+    assert detector.calls[0]["confidence_threshold"] == 0.52
+    assert detector.calls[0]["tiling_enabled"] is False
+    assert result.regions[0].box == Box(x1=3, y1=4, x2=13, y2=14)
 
 
 def test_ocr_adapter_adds_recognized_text_to_regions():
