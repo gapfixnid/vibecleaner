@@ -27,8 +27,23 @@ class FakeLegacyDetector:
 
 
 class FakeLegacyOcr:
+    def __init__(self):
+        self.calls = []
+
     def recognize(self, image, regions, options):
+        self.calls.append({"image": image, "regions": regions, "options": options})
         return ["こんにちは"]
+
+
+class FakeRecognizeTextOcr:
+    def __init__(self):
+        self.calls = []
+
+    def recognize_text(self, image, blocks, engine=None):
+        self.calls.append({"image": image, "blocks": blocks, "engine": engine})
+        for block in blocks:
+            block.text = f"{engine}:{block.xyxy[0]}"
+        return blocks
 
 
 class FakeLegacyTranslator:
@@ -78,12 +93,39 @@ def test_detection_adapter_converts_legacy_blocks_to_regions():
 
 
 def test_ocr_adapter_adds_recognized_text_to_regions():
-    adapter = OcrEngineAdapter(engine=FakeLegacyOcr())
+    ocr = FakeLegacyOcr()
+    adapter = OcrEngineAdapter(engine=ocr)
     region = TextRegion(box=Box(1, 2, 11, 12))
 
     result = adapter.recognize(ImageData(array=None), [region], OcrOptions())
 
     assert result.regions[0].text == "こんにちは"
+
+
+def test_ocr_adapter_passes_explicit_options_to_legacy_engine():
+    ocr = FakeLegacyOcr()
+    adapter = OcrEngineAdapter(engine=ocr)
+    options = OcrOptions(engine="ppocr", padding=12, crop_scale=2.0)
+
+    adapter.recognize(ImageData(array=None), [TextRegion(box=Box(1, 2, 11, 12))], options)
+
+    assert ocr.calls[0]["options"] is options
+
+
+def test_ocr_adapter_wraps_recognize_text_legacy_engine():
+    ocr = FakeRecognizeTextOcr()
+    adapter = OcrEngineAdapter(engine=ocr)
+    region = TextRegion(box=Box(1, 2, 11, 12))
+
+    result = adapter.recognize(
+        ImageData(array=object()),
+        [region],
+        OcrOptions(engine="ppocr"),
+    )
+
+    assert ocr.calls[0]["engine"] == "ppocr"
+    assert ocr.calls[0]["blocks"][0].xyxy == [1, 2, 11, 12]
+    assert result.regions[0].text == "ppocr:1"
 
 
 def test_translation_adapter_returns_translation_map():

@@ -20,9 +20,11 @@ class DetectionService:
         self,
         detector: Optional[RTDETRv2Detector] = None,
         ocr_engine: Optional[LocalOCR] = None,
+        config: Any = None,
     ) -> None:
         self.detector: RTDETRv2Detector = detector or RTDETRv2Detector()
         self.ocr_engine: LocalOCR = ocr_engine or LocalOCR()
+        self.config = config
         self._ocr_cache: collections.OrderedDict[str, str] = collections.OrderedDict()
         self._lock = threading.RLock()
         self.last_error: str | None = None
@@ -31,6 +33,9 @@ class DetectionService:
 
         # Load disk cache on startup
         self._load_cache_from_disk()
+
+    def _ocr_engine_name(self, engine: str | None = None) -> str:
+        return engine or getattr(self.config, "ocr_engine", "auto")
 
     # ------------------------------------------------------------------ #
     #  Cache persistence (disk)
@@ -114,7 +119,7 @@ class DetectionService:
     #  Public API
     # ------------------------------------------------------------------ #
 
-    def detect_and_ocr(self, image: np.ndarray, lang: str = "Japanese") -> List[Any]:
+    def detect_and_ocr(self, image: np.ndarray, lang: str = "Japanese", engine: str | None = None) -> List[Any]:
         """Detect text blocks and run OCR on them, utilizing OCR cache."""
         t0 = time.perf_counter()
         with self._lock:
@@ -148,7 +153,7 @@ class DetectionService:
             t_ocr = time.perf_counter()
             if uncached_blocks:
                 try:
-                    self.ocr_engine.recognize_text(image, uncached_blocks)
+                    self.ocr_engine.recognize_text(image, uncached_blocks, engine=self._ocr_engine_name(engine))
                 except Exception as exc:
                     self.last_error = str(exc)
                     logger.exception("OCR failed. lang=%s block_count=%s", lang, len(uncached_blocks))
@@ -172,7 +177,13 @@ class DetectionService:
             self.last_error = None
             return blocks
 
-    def recognize_single_block(self, image: np.ndarray, block: Any, lang: str = "Japanese") -> None:
+    def recognize_single_block(
+        self,
+        image: np.ndarray,
+        block: Any,
+        lang: str = "Japanese",
+        engine: str | None = None,
+    ) -> None:
         """Run OCR on a single block (for manual drag-select), utilizing OCR cache."""
         with self._lock:
             self.ocr_engine.lang = lang
@@ -183,7 +194,7 @@ class DetectionService:
             self._ocr_misses += 1
 
             try:
-                self.ocr_engine.recognize_text(image, [block])
+                self.ocr_engine.recognize_text(image, [block], engine=self._ocr_engine_name(engine))
             except Exception as exc:
                 self.last_error = str(exc)
                 logger.exception("Single-block OCR failed. lang=%s bbox=%s", lang, getattr(block, "xyxy", None))

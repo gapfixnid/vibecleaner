@@ -26,10 +26,8 @@ class LocalOCR:
         self.ppocr_engines = {}
         self._lock = threading.Lock()
 
-    def _resolve_engine_name(self) -> str:
-        from modules.config import config
-
-        requested = str(getattr(config, "ocr_engine", "auto") or "auto").strip().lower()
+    def _resolve_engine_name(self, engine: str | None = None) -> str:
+        requested = str(engine or "auto").strip().lower()
         if requested in {"manga_ocr", "manga-ocr", "manga", "manga_ocr_mobile"}:
             return "manga_ocr"
         if requested in {"ppocr", "paddleocr", "paddle_ocr", "fast", "speed"}:
@@ -49,14 +47,20 @@ class LocalOCR:
             return "ch"
         return "ko"
         
-    def recognize_text(self, image: np.ndarray, text_blocks: list[TextBlock]) -> list[TextBlock]:
+    def recognize_text(
+        self,
+        image: np.ndarray,
+        text_blocks: list[TextBlock],
+        *,
+        engine: str | None = None,
+    ) -> list[TextBlock]:
         """
         Runs the real OCR engine on a list of TextBlock objects.
         """
         if not text_blocks:
             return text_blocks
             
-        engine_name = self._resolve_engine_name()
+        engine_name = self._resolve_engine_name(engine)
         if engine_name == "manga_ocr":
             if self.japanese_engine is None:
                 with self._lock:

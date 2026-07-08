@@ -439,6 +439,9 @@ Expected: PASS.
 - The inpainting legacy wrapper now receives explicit engine, dilation, and
   bubble-clipping options through `InpaintingService` and
   `InpaintingEngineAdapter` instead of reading the global config singleton.
+- The OCR legacy wrapper now receives explicit engine selection through
+  `DetectionService` and `OcrEngineAdapter`; `LocalOCR` no longer reads the
+  global config singleton to choose Manga OCR vs PPOCR.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

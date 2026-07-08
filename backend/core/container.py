@@ -58,7 +58,7 @@ def build_container() -> AppContainer:
     from services.translation_service import TranslationService
 
     translation_service = TranslationService(config=config)
-    detection_service = DetectionService()
+    detection_service = DetectionService(config=config)
     inpainting_service = InpaintingService(config=config)
     render_service = RenderService()
     export_service = ExportService(render_service)
