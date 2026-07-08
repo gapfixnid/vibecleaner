@@ -4,7 +4,7 @@ Speech bubble processing utilities.
 import cv2
 import numpy as np
 from typing import Optional
-import imkit as imk
+from infrastructure import image as imk
 
 
 

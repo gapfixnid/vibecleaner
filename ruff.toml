@@ -8,7 +8,7 @@ exclude = [
     "venv",
     ".venv",
     "modules",
-    "imkit",
+    "backend/infrastructure/image",
 ]
 
 line-length = 120

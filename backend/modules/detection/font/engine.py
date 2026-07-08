@@ -3,7 +3,7 @@ import os
 import logging
 import numpy as np
 from PIL import Image
-import imkit as imk
+from infrastructure import image as imk
 from . import config
 from modules.utils.device import resolve_device, get_providers
 from infrastructure.downloads import ModelDownloader, ModelID

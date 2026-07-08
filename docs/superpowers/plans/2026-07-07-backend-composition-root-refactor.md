@@ -488,6 +488,14 @@ Expected: PASS.
   moved from `backend/modules/utils/download*.py` into
   `backend/infrastructure/downloads`. `tests/test_backend_boundaries.py` now
   asserts the legacy download modules stay deleted.
+- The image toolkit moved from `backend/imkit` into
+  `backend/infrastructure/image` (same `imk` facade, imported as
+  `from infrastructure import image as imk`). The only live helper in
+  `backend/modules/utils/image_utils.py` (`build_bubble_clip_mask`) moved to
+  `backend/infrastructure/image/masks.py`; the rest of that file was dead code
+  and was deleted. `tests/test_backend_boundaries.py` asserts the legacy
+  modules stay deleted and that `backend/infrastructure` never imports
+  `modules`, `services`, `api`, `pipeline`, or `engines`.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 

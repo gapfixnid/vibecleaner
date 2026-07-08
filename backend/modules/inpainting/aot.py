@@ -1,5 +1,5 @@
 import numpy as np
-import imkit as imk
+from infrastructure import image as imk
 import onnxruntime as ort
 from PIL import Image
 import logging

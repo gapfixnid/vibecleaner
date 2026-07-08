@@ -3,7 +3,7 @@ Content detection and processing utilities.
 """
 import numpy as np
 from typing import Optional, Union
-import imkit as imk
+from infrastructure import image as imk
 from modules.utils.textblock import adjust_text_line_coordinates
 
 

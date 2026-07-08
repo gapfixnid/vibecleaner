@@ -1,7 +1,7 @@
 import logging
 
 import numpy as np
-import imkit as imk
+from infrastructure import image as imk
 
 logger = logging.getLogger(__name__)
 

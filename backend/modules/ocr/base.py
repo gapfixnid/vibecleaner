@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 import base64
-import imkit as imk
+from infrastructure import image as imk
 
 from ..utils.textblock import TextBlock
 

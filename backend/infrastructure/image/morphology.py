@@ -1,4 +1,4 @@
-"""Morphological operations for the imkit module."""
+"""Morphological operations for the image toolkit."""
 
 from __future__ import annotations
 import cv2

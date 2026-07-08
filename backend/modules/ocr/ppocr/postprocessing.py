@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Tuple, Optional
 import numpy as np
-import imkit as imk
+from infrastructure import image as imk
 import pyclipper
 from shapely.geometry import Polygon
 

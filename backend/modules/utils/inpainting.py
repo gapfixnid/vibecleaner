@@ -6,7 +6,7 @@ import sys
 import logging
 import hashlib
 import numpy as np
-import imkit as imk
+from infrastructure import image as imk
 from typing import List, Optional
 from urllib.parse import urlparse
 from PIL import Image, ImageOps, PngImagePlugin

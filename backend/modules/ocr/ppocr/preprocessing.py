@@ -4,7 +4,7 @@ import logging
 
 import cv2
 import numpy as np
-import imkit as imk
+from infrastructure import image as imk
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ def crop_quad(img: np.ndarray, quad: np.ndarray) -> np.ndarray:
 	w = int(max(np.linalg.norm(pts[0]-pts[1]), np.linalg.norm(pts[2]-pts[3])))
 	h = int(max(np.linalg.norm(pts[0]-pts[3]), np.linalg.norm(pts[1]-pts[2])))
 	dst = np.array([[0,0],[w,0],[w,h],[0,h]], dtype=np.float32)
-	# imkit expects 4x2 arrays (x,y)
+	# the image toolkit expects 4x2 arrays (x,y)
 	M = imk.get_perspective_transform(pts, dst)
 	crop = imk.warp_perspective(img, M, (w, h))
 	if h > 0 and w > 0 and (h / float(w)) >= 1.5:

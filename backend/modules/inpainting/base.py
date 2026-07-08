@@ -2,7 +2,7 @@ import abc
 from typing import Optional
 
 import numpy as np
-import imkit as imk
+from infrastructure import image as imk
 from PIL import Image
 import logging
 from contextlib import nullcontext

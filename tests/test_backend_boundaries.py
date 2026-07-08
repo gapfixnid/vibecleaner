@@ -21,6 +21,8 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert not (backend / "modules" / "logging_config.py").exists()
     assert not (backend / "modules" / "utils" / "download.py").exists()
     assert not (backend / "modules" / "utils" / "download_file.py").exists()
+    assert not (backend / "imkit").exists()
+    assert not (backend / "modules" / "utils" / "image_utils.py").exists()
 
     scanned_files = [
         path
@@ -44,6 +46,9 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert "from services.service_registry import" not in combined
     assert ("modules." + "logging_config") not in combined
     assert ("modules.utils." + "download") not in combined
+    assert ("import " + "imkit") not in combined
+    assert ("from " + "imkit") not in combined
+    assert ("modules.utils." + "image_utils") not in combined
 
 
 def test_pipeline_and_api_do_not_import_concrete_engines():
@@ -88,6 +93,29 @@ def test_pipeline_does_not_import_legacy_modules():
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     if alias.name == "modules" or alias.name.startswith("modules."):
+                        offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+
+    assert offenders == []
+
+
+def test_infrastructure_does_not_import_legacy_or_upper_layers():
+    infrastructure = ROOT / "backend" / "infrastructure"
+    forbidden_roots = ("modules", "services", "api", "pipeline", "engines")
+    offenders = []
+
+    for path in infrastructure.rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                root = node.module.split(".")[0]
+                if root in forbidden_roots:
+                    offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    root = alias.name.split(".")[0]
+                    if root in forbidden_roots:
                         offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
 
     assert offenders == []

@@ -1,4 +1,4 @@
-# import imkit as imk
+# from infrastructure import image as imk
 # import numpy as np
 # import platform
 # from PIL import ImageFont, ImageDraw, Image

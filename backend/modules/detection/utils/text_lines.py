@@ -1,5 +1,5 @@
 import numpy as np
-import imkit as imk
+from infrastructure import image as imk
 
 from .orientation import infer_orientation, infer_reading_order, \
     infer_text_direction

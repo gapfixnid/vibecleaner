@@ -1,4 +1,4 @@
-"""Image I/O operations for the imkit module."""
+"""Image I/O operations for the image toolkit."""
 
 from __future__ import annotations
 import os

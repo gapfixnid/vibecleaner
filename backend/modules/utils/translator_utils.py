@@ -4,7 +4,7 @@ import logging
 import re
 import numpy as np
 from .textblock import TextBlock
-import imkit as imk
+from infrastructure import image as imk
 
 logger = logging.getLogger(__name__)
 

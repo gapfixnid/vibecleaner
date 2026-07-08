@@ -6,7 +6,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 from app.models import TextBubble
 from modules.rendering_wrapper import TextRenderer, TextLayoutResult
-from modules.utils.image_utils import build_bubble_clip_mask
+from infrastructure.image.masks import build_bubble_clip_mask
 
 logger = logging.getLogger(__name__)
 

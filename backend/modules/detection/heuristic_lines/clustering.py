@@ -1,7 +1,7 @@
 from __future__ import annotations
 import math
 import numpy as np
-import imkit as imk
+from infrastructure import image as imk
 
 from .mask import _mask_bounds, _sum_box_pixels
 

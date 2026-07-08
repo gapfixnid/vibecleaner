@@ -1,4 +1,4 @@
-"""Utility functions for the imkit module."""
+"""Utility functions for the image toolkit."""
 
 from __future__ import annotations
 import numpy as np

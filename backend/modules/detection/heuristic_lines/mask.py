@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
-import imkit as imk
+from infrastructure import image as imk
 
 @dataclass(slots=True)
 class _MaskStats:

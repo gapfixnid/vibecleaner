@@ -1,4 +1,4 @@
-"""Image transformation operations for the imkit module."""
+"""Image transformation operations for the image toolkit."""
 
 from __future__ import annotations
 import cv2

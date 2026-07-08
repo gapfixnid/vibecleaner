@@ -4,7 +4,7 @@ import os
 import numpy as np
 import onnxruntime as ort
 from PIL import Image
-import imkit as imk
+from infrastructure import image as imk
 from typing import Optional
 
 from infrastructure.downloads import ModelDownloader, ModelID

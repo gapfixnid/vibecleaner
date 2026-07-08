@@ -2,7 +2,7 @@
 Images module providing a unified interface for image processing operations.
 
 This module provides PIL, OpenCV, and numpy-based image processing helpers.
-Uses the pattern: import imkit as imk, then imk.function_name()
+Uses the pattern: from infrastructure import image as imk, then imk.function_name()
 """
 
 # Import all functions to provide the imk.function_name interface
