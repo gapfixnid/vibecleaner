@@ -3,7 +3,7 @@ import numpy as np
 import base64
 from infrastructure import image as imk
 
-from ..utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 
 
 class OCREngine(ABC):

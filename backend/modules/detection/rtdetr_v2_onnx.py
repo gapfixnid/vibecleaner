@@ -6,7 +6,7 @@ from PIL import Image
 from infrastructure.runtime.device import get_providers
 from infrastructure.downloads import ModelDownloader, ModelID, models_base_dir
 from infrastructure.runtime.onnx import make_session
-from modules.utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 from modules.detection.utils.slicer import ImageSlicer
 from .base import DetectionEngine
 

@@ -3,9 +3,9 @@ import numpy as np
 import copy
 from PIL import Image, ImageDraw
 from collections import defaultdict, deque
-from ..detection.utils.text_lines import group_items_into_lines
-from modules.detection.utils.geometry import does_rectangle_fit, is_mostly_contained
-from modules.utils.language_utils import is_no_space_lang
+from .text_lines import group_items_into_lines
+from .geometry import does_rectangle_fit, is_mostly_contained
+from .language_utils import is_no_space_lang
 
 class TextBlock(object):
     """

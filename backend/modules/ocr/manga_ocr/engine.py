@@ -5,7 +5,7 @@ import jaconv
 import logging
 
 from modules.ocr.base import OCREngine
-from modules.utils.textblock import TextBlock, adjust_text_line_coordinates
+from engines.common.textblock import TextBlock, adjust_text_line_coordinates
 from infrastructure.downloads import ModelDownloader, ModelID, models_base_dir
 from infrastructure.runtime.torch_autocast import TorchAutocastMixin
 

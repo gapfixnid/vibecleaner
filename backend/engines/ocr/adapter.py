@@ -6,7 +6,7 @@ from typing import Any
 from core.models.image import ImageData
 from core.models.text import TextRegion
 from core.ports.ocr import OcrOptions, OcrResult
-from modules.utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 
 
 class OcrEngineAdapter:

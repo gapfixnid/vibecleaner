@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from PySide6.QtCore import QRectF
 
 from app.models import TextBubble
-from modules.utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 from services.job_service import job_manager
 from services.page_image_loader import ensure_page_image, invalidate_page_caches, load_cv_image
 from services.review_state_service import derive_bubble_status, refresh_bubble_status, refresh_page_status

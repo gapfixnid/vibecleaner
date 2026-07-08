@@ -37,6 +37,11 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert not (backend / "services" / "layout_planner_service.py").exists()
     assert not (backend / "services" / "typesetting_service.py").exists()
     assert not (backend / "modules" / "rendering_wrapper.py").exists()
+    assert not (backend / "modules" / "utils" / "textblock.py").exists()
+    assert not (backend / "modules" / "utils" / "language_utils.py").exists()
+    assert not (backend / "modules" / "detection" / "utils" / "geometry.py").exists()
+    assert not (backend / "modules" / "detection" / "utils" / "text_lines.py").exists()
+    assert not (backend / "modules" / "detection" / "utils" / "orientation.py").exists()
 
     scanned_files = [
         path
@@ -75,6 +80,11 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert ("services." + "layout_planner_service") not in combined
     assert ("services." + "typesetting_service") not in combined
     assert ("modules." + "rendering_wrapper") not in combined
+    assert ("modules.utils." + "textblock") not in combined
+    assert ("modules.utils." + "language_utils") not in combined
+    assert ("detection.utils." + "geometry") not in combined
+    assert ("detection.utils." + "text_lines") not in combined
+    assert ("detection.utils." + "orientation") not in combined
 
 
 def test_pipeline_and_api_do_not_import_concrete_engines():

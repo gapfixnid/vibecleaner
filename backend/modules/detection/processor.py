@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 from .factory import DetectionEngineFactory
 
 

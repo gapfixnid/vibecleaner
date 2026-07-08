@@ -7,9 +7,9 @@ from modules.detection.backend import resolve_detection_backend
 from modules.detection.font.engine import extract_foreground_color
 from modules.detection.heuristic_lines import annotate_blocks_with_heuristic_lines
 from modules.detection.utils.content import filter_and_fix_bboxes
-from modules.detection.utils.geometry import does_rectangle_fit, do_rectangles_overlap, merge_overlapping_boxes
+from engines.common.geometry import does_rectangle_fit, do_rectangles_overlap, merge_overlapping_boxes
 from infrastructure.runtime.device import resolve_device
-from modules.utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 
 logger = logging.getLogger(__name__)
 

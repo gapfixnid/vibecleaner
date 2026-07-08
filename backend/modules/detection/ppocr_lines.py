@@ -10,7 +10,7 @@ from modules.ocr.ppocr.postprocessing import DBPostProcessor
 from infrastructure.downloads import ModelDownloader, ModelID
 from infrastructure.runtime.device import get_providers
 from infrastructure.runtime.onnx import make_session, make_session_options
-from modules.utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 from .backend import resolve_detection_backend
 
 

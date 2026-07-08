@@ -12,7 +12,7 @@ from modules.constants import (
     OLLAMA_CONNECTION_TIMEOUT_SECONDS,
     OLLAMA_REQUEST_TIMEOUT_SECONDS,
 )
-from modules.utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 from modules.utils.translator_utils import (
     TranslationParseError,
     get_raw_text,

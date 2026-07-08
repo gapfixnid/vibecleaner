@@ -3,7 +3,7 @@ import json
 import logging
 import re
 import numpy as np
-from .textblock import TextBlock
+from engines.common.textblock import TextBlock
 from infrastructure import image as imk
 
 logger = logging.getLogger(__name__)

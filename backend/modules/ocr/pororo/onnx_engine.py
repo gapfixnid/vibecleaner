@@ -11,9 +11,9 @@ from infrastructure.downloads import ModelDownloader, ModelID
 from modules.ocr.base import OCREngine
 from infrastructure.runtime.device import get_providers
 from infrastructure.runtime.onnx import make_session
-from modules.utils.textblock import TextBlock
-from modules.utils.language_utils import is_no_space_lang
-from modules.utils.textblock import adjust_text_line_coordinates
+from engines.common.textblock import TextBlock
+from engines.common.language_utils import is_no_space_lang
+from engines.common.textblock import adjust_text_line_coordinates
 from modules.ocr.ppocr.preprocessing import crop_quad
 from .pororo.models.brainOCR.brainocr import Reader
 from .pororo.models.brainOCR.detection import (

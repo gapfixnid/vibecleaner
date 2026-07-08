@@ -1,7 +1,7 @@
 # modules/ocr_wrapper.py
 import numpy as np
 import threading
-from modules.utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 from modules.ocr.manga_ocr.mobile.onnx_engine import MangaOCRMobileONNXEngine
 from modules.ocr.ppocr.engine import PPOCRv5Engine
 

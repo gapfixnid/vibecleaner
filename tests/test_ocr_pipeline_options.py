@@ -14,7 +14,7 @@ from modules.config import AppConfig
 from modules.ocr.ppocr import engine as ppocr_module
 from modules.ocr.ppocr.engine import PPOCRv5Engine
 from modules.ocr_wrapper import LocalOCR
-from modules.utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 
 
 class FakeMangaEngine:

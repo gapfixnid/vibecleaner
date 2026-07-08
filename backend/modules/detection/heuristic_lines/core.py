@@ -3,7 +3,7 @@ import logging
 import math
 import numpy as np
 
-from modules.utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 from .geometry import _clamp_box, _expand_box, _to_box, _offset_line, _pad_line_boxes, _union_box, _line_axis_box
 from .mask import _compute_mask_stats, _prepare_inverse_text_mask, _prepare_text_mask
 from .direction import _fallback_direction, _sort_lines

@@ -10,7 +10,7 @@ if str(BACKEND) not in sys.path:
 
 from modules import translation_wrapper
 from modules.config import AppConfig
-from modules.utils.textblock import TextBlock
+from engines.common.textblock import TextBlock
 from services.translation_service import TranslationService
 
 

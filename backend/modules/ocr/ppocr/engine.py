@@ -5,9 +5,9 @@ import numpy as np
 import onnxruntime as ort
 
 from ..base import OCREngine
-from modules.utils.textblock import TextBlock
-from modules.utils.textblock import lists_to_blk_list
-from modules.utils.language_utils import is_no_space_lang
+from engines.common.textblock import TextBlock
+from engines.common.textblock import lists_to_blk_list
+from engines.common.language_utils import is_no_space_lang
 from infrastructure.runtime.device import get_providers
 from infrastructure.downloads import ModelDownloader, ModelID
 from infrastructure.runtime.onnx import make_session
