@@ -61,50 +61,72 @@ The frontend Translate action calls the backend `translate-all` pipeline for the
 
 ## Requirements
 
-- Windows
-- Node.js and npm
-- Rust and Cargo, installed through `rustup`
-- Python 3.10+
-- A Python virtual environment at `venv/`
+- Windows 10/11
+- Node.js LTS with `node` and `npm` on `PATH`
+- Rust stable with the MSVC toolchain, installed through `rustup`
+- Python 3.10-3.12 with `python` on `PATH`
+- Microsoft Edge WebView2 Runtime, usually already installed on Windows
+- A repository-root Python virtual environment at `venv/`
 
-Tauri requires `cargo` to be available on the shell `PATH`. If `npm run dev` fails at `cargo metadata`, install Rust from `https://rustup.rs`, restart the terminal, and confirm:
+Tauri requires `cargo` to be available on the shell `PATH`. If `npm run dev` fails at `cargo metadata`, install Rust from `https://rustup.rs`, restart the terminal, and confirm all required CLIs are visible:
 
 ```powershell
+node --version
+npm --version
 cargo --version
 rustc --version
+python --version
 ```
 
 ## Quick Start
 
-Install JavaScript dependencies:
+Run these commands from the repository root.
+
+Install the root Tauri CLI dependency and the React frontend dependencies:
 
 ```powershell
 npm install
 npm --prefix frontend install
 ```
 
-Create and prepare the Python environment:
+Create the Python environment in the repository root. The Tauri dev launcher looks for this exact `venv` folder when it starts `backend/main.py`.
 
 ```powershell
 python -m venv venv
 .\venv\Scripts\python.exe -m pip install -U pip
-.\venv\Scripts\python.exe -m pip install -r requirements.txt
-.\venv\Scripts\python.exe -m pip install -e .
+.\venv\Scripts\python.exe -m pip install -r requirements-runtime.txt
 ```
 
-> **Note:** `requirements.txt` is the full development environment. Release sidecar builds use `requirements-runtime.txt`, which excludes Torch packages and keeps model files outside the installer.
+For the default ONNX-backed local workflow, `requirements-runtime.txt` is enough to start the desktop app. Install Torch only when you need Torch-backed OCR, inpainting, RT-DETR, or font-detection paths:
 
-Download the standard local models:
+```powershell
+.\venv\Scripts\python.exe -m pip install -r requirements-torch.txt
+```
+
+Download local models. The minimal profile is the fastest way to get the app running; use the full profile only when you need every local model path.
+
+```powershell
+.\venv\Scripts\python.exe download_models.py --minimal
+```
 
 ```powershell
 .\venv\Scripts\python.exe download_models.py
 ```
 
-Start the desktop app in development mode:
+Start the desktop app. `npm run dev` runs `tauri dev`; Tauri starts the Vite frontend through `desktop/src-tauri/tauri.conf.json` and launches the Python backend from `.\venv\Scripts\python.exe`.
 
 ```powershell
 npm run dev
 ```
+
+For browser-only frontend work, start the backend and frontend yourself:
+
+```powershell
+.\venv\Scripts\python.exe backend\main.py --port 8000
+npm --prefix frontend run dev
+```
+
+Release sidecar builds use a separate `.venv-runtime` environment created by `scripts/build-runtime-sidecar.ps1`. Do not install sidecar build dependencies into `venv` unless you need them for local packaging experiments.
 
 ## Commands
 
