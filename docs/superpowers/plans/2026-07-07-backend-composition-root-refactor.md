@@ -547,6 +547,18 @@ Verification result:
 - `rg "service_registry|auto_typeset_pipeline =|state = ProjectState\\(|config: AppConfig = AppConfig\\(" backend`: no matches.
 - Extended singleton scan for direct `modules.config config`, legacy `load_settings`/`save_settings`, adaptive-binarization alias, `auto_typeset_pipeline`, and global `ProjectState`: no matches.
 
+Documentation follow-up, 2026-07-08:
+
+- `docs/backend-dependency-contract.md` is now the operational dependency
+  contract for layer ownership, forbidden coupling, runtime entry points,
+  dependency sets, and boundary-check commands.
+- `README.md` Quick Start now documents the real desktop launch path:
+  `npm run dev` -> `tauri dev` -> Vite frontend plus Python backend from the
+  repository-root `venv/`.
+- Standalone `npm --prefix frontend run dev` is documented as static UI work
+  only because it does not launch the backend or provide the Tauri command
+  bridge.
+
 ---
 
 ## Self-Review

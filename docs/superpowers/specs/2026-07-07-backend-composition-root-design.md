@@ -126,6 +126,10 @@ backend/
 
 ## Dependency Rules
 
+The operational dependency contract lives in
+`docs/backend-dependency-contract.md`. Keep that document and this design in
+sync whenever the runtime wiring or layer rules change.
+
 Allowed dependency direction:
 
 ```text
@@ -149,6 +153,12 @@ api routes -> concrete engines or infrastructure internals
 
 The only module that may know every concrete implementation is
 `backend/core/container.py`.
+
+Current runtime rule: the desktop app is launched through `npm run dev`
+(`tauri dev`). Tauri starts Vite and launches `backend/main.py` from the
+repository-root `venv/`. Running `npm --prefix frontend run dev` directly is a
+browser-only/static-UI mode and does not provide the Tauri command bridge or the
+backend process.
 
 ## Composition Root
 

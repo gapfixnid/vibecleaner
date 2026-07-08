@@ -43,6 +43,9 @@ Backend dependency direction is intentionally one-way:
 
 Routes must not import concrete engines, `services.service_registry`, module-level project state, or module-level config singletons. Runtime state and settings are container-owned instances, so tests can assemble fake ports and run the pipeline without local model files.
 
+See `docs/backend-dependency-contract.md` for the full import boundary,
+composition root, dependency-set, and verification contract.
+
 ## Translation Pipeline
 
 The current page translation flow is:
@@ -78,18 +81,31 @@ rustc --version
 python --version
 ```
 
+## Dependency Sets
+
+| Dependency set | Install command | Purpose |
+| --- | --- | --- |
+| Root Node package | `npm install` | Installs the Tauri CLI used by `npm run dev` and `npm run build`. |
+| Frontend package | `npm --prefix frontend install` | Installs React, Vite, TypeScript, and the Tauri frontend API. |
+| Backend runtime | `.\venv\Scripts\python.exe -m pip install -r requirements-runtime.txt` | Default local desktop backend and release sidecar runtime. |
+| Optional Torch runtime | `.\venv\Scripts\python.exe -m pip install -r requirements-torch.txt` | Torch-backed OCR, inpainting, RT-DETR, or font-detection paths. |
+| Sidecar build tools | installed by `npm run build:sidecar:runtime` | PyInstaller build environment for the packaged backend sidecar. |
+| Full Python dev file | `requirements.txt` | Full development environment; avoid it for lean sidecar packaging. |
+
 ## Quick Start
 
 Run these commands from the repository root.
 
-Install the root Tauri CLI dependency and the React frontend dependencies:
+Install the root Tauri CLI dependency and the React frontend dependencies.
+Both are required for the desktop app; installing only `frontend/` is not enough.
 
 ```powershell
 npm install
 npm --prefix frontend install
 ```
 
-Create the Python environment in the repository root. The Tauri dev launcher looks for this exact `venv` folder when it starts `backend/main.py`.
+Create the Python environment in the repository root. The Tauri dev launcher
+looks for this exact `venv` folder when it starts `backend/main.py`.
 
 ```powershell
 python -m venv venv
@@ -103,7 +119,8 @@ For the default ONNX-backed local workflow, `requirements-runtime.txt` is enough
 .\venv\Scripts\python.exe -m pip install -r requirements-torch.txt
 ```
 
-Download local models. The minimal profile is the fastest way to get the app running; use the full profile only when you need every local model path.
+Download local models. The minimal profile is the fastest way to get the app
+running; use the full profile only when you need every local model path.
 
 ```powershell
 .\venv\Scripts\python.exe download_models.py --minimal
@@ -113,15 +130,19 @@ Download local models. The minimal profile is the fastest way to get the app run
 .\venv\Scripts\python.exe download_models.py
 ```
 
-Start the desktop app. `npm run dev` runs `tauri dev`; Tauri starts the Vite frontend through `desktop/src-tauri/tauri.conf.json` and launches the Python backend from `.\venv\Scripts\python.exe`.
+Start the desktop app. This is the normal development command. `npm run dev`
+runs `tauri dev`; Tauri starts the Vite frontend through
+`desktop/src-tauri/tauri.conf.json` and launches the Python backend from
+`.\venv\Scripts\python.exe`.
 
 ```powershell
 npm run dev
 ```
 
-The frontend API client currently talks through Tauri commands, so use `npm run dev`
-for normal app work. Running Vite in a standalone browser is useful only for
-static UI work that does not call backend or desktop APIs.
+The frontend API client currently talks through Tauri commands. Running Vite by
+itself opens a browser-only frontend without the backend launcher or Tauri
+command bridge, so it is only useful for static UI work that does not call
+backend or desktop APIs.
 
 ```powershell
 npm --prefix frontend run dev
