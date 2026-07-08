@@ -116,6 +116,7 @@ rg "domain.project_state|legacy_state|from modules.config import config" backend
 rg "^service = .*Service\(|^[a-z_]+_service = [A-Z][A-Za-z]+Service\(" backend/services backend/pipeline
 rg "from services|import services" backend/pipeline
 rg "from modules|import modules" backend/pipeline
+rg "modules.logging_config" backend download_models.py tests scripts
 ```
 
 Expected result: no application imports or singleton definitions that violate

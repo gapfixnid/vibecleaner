@@ -9,7 +9,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 sys.path.append(os.path.join(current_dir, "backend"))
 
-from modules.logging_config import configure_logging
+from infrastructure.logging import configure_logging
 from modules.utils.download import ModelDownloader, ModelID
 from modules.config import AppConfig
 from services.model_requirements import get_required_model_ids

@@ -6,7 +6,7 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-from modules.utils.paths import get_user_data_dir
+from infrastructure.storage.paths import get_user_data_dir
 
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 DEFAULT_LOG_LEVEL = logging.INFO
@@ -44,4 +44,3 @@ def configure_logging(level: int = DEFAULT_LOG_LEVEL) -> None:
     root_logger.addHandler(file_handler)
 
     _configured = True
-

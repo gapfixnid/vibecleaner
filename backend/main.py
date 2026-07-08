@@ -22,7 +22,7 @@ import app.qt_runtime  # noqa: F401
 
 from app.version import APP_NAME, __version__ as APP_VERSION
 from core.container import build_container
-from modules.logging_config import configure_logging
+from infrastructure.logging import configure_logging
 from api.routes.jobs import router as jobs_router
 from api.routes.pages import router as pages_router
 from api.routes.project import router as project_router

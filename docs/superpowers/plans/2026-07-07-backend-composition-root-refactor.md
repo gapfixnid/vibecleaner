@@ -481,6 +481,9 @@ Expected: PASS.
 - `backend/pipeline` no longer imports `backend/modules` directly. The page
   translation stage uses an attribute-compatible translation block instead of
   the legacy `modules.utils.textblock.TextBlock`.
+- `backend/infrastructure` now exists as a concrete package. Logging setup and
+  user-data path helpers moved from `backend/modules` into
+  `backend/infrastructure/logging` and `backend/infrastructure/storage`.
 
 - [ ] **Step 1: Find remaining forbidden imports**
 
@@ -583,9 +586,10 @@ Architecture cleanup pivot, 2026-07-08:
   stages no longer import an old wrapper module for helper behavior.
 - Unused desktop/frontend command surfaces for the old page translation path
   were removed.
-- Remaining cleanup targets include absorbing transitional `backend/modules`
-  wrappers behind `backend/engines` or `backend/infrastructure`, and moving
-  hard-coded defaults behind strategies or explicit container-owned options.
+- Remaining cleanup targets include continuing to absorb transitional
+  `backend/modules` wrappers behind `backend/engines` or
+  `backend/infrastructure`, and moving hard-coded defaults behind strategies or
+  explicit container-owned options.
 
 ---
 
