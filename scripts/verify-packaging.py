@@ -16,8 +16,8 @@ TAURI_ROOT = REPO_ROOT / "desktop" / "src-tauri"
 TAURI_CONFIG = TAURI_ROOT / "tauri.conf.json"
 SIDECAR_RESOURCE = "binaries/server-x86_64-pc-windows-msvc.exe"
 SIDECAR_PATH = TAURI_ROOT / SIDECAR_RESOURCE
-BUNDLED_FONT = BACKEND_ROOT / "app" / "assets" / "fonts" / "PretendardVariable.ttf"
-BUNDLED_FONT_LICENSE = BACKEND_ROOT / "app" / "assets" / "fonts" / "LICENSE-Pretendard.txt"
+BUNDLED_FONT = BACKEND_ROOT / "infrastructure" / "assets" / "fonts" / "PretendardVariable.ttf"
+BUNDLED_FONT_LICENSE = BACKEND_ROOT / "infrastructure" / "assets" / "fonts" / "LICENSE-Pretendard.txt"
 RUNTIME_REQUIREMENTS = REPO_ROOT / "requirements-runtime.txt"
 FORBIDDEN_RUNTIME_REQUIREMENTS = {
     "torch",

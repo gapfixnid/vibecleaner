@@ -14,7 +14,7 @@ from infrastructure.downloads import ModelDownloader, ModelID
 from infrastructure.storage import get_settings_file_path
 from core.config import AppConfig
 from services.model_requirements import get_required_model_ids
-from app.version import APP_NAME
+from core.version import APP_NAME
 
 configure_logging()
 logger = logging.getLogger(__name__)

@@ -58,7 +58,7 @@ class PageDetectionStage:
             start_revision = state.revision
             image = page.cv_image.copy()
             inpainted_image = page.inpainted_image.copy() if page.inpainted_image is not None else None
-            local_bubbles = [bubble.without_item() for bubble in page.bubbles]
+            local_bubbles = [bubble.clone() for bubble in page.bubbles]
             bubble_counter = page.bubble_counter
 
         context.page = page

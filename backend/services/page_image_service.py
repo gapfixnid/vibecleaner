@@ -5,8 +5,8 @@ import os
 from fastapi import HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
-from app.models import MangaPage
-from app.version import APP_NAME
+from core.models import MangaPage
+from core.version import APP_NAME
 from services.image_encoding_service import (
     encode_jpeg_bytes,
     encode_png_bytes,

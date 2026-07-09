@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-from PySide6.QtCore import QRectF
+from core.models import Rect
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
@@ -12,7 +12,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 import services.bubble_service as bubble_service
-from app.models import MangaPage, TextBubble
+from core.models import MangaPage, TextBubble
 from core.state.project_state import ProjectState
 
 
@@ -38,9 +38,9 @@ class BubbleServiceTests(unittest.TestCase):
             bubbles=[
                 TextBubble(
                     id=1,
-                    box=QRectF(1, 2, 30, 40),
-                    text_box=QRectF(3, 4, 20, 22),
-                    layout_box=QRectF(5, 6, 16, 18),
+                    box=Rect(1, 2, 30, 40),
+                    text_box=Rect(3, 4, 20, 22),
+                    layout_box=Rect(5, 6, 16, 18),
                     text="hello",
                     translated="안녕",
                     font_size=14,
@@ -67,7 +67,7 @@ class BubbleServiceTests(unittest.TestCase):
             bubbles=[
                 TextBubble(
                     id=1,
-                    box=QRectF(1, 2, 30, 40),
+                    box=Rect(1, 2, 30, 40),
                     text="hello",
                     translated="안녕",
                     font_family="",
@@ -96,7 +96,7 @@ class BubbleServiceTests(unittest.TestCase):
             bubbles=[
                 TextBubble(
                     id=1,
-                    box=QRectF(1, 2, 30, 40),
+                    box=Rect(1, 2, 30, 40),
                     text="hello",
                     translated="안녕",
                     font_family="",

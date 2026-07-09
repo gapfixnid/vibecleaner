@@ -3,14 +3,12 @@ from typing import List
 import numpy as np
 from fastapi import HTTPException
 from pydantic import BaseModel
-from PySide6.QtCore import QRectF
-
-from app.models import TextBubble
+from core.models import Rect, TextBubble
 from engines.common.textblock import TextBlock
 from services.job_service import job_manager
 from services.page_image_loader import ensure_page_image, invalidate_page_caches, load_cv_image
 from services.review_state_service import derive_bubble_status, refresh_bubble_status, refresh_page_status
-from app.version import APP_NAME
+from core.version import APP_NAME
 
 import logging
 
@@ -33,14 +31,14 @@ class BubbleUpdateSchema(BaseModel):
     alignment: str
 
 
-def _rect_response(rect: QRectF | None) -> dict | None:
+def _rect_response(rect: Rect | None) -> dict | None:
     if rect is None:
         return None
     return {
-        "x": rect.x(),
-        "y": rect.y(),
-        "width": rect.width(),
-        "height": rect.height(),
+        "x": rect.x,
+        "y": rect.y,
+        "width": rect.width,
+        "height": rect.height,
     }
 
 
@@ -95,16 +93,16 @@ def _layout_cache_key(bubble: TextBubble) -> tuple:
     layout_box = bubble.layout_box
     return (
         bubble.id,
-        round(box.x(), 2),
-        round(box.y(), 2),
-        round(box.width(), 2),
-        round(box.height(), 2),
+        round(box.x, 2),
+        round(box.y, 2),
+        round(box.width, 2),
+        round(box.height, 2),
         tuple(round(v, 2) for v in bubble.source_xyxy()) if text_box is not None else None,
         (
-            round(layout_box.x(), 2),
-            round(layout_box.y(), 2),
-            round(layout_box.width(), 2),
-            round(layout_box.height(), 2),
+            round(layout_box.x, 2),
+            round(layout_box.y, 2),
+            round(layout_box.width, 2),
+            round(layout_box.height, 2),
         ) if layout_box is not None else None,
         bubble.text,
         bubble.translated,
@@ -156,7 +154,7 @@ def get_bubbles_response(state, page_id: str, render_service):
         loaded = getattr(page, "_loaded", True) and page.cv_image is not None and page.cv_image.size > 0
         source_img = page.cv_image if loaded else None
         load_path = page.file_path
-        bubbles_snapshot = [bubble.without_item() for bubble in page.bubbles]
+        bubbles_snapshot = [bubble.clone() for bubble in page.bubbles]
         layout_cache = getattr(page, "_bubble_layout_cache", None)
         if layout_cache is None:
             layout_cache = {}
@@ -195,10 +193,10 @@ def get_bubbles_response(state, page_id: str, render_service):
 
         bubbles_list.append({
             "id": bubble.id,
-            "x": bubble.box.x(),
-            "y": bubble.box.y(),
-            "width": bubble.box.width(),
-            "height": bubble.box.height(),
+            "x": bubble.box.x,
+            "y": bubble.box.y,
+            "width": bubble.box.width,
+            "height": bubble.box.height,
             "text_box": _rect_response(bubble.text_box),
             "layout_box": _rect_response(bubble.layout_box),
             "text": bubble.text,
@@ -265,10 +263,10 @@ def update_bubbles_response(state, page_id: str, bubbles: List[BubbleUpdateSchem
             status = existing.status if existing else "needs_review"
             if existing is not None:
                 edited = edited or any((
-                    existing.box.x() != b_schema.x,
-                    existing.box.y() != b_schema.y,
-                    existing.box.width() != b_schema.width,
-                    existing.box.height() != b_schema.height,
+                    existing.box.x != b_schema.x,
+                    existing.box.y != b_schema.y,
+                    existing.box.width != b_schema.width,
+                    existing.box.height != b_schema.height,
                     existing.text != b_schema.text,
                     existing.translated != b_schema.translated,
                     existing.font_family != b_schema.font_family,
@@ -281,7 +279,7 @@ def update_bubbles_response(state, page_id: str, bubbles: List[BubbleUpdateSchem
 
             bubble = TextBubble(
                 id=b_schema.id,
-                box=QRectF(b_schema.x, b_schema.y, b_schema.width, b_schema.height),
+                box=Rect(b_schema.x, b_schema.y, b_schema.width, b_schema.height),
                 text=b_schema.text,
                 translated=b_schema.translated,
                 text_box=text_box,
@@ -326,8 +324,7 @@ def re_ocr_bubble_response(state, page_id: str, bubble_id: int, detection_servic
         image = page.cv_image.copy()
         box = bubble.box
 
-    x1, y1 = int(box.x()), int(box.y())
-    x2, y2 = int(box.x() + box.width()), int(box.y() + box.height())
+    x1, y1, x2, y2 = (int(v) for v in box.to_xyxy())
     tb_block = TextBlock(text_bbox=np.array([x1, y1, x2, y2]))
     try:
         detection_service.recognize_single_block(image, tb_block, lang=config.source_language)
@@ -372,7 +369,7 @@ def _translate_single_bubble_job(state, job: dict, page_id: str, bubble_id: int,
             raise RuntimeError("Bubble not found")
         start_revision = state.revision
         image = page.cv_image.copy()
-        bubble_snapshot = bubble.without_item()
+        bubble_snapshot = bubble.clone()
 
     job_manager.ensure_not_cancelled(job)
     job_manager.update(job, progress=30, message="Translating selected bubble")

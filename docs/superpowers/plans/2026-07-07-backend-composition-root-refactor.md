@@ -703,6 +703,42 @@ Architecture cleanup pivot, 2026-07-08:
   `backend/infrastructure`, and moving hard-coded defaults behind strategies or
   explicit container-owned options.
 
+Progress note, 2026-07-09 (`backend/app` removal):
+
+- The runtime domain models moved from `backend/app/models.py` into
+  `backend/core/models/page.py` (`TextBubble`, `MangaPage`). Bubble geometry is
+  now the Qt-free `core.models.geometry.Rect` (x/y/width/height dataclass with
+  `from_xyxy`/`to_xyxy`/`united` helpers) instead of `PySide6.QtCore.QRectF`.
+  `TextBubble.without_item()` became `TextBubble.clone()` and the dead GUI
+  `item` field was dropped. The port-level `Bubble` DTO stays as the minimal
+  render-port contract.
+- Qt geometry is now an engine-internal concern: `engines/rendering/service.py`
+  converts `Rect` -> `QRectF` at the renderer boundary (`_to_qrectf`), and
+  `engines/rendering/layout_planner.py` runs entirely on `Rect`. The dead,
+  import-free `bubble_to_layout_input` helper was deleted.
+  `pipeline/page_analysis.py` no longer imports PySide6; a boundary test now
+  asserts `backend/core` and `backend/pipeline` are Qt-free.
+- `backend/app/version.py` moved to `backend/core/version.py`
+  (`scripts/sync-version.mjs` regenerates the new path). The offscreen
+  QApplication bootstrap moved from `app/qt_runtime.py` to
+  `infrastructure/runtime/qt.py`; its sys.path bootstrap was dropped because
+  `main.py` already does it.
+- Bundled fonts moved from `backend/app/assets/fonts/` to
+  `backend/infrastructure/assets/fonts/`. This also fixed a latent path bug:
+  `infrastructure/fonts/resolver.py` computed the bundled-fonts dir relative to
+  `backend/infrastructure` but still appended `app/assets/fonts`, so the
+  bundled Pretendard font silently never resolved. The PyInstaller spec,
+  `scripts/verify-packaging.py`, README, and NOTICE were repointed.
+- `backend/app`, the dead `backend/routes/__init__.py` shell, and the stale
+  `backend/domain` pycache directory were deleted. Boundary tests assert
+  `backend/app`, `backend/routes`, and `backend/domain` stay deleted.
+- `core/state/repository.py` now keys on the real `MangaPage.page_id` and
+  `create_page(file_path, display_name)`; the placeholder
+  `MangaPage(id/name/image_path)` shape is gone.
+- Verification: `pytest -q` 81 passed; contract boundary greps clean;
+  `scripts/verify-packaging.py` passed; `create_app()` smoke boots with the
+  container and the bundled font resolves.
+
 ---
 
 ## Self-Review

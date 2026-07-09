@@ -30,7 +30,7 @@ def test_repository_returns_page_by_id():
     state = ProjectState()
     repo = InMemoryProjectRepository(state)
 
-    page = repo.create_page(name="page-1", image_path="C:/tmp/page.png")
+    page = repo.create_page(file_path="C:/tmp/page.png", display_name="page-1")
 
-    assert repo.get_page(page.id).id == page.id
+    assert repo.get_page(page.page_id).page_id == page.page_id
     assert repo.list_pages() == [page]

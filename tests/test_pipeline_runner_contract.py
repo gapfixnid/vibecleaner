@@ -27,7 +27,7 @@ class FailingStage:
 def make_context():
     return PipelineContext(
         page_id="page-1",
-        page=MangaPage(id="page-1", name="page", image_path="C:/tmp/page.png"),
+        page=MangaPage(file_path="C:/tmp/page.png", page_id="page-1"),
         image=ImageData(array=None, explicit_width=1, explicit_height=1),
         settings={},
     )

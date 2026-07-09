@@ -4,7 +4,7 @@ import cv2
 from PIL import Image, ImageDraw, ImageFont
 from PySide6.QtGui import QFontMetricsF
 from typing import Optional, Any, Callable
-from app.models import MangaPage
+from core.models import MangaPage
 from engines.rendering.service import RenderService
 
 logger = logging.getLogger(__name__)
@@ -42,8 +42,8 @@ class ExportService:
             if not b.translated:
                 continue
             rect = b.box
-            x1, y1 = int(rect.x()), int(rect.y())
-            rh = int(rect.height())
+            x1, y1 = int(rect.x), int(rect.y)
+            rh = int(rect.height)
             text = b.translated
             bubble_font_family = b.font_family or font_family
             bubble_font_path = font_resolver(bubble_font_family) if font_resolver else default_font_path

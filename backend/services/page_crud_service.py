@@ -4,7 +4,7 @@ from typing import List
 from fastapi import HTTPException
 from PIL import Image
 
-from app.models import MangaPage
+from core.models import MangaPage
 from services.page_image_loader import ensure_page_image
 from services.review_state_service import derive_page_status
 
@@ -122,7 +122,7 @@ def _clone_page(source: MangaPage) -> MangaPage:
         file_path=source.file_path,
         cv_image=source.cv_image.copy(),
         inpainted_image=source.inpainted_image.copy() if source.inpainted_image is not None else None,
-        bubbles=[bubble.without_item() for bubble in source.bubbles],
+        bubbles=[bubble.clone() for bubble in source.bubbles],
         bubble_counter=source.bubble_counter,
     )
     clone._width = getattr(source, "_width", 0)

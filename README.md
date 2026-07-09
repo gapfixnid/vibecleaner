@@ -175,7 +175,7 @@ Release sidecar builds use a separate `.venv-runtime` environment created by `sc
 - Model files are downloaded into the user data directory and are not committed to the repository.
 - Runtime sidecar builds use `.venv-runtime/`, `requirements-runtime.txt`, and PyInstaller excludes so optional Torch packages and model weights are not bundled into the installer.
 - Release builds need a backend sidecar at `desktop/src-tauri/binaries/server-x86_64-pc-windows-msvc.exe`.
-- Pretendard is bundled for Korean text rendering under `backend/app/assets/fonts/`.
+- Pretendard is bundled for Korean text rendering under `backend/infrastructure/assets/fonts/`.
 
 ## Release Packaging
 

@@ -5,32 +5,22 @@ from typing import Any
 
 import numpy as np
 
-from app.models import TextBubble
+from core.models import Rect, TextBubble
 
 
 def inpaint_boxes(bubbles, *, use_textbox_only: bool = True) -> list:
     if use_textbox_only:
         return [bubble.source_xyxy() for bubble in bubbles]
-    boxes = []
-    for bubble in bubbles:
-        box = bubble.box
-        boxes.append([box.x(), box.y(), box.x() + box.width(), box.y() + box.height()])
-    return boxes
+    return [bubble.box.to_xyxy() for bubble in bubbles]
 
 
 def bubble_clip_boxes(bubbles) -> list:
-    boxes = []
-    for bubble in bubbles:
-        box = bubble.box
-        boxes.append([box.x(), box.y(), box.x() + box.width(), box.y() + box.height()])
-    return boxes
+    return [bubble.box.to_xyxy() for bubble in bubbles]
 
 
-def _rect_from_xyxy(xyxy):
-    from PySide6.QtCore import QRectF
-
+def _rect_from_xyxy(xyxy) -> Rect:
     x1, y1, x2, y2 = map(int, xyxy)
-    return QRectF(x1, y1, x2 - x1, y2 - y1)
+    return Rect.from_xyxy(x1, y1, x2, y2)
 
 
 def _color_to_hex(color) -> str:
@@ -144,21 +134,17 @@ def merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float = 
         return bubbles
 
     def _iou(first: TextBubble, second: TextBubble) -> float:
-        ax1, ay1 = first.box.x(), first.box.y()
-        ax2, ay2 = ax1 + first.box.width(), ay1 + first.box.height()
-        bx1, by1 = second.box.x(), second.box.y()
-        bx2, by2 = bx1 + second.box.width(), by1 + second.box.height()
+        ax1, ay1, ax2, ay2 = first.box.to_xyxy()
+        bx1, by1, bx2, by2 = second.box.to_xyxy()
         ix1 = max(ax1, bx1)
         iy1 = max(ay1, by1)
         ix2 = min(ax2, bx2)
         iy2 = min(ay2, by2)
         intersection = max(0, ix2 - ix1) * max(0, iy2 - iy1)
-        union = first.box.width() * first.box.height() + second.box.width() * second.box.height() - intersection
+        union = first.box.width * first.box.height + second.box.width * second.box.height - intersection
         if union <= 0:
             return 0.0
         return intersection / union
-
-    from PySide6.QtCore import QRectF
 
     merged = True
     current = list(bubbles)
@@ -171,29 +157,17 @@ def merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float = 
                 if _iou(current[i], current[j]) >= iou_threshold:
                     first = current[i]
                     second = current[j]
-                    x1 = min(first.box.x(), second.box.x())
-                    y1 = min(first.box.y(), second.box.y())
-                    x2 = max(first.box.x() + first.box.width(), second.box.x() + second.box.width())
-                    y2 = max(first.box.y() + first.box.height(), second.box.y() + second.box.height())
-                    first.box = QRectF(x1, y1, x2 - x1, y2 - y1)
+                    first.box = first.box.united(second.box)
 
                     if first.text_box is not None and second.text_box is not None:
-                        tx1 = min(first.text_box.x(), second.text_box.x())
-                        ty1 = min(first.text_box.y(), second.text_box.y())
-                        tx2 = max(first.text_box.x() + first.text_box.width(), second.text_box.x() + second.text_box.width())
-                        ty2 = max(first.text_box.y() + first.text_box.height(), second.text_box.y() + second.text_box.height())
-                        first.text_box = QRectF(tx1, ty1, tx2 - tx1, ty2 - ty1)
+                        first.text_box = first.text_box.united(second.text_box)
                     elif second.text_box is not None:
-                        first.text_box = QRectF(second.text_box)
+                        first.text_box = second.text_box
 
                     if first.layout_box is not None and second.layout_box is not None:
-                        lx1 = min(first.layout_box.x(), second.layout_box.x())
-                        ly1 = min(first.layout_box.y(), second.layout_box.y())
-                        lx2 = max(first.layout_box.x() + first.layout_box.width(), second.layout_box.x() + second.layout_box.width())
-                        ly2 = max(first.layout_box.y() + first.layout_box.height(), second.layout_box.y() + second.layout_box.height())
-                        first.layout_box = QRectF(lx1, ly1, lx2 - lx1, ly2 - ly1)
+                        first.layout_box = first.layout_box.united(second.layout_box)
                     elif second.layout_box is not None:
-                        first.layout_box = QRectF(second.layout_box)
+                        first.layout_box = second.layout_box
 
                     merged_text = _join_merged_text([first.text, second.text])
                     if merged_text:

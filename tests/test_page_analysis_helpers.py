@@ -3,7 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-from PySide6.QtCore import QRectF
+from core.models import Rect
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
@@ -11,7 +11,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 import pipeline.page_analysis as page_analysis
-from app.models import TextBubble
+from core.models import TextBubble
 from core.config import AppConfig
 from services.bubble_analysis_service import BubbleAnalysisResult, BubbleData
 from engines.rendering.layout_planner import Insets
@@ -101,7 +101,7 @@ def test_bubbles_from_analysis_preserves_layout_plan_metadata():
 
     assert len(bubbles) == 1
     bubble = bubbles[0]
-    assert bubble.layout_box == QRectF(8, 9, 16, 16)
+    assert bubble.layout_box == Rect(8, 9, 16, 16)
     assert bubble.font_family == ""
     assert bubble.alignment == "right"
     assert bubble.writing_mode == "vertical"
@@ -116,15 +116,15 @@ def test_bubbles_from_analysis_preserves_layout_plan_metadata():
 def test_merge_overlapping_bubbles_preserves_cjk_lines_without_spaces():
     first = TextBubble(
         id=1,
-        box=QRectF(10, 10, 30, 30),
-        text_box=QRectF(12, 12, 10, 10),
+        box=Rect(10, 10, 30, 30),
+        text_box=Rect(12, 12, 10, 10),
         text="こん",
         translated="안녕",
     )
     second = TextBubble(
         id=2,
-        box=QRectF(12, 12, 30, 30),
-        text_box=QRectF(20, 20, 10, 10),
+        box=Rect(12, 12, 30, 30),
+        text_box=Rect(20, 20, 10, 10),
         text="にちは",
         translated="하세요",
     )

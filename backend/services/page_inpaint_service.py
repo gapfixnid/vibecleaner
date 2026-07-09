@@ -46,7 +46,7 @@ def _inpaint_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, i
             raise RuntimeError(f"Bubble {bubble_id} not found")
         start_revision = state.revision
         image = page.inpainted_image.copy() if page.inpainted_image is not None else page.cv_image.copy()
-        bubble_snapshot = bubble.without_item()
+        bubble_snapshot = bubble.clone()
 
     snapshots = [bubble_snapshot]
     boxes = inpaint_boxes(snapshots)
@@ -79,7 +79,7 @@ def _inpaint_job(state, job: dict, page_id: str, inpainting_service):
         ensure_page_image(page)
         start_revision = state.revision
         image = page.cv_image.copy()
-        bubbles_snapshot = [bubble.without_item() for bubble in page.bubbles]
+        bubbles_snapshot = [bubble.clone() for bubble in page.bubbles]
         boxes = inpaint_boxes(bubbles_snapshot)
         bubble_boxes = bubble_clip_boxes(bubbles_snapshot)
 

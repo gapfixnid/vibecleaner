@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterable, Optional, Dict, List, Union
 from infrastructure.downloads.files import download_url_to_file
 from infrastructure.storage.paths import get_user_data_dir
-from app.version import APP_NAME
+from core.version import APP_NAME
 
 logger = logging.getLogger(__name__)
 

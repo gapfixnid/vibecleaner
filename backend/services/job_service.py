@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import RLock
 from typing import Any, Callable
 
-from app.version import APP_NAME
+from core.version import APP_NAME
 
 
 logger = logging.getLogger(APP_NAME)

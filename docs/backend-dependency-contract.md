@@ -59,6 +59,16 @@ implementations live in `backend/engines/*`, shared engine domain types in
 by injection from the container. New code must not reintroduce a
 `backend/modules` package or module-level runtime state/config singletons.
 
+The legacy `backend/app` and `backend/routes` packages are also removed:
+runtime domain models (`TextBubble`, `MangaPage`) live in
+`backend/core/models/page.py`, version constants in `backend/core/version.py`,
+the offscreen Qt bootstrap in `backend/infrastructure/runtime/qt.py`, and
+bundled fonts under `backend/infrastructure/assets/fonts/`.
+
+`backend/core` and `backend/pipeline` are Qt-free. Bubble geometry uses
+`core.models.geometry.Rect`; only rendering-engine code converts `Rect` to
+`QRectF` at its own boundary.
+
 ## Settings And Engine Options
 
 Settings flow through explicit values:
@@ -118,6 +128,8 @@ rg "^service = .*Service\(|^[a-z_]+_service = [A-Z][A-Za-z]+Service\(" backend/s
 rg "from services|import services" backend/pipeline
 rg "from modules|import modules" backend tests download_models.py scripts
 rg "modules.logging_config" backend download_models.py tests scripts
+rg "^from app\.|^import app\." backend tests download_models.py scripts
+rg "PySide6" backend/core backend/pipeline
 ```
 
 Expected result: no application imports or singleton definitions that violate

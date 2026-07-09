@@ -46,8 +46,8 @@ licenses and terms:
 - https://huggingface.co/ogkalu/pororo
 
 This product bundles the Pretendard Variable font at
-backend/app/assets/fonts/PretendardVariable.ttf.
+backend/infrastructure/assets/fonts/PretendardVariable.ttf.
 Pretendard is licensed under the SIL Open Font License, Version 1.1.
 For copyright and license details, see
-backend/app/assets/fonts/LICENSE-Pretendard.txt.
+backend/infrastructure/assets/fonts/LICENSE-Pretendard.txt.
 

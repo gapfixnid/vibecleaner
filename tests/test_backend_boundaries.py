@@ -49,6 +49,9 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert not (backend / "modules" / "utils" / "translator_utils.py").exists()
     assert not (backend / "services" / "translation_service.py").exists()
     assert not (backend / "modules").exists()
+    assert not (backend / "app").exists()
+    assert not (backend / "routes").exists()
+    assert not (backend / "domain").exists()
 
     scanned_files = [
         path
@@ -99,6 +102,9 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert ("services." + "translation_service") not in combined
     assert ("from " + "modules") not in combined
     assert ("import " + "modules") not in combined
+    assert ("from app." + "models") not in combined
+    assert ("from app." + "version") not in combined
+    assert ("import app." + "qt_runtime") not in combined
 
 
 def test_pipeline_and_api_do_not_import_concrete_engines():
@@ -108,6 +114,18 @@ def test_pipeline_and_api_do_not_import_concrete_engines():
 
     assert "from engines" not in combined
     assert "import engines" not in combined
+
+
+def test_core_and_pipeline_are_qt_free():
+    backend = ROOT / "backend"
+    scanned_files = list((backend / "core").rglob("*.py")) + list((backend / "pipeline").rglob("*.py"))
+    combined = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in scanned_files
+        if "__pycache__" not in path.parts
+    )
+
+    assert "PySide6" not in combined
 
 
 def test_pipeline_does_not_import_services():

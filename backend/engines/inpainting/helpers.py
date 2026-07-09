@@ -10,7 +10,7 @@ from infrastructure import image as imk
 from typing import List, Optional
 from urllib.parse import urlparse
 from PIL import Image, ImageOps, PngImagePlugin
-from app.version import APP_NAME
+from core.version import APP_NAME
 
 from infrastructure.downloads import (
     download_url_to_file,

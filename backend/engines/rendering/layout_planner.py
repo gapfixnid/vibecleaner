@@ -19,7 +19,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-from PySide6.QtCore import QRectF
+
+from core.models import Rect
 
 logger = logging.getLogger(__name__)
 
@@ -89,8 +90,8 @@ class LayoutPlanDto:
 @dataclass
 class BubbleLayoutInput:
     """Input for layout planning — derived from BubbleData or TextBubble."""
-    bubble_box: QRectF  # Full bubble bounding box
-    layout_box: QRectF  # Area where text can be placed
+    bubble_box: Rect  # Full bubble bounding box
+    layout_box: Rect  # Area where text can be placed
     text: str = ''  # Text to render
     text_class: str = ''  # 'text_bubble' | 'text_free' | 'sfx'
     polygon: Optional[np.ndarray] = None  # Bubble polygon for shape analysis
@@ -213,7 +214,7 @@ class LayoutPlannerService:
             return 'vertical'
 
         # Check if bubble is tall (vertical text often in tall bubbles)
-        aspect = inp.layout_box.width() / max(1, inp.layout_box.height())
+        aspect = inp.layout_box.width / max(1, inp.layout_box.height)
         if aspect < self.SHAPE_TALL_THRESHOLD:
             return 'vertical'
 
@@ -257,11 +258,11 @@ class LayoutPlannerService:
     def _align_text_free(self, inp: BubbleLayoutInput) -> str:
         """Align text-free elements based on position and shape."""
         # Check if text is positioned to the right or left of layout box
-        bw = inp.bubble_box.width()
-        lw = inp.layout_box.width()
+        bw = inp.bubble_box.width
+        lw = inp.layout_box.width
         if bw > lw * 2:
             # Wide bubble with narrow text area — likely sidebar text
-            rel_x = inp.layout_box.x() - inp.bubble_box.x()
+            rel_x = inp.layout_box.x - inp.bubble_box.x
             if rel_x < bw * 0.5:
                 return 'left'
             return 'right'
@@ -269,7 +270,7 @@ class LayoutPlannerService:
 
     def _align_by_shape(self, inp: BubbleLayoutInput) -> str:
         """Align based on bubble shape and text characteristics."""
-        aspect = inp.layout_box.width() / max(1, inp.layout_box.height())
+        aspect = inp.layout_box.width / max(1, inp.layout_box.height)
         text = inp.text or ''
 
         # Tall narrow bubbles: center
@@ -297,8 +298,8 @@ class LayoutPlannerService:
         Padding prevents text from touching bubble edges.
         Larger bubbles get more padding, but capped at reasonable max.
         """
-        lw = inp.layout_box.width()
-        lh = inp.layout_box.height()
+        lw = inp.layout_box.width
+        lh = inp.layout_box.height
 
         pad_x = max(self.MIN_PADDING, min(lw * self.PADDING_RATIO_X, self.MAX_PADDING_X))
         pad_y = max(self.MIN_PADDING, min(lh * self.PADDING_RATIO_Y, self.MAX_PADDING_Y))
@@ -306,7 +307,7 @@ class LayoutPlannerService:
         # Text-free bubbles may need asymmetric padding
         if inp.text_class == 'text_free':
             # Add extra padding on the side closer to bubble edge
-            rel_x = (inp.layout_box.x() - inp.bubble_box.x()) / max(1, inp.bubble_box.width())
+            rel_x = (inp.layout_box.x - inp.bubble_box.x) / max(1, inp.bubble_box.width)
             if rel_x < 0.3:
                 return Insets(
                     top=pad_y, right=pad_x, bottom=pad_y, left=pad_x * 0.5
@@ -332,8 +333,8 @@ class LayoutPlannerService:
 
         Margin is used for special cases like SFX or multi-paragraph text.
         """
-        mw = inp.layout_box.width()
-        mh = inp.layout_box.height()
+        mw = inp.layout_box.width
+        mh = inp.layout_box.height
 
         margin = max(1.0, min(mw * self.MARGIN_RATIO, 4.0))
 
@@ -365,7 +366,7 @@ class LayoutPlannerService:
             return 'none'
 
         # Wide bubbles with long text: justify for clean edges
-        aspect = inp.layout_box.width() / max(1, inp.layout_box.height())
+        aspect = inp.layout_box.width / max(1, inp.layout_box.height)
         if aspect > 2.0 and len(text) > 40:
             return 'full'
 
@@ -387,8 +388,8 @@ class LayoutPlannerService:
         Anchor point is relative to layout box (0,0 = top-left).
         Based on alignment and writing mode.
         """
-        lw = inp.layout_box.width()
-        lh = inp.layout_box.height()
+        lw = inp.layout_box.width
+        lh = inp.layout_box.height
 
         if plan.alignment == 'left':
             x = plan.padding.left
@@ -426,7 +427,7 @@ class LayoutPlannerService:
             score += 0.2
 
         # Clear shape signals increase confidence
-        aspect = inp.layout_box.width() / max(1, inp.layout_box.height())
+        aspect = inp.layout_box.width / max(1, inp.layout_box.height)
         if aspect > self.SHAPE_WIDE_THRESHOLD or aspect < self.SHAPE_TALL_THRESHOLD:
             score += 0.1
 
@@ -439,36 +440,3 @@ class LayoutPlannerService:
             score += 0.05
 
         return min(1.0, score)
-
-
-# ---------------------------------------------------------------------------
-# Convenience: convert TextBubble to BubbleLayoutInput
-# ---------------------------------------------------------------------------
-
-def bubble_to_layout_input(
-    bubble,  # TextBubble or similar
-    page_reading_order: str = 'ltr',
-    page_writing_mode: str = 'horizontal',
-) -> BubbleLayoutInput:
-    """Convert a TextBubble to BubbleLayoutInput for layout planning."""
-    box = bubble.box
-    text_box = getattr(bubble, 'text_box', None) or box
-
-    # layout_box: use text_box shrunk slightly, or box itself
-    shrink = max(4, min(box.width(), box.height()) * 0.05)
-    layout_box = QRectF(
-        text_box.x() + shrink * 0.5,
-        text_box.y() + shrink * 0.5,
-        max(10, text_box.width() - shrink),
-        max(10, text_box.height() - shrink),
-    )
-    return BubbleLayoutInput(
-        bubble_box=box,
-        layout_box=layout_box,
-        text=getattr(bubble, 'translated', '') or getattr(bubble, 'text', '') or '',
-        text_class=getattr(bubble, 'text_class', ''),
-        page_reading_order=page_reading_order,
-        page_writing_mode=page_writing_mode,
-        user_alignment=getattr(bubble, 'alignment', None) or None,
-        user_font_size=getattr(bubble, 'font_size', 0) or 0,
-    )

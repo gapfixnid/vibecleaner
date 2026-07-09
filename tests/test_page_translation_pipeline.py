@@ -61,7 +61,7 @@ def make_runner():
 def test_translate_page_pipeline_runs_all_stages():
     context = PipelineContext(
         page_id="page-1",
-        page=MangaPage(id="page-1", name="page", image_path="C:/tmp/page.png"),
+        page=MangaPage(file_path="C:/tmp/page.png", page_id="page-1"),
         image=ImageData(array=object(), explicit_width=100, explicit_height=100),
         settings=AppConfigSnapshot(target_language="Korean"),
     )

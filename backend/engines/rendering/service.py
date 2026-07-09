@@ -4,11 +4,16 @@ import numpy as np
 from PySide6.QtCore import QRectF
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
-from app.models import TextBubble
+from core.models import Rect, TextBubble
 from .renderer import TextRenderer, TextLayoutResult
 from infrastructure.image.masks import build_bubble_clip_mask
 
 logger = logging.getLogger(__name__)
+
+
+def _to_qrectf(rect: Rect) -> QRectF:
+    """Convert the core Rect DTO to Qt geometry at the rendering boundary."""
+    return QRectF(rect.x, rect.y, rect.width, rect.height)
 
 
 class RenderService:
@@ -52,7 +57,7 @@ class RenderService:
         if mask is not None:
             return self.renderer.find_optimal_font_size_for_mask(
                 text,
-                bubble.box,
+                _to_qrectf(bubble.box),
                 mask,
                 font_family=font_family,
                 min_size=self._min_font_size(),
@@ -71,17 +76,17 @@ class RenderService:
 
     def _text_layout_rect(self, bubble: TextBubble) -> QRectF:
         rect = bubble.layout_box if bubble.layout_box is not None else bubble.box
-        if rect.width() <= 1 or rect.height() <= 1:
-            return bubble.box
-        return rect
+        if rect.width <= 1 or rect.height <= 1:
+            return _to_qrectf(bubble.box)
+        return _to_qrectf(rect)
 
     def _build_bubble_layout_mask(self, bubble: TextBubble, image: np.ndarray | None) -> np.ndarray | None:
         if bubble.text_class == "text_free":
             return None
 
         rect = bubble.box
-        width = int(round(rect.width()))
-        height = int(round(rect.height()))
+        width = int(round(rect.width))
+        height = int(round(rect.height))
         if width <= 2 or height <= 2:
             return None
 
@@ -91,10 +96,10 @@ class RenderService:
             return fallback_mask
 
         bounds = (
-            int(round(rect.x())),
-            int(round(rect.y())),
-            int(round(rect.x() + rect.width())),
-            int(round(rect.y() + rect.height())),
+            int(round(rect.x)),
+            int(round(rect.y)),
+            int(round(rect.right)),
+            int(round(rect.bottom)),
         )
         coords = [int(round(v)) for v in bubble.source_xyxy()]
         seed_bbox = (coords[0], coords[1], coords[2], coords[3]) if len(coords) == 4 else None

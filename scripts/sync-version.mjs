@@ -61,7 +61,7 @@ setTomlVersion("pyproject.toml", "project");
 
 // --- Generated runtime constants (imported by app code) ---
 write(
-  "backend/app/version.py",
+  "backend/core/version.py",
   `"""App name/version constants.
 
 Generated from app.meta.json by scripts/sync-version.mjs.

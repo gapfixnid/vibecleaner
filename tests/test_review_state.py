@@ -2,14 +2,14 @@ import unittest
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QRectF
+from core.models import Rect
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from app.models import MangaPage, TextBubble
+from core.models import MangaPage, TextBubble
 from services.review_state_service import derive_bubble_status, derive_page_status, refresh_page_status
 
 
@@ -17,7 +17,7 @@ class ReviewStateTests(unittest.TestCase):
     def test_bubble_review_state_survives_project_roundtrip(self):
         bubble = TextBubble(
             id=1,
-            box=QRectF(1, 2, 30, 40),
+            box=Rect(1, 2, 30, 40),
             text="hello",
             translated="안녕",
             status="edited",
@@ -39,7 +39,7 @@ class ReviewStateTests(unittest.TestCase):
             bubbles=[
                 TextBubble(
                     id=1,
-                    box=QRectF(0, 0, 10, 10),
+                    box=Rect(0, 0, 10, 10),
                     text="hello",
                     translated="안녕",
                 )
@@ -60,7 +60,7 @@ class ReviewStateTests(unittest.TestCase):
             bubbles=[
                 TextBubble(
                     id=1,
-                    box=QRectF(0, 0, 10, 10),
+                    box=Rect(0, 0, 10, 10),
                     text="hello",
                     translated="안녕",
                     status="needs_review",

@@ -3,14 +3,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-from PySide6.QtCore import QRectF
+from core.models import Rect
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from app.models import MangaPage, TextBubble
+from core.models import MangaPage, TextBubble
 from core.state.project_state import ProjectState
 from core.config import AppConfig
 from pipeline.page_translation import run_page_translation
@@ -49,8 +49,8 @@ def test_page_translation_runner_uses_canonical_stages_and_updates_page_state():
         bubbles=[
             TextBubble(
                 id=1,
-                box=QRectF(2, 3, 10, 8),
-                text_box=QRectF(3, 4, 8, 6),
+                box=Rect(2, 3, 10, 8),
+                text_box=Rect(3, 4, 8, 6),
                 text="hello",
                 translated="",
             )

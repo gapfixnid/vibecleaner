@@ -42,8 +42,8 @@ class FontSource:
 # Platform-specific font databases
 def _get_bundled_fonts() -> List[FontSource]:
     """Get bundled fonts shipped with the application."""
-    backend_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    fonts_dir = os.path.join(backend_root, "app", "assets", "fonts")
+    infrastructure_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    fonts_dir = os.path.join(infrastructure_root, "assets", "fonts")
 
     fonts = []
     for name in ("PretendardVariable.ttf", "Pretendard-Variable.ttf"):

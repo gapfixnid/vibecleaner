@@ -4,15 +4,20 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-from PySide6.QtCore import QRectF
+from core.models import Rect
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from app.models import TextBubble
+from core.models import TextBubble
 from engines.rendering.service import RenderService
+
+
+def _rect_from_qrectf(rect) -> Rect:
+    """The service hands the renderer Qt geometry; record it as a core Rect."""
+    return Rect(rect.x(), rect.y(), rect.width(), rect.height())
 
 
 class FakeRenderer:
@@ -26,21 +31,21 @@ class FakeRenderer:
         self.max_size = None
 
     def find_optimal_font_size(self, text, rect, font_family=None, min_size=None, max_size=None):
-        self.font_rect = QRectF(rect)
+        self.font_rect = _rect_from_qrectf(rect)
         self.font_family = font_family
         self.min_size = min_size
         self.max_size = max_size
         return SimpleNamespace(pointSizeF=lambda: 18.0), [text], rect.width()
 
     def layout_lines_in_rect(self, lines, rect, font, render_width, alignment="center"):
-        self.layout_rect = QRectF(rect)
+        self.layout_rect = _rect_from_qrectf(rect)
         return SimpleNamespace(
             font=font,
             line_layouts=[],
         )
 
     def find_optimal_font_size_for_mask(self, text, rect, mask, font_family=None, min_size=None, max_size=None):
-        self.mask_rect = QRectF(rect)
+        self.mask_rect = _rect_from_qrectf(rect)
         self.mask_shape = mask.shape
         self.font_family = font_family
         self.min_size = min_size
@@ -60,8 +65,8 @@ class RenderServiceTests(unittest.TestCase):
         service = RenderService(renderer=renderer, config=SimpleNamespace(min_font_size=9.0, max_font_size=27.0))
         bubble = TextBubble(
             id=1,
-            box=QRectF(0, 0, 100, 80),
-            layout_box=QRectF(20, 12, 40, 24),
+            box=Rect(0, 0, 100, 80),
+            layout_box=Rect(20, 12, 40, 24),
             text="hello",
         )
 
@@ -75,15 +80,15 @@ class RenderServiceTests(unittest.TestCase):
         service = RenderService(renderer=renderer)
         bubble = TextBubble(
             id=1,
-            box=QRectF(0, 0, 100, 80),
-            layout_box=QRectF(20, 12, 40, 24),
+            box=Rect(0, 0, 100, 80),
+            layout_box=Rect(20, 12, 40, 24),
             text="hello",
             text_class="text_bubble",
         )
 
         service.get_layout_for_bubble("translated", bubble, image=None, font_family="Test")
 
-        self.assertEqual(renderer.mask_rect, QRectF(0, 0, 100, 80))
+        self.assertEqual(renderer.mask_rect, Rect(0, 0, 100, 80))
         self.assertEqual(renderer.mask_shape, (80, 100))
 
     def test_auto_font_selection_reaches_renderer_when_no_font_family_is_requested(self):
@@ -91,8 +96,8 @@ class RenderServiceTests(unittest.TestCase):
         service = RenderService(renderer=renderer)
         bubble = TextBubble(
             id=1,
-            box=QRectF(0, 0, 100, 80),
-            layout_box=QRectF(20, 12, 40, 24),
+            box=Rect(0, 0, 100, 80),
+            layout_box=Rect(20, 12, 40, 24),
             text="hello",
         )
 

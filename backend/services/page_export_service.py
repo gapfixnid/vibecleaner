@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.models import MangaPage
+from core.models import MangaPage
 from services.page_crud_service import resolve_page
 from services.page_image_loader import ensure_page_image
 
@@ -35,7 +35,7 @@ def export_page_response(state, page_id: str, export_service, save_path: Optiona
             file_path=source.file_path,
             cv_image=source.cv_image.copy(),
             inpainted_image=source.inpainted_image.copy(),
-            bubbles=[bubble.without_item() for bubble in source.bubbles],
+            bubbles=[bubble.clone() for bubble in source.bubbles],
             bubble_counter=source.bubble_counter,
         )
 

@@ -18,9 +18,9 @@ if backend_dir not in sys.path:
 
 # Text layout uses QFontMetricsF in request handlers, so the backend process
 # needs an offscreen QApplication before routes start serving bubble data.
-import app.qt_runtime  # noqa: F401
+import infrastructure.runtime.qt  # noqa: F401
 
-from app.version import APP_NAME, __version__ as APP_VERSION
+from core.version import APP_NAME, __version__ as APP_VERSION
 from core.container import build_container
 from infrastructure.logging import configure_logging
 from api.routes.jobs import router as jobs_router

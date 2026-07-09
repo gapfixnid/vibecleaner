@@ -7,8 +7,8 @@ import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Form
 from PIL import Image
 from api.dependencies import get_container
-from app.models import MangaPage
-from app.version import APP_NAME
+from core.models import MangaPage
+from core.version import APP_NAME
 from core.container import AppContainer
 from services.cache_service import submit_cache_task
 from services.image_encoding_service import encode_preview_jpeg_bytes
