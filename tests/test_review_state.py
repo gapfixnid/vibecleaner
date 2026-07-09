@@ -10,7 +10,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from core.models import MangaPage, TextBubble
-from services.review_state_service import derive_bubble_status, derive_page_status, refresh_page_status
+from core.state.review import derive_bubble_status, derive_page_status, refresh_page_status
 
 
 class ReviewStateTests(unittest.TestCase):

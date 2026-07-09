@@ -1,13 +1,12 @@
+from types import SimpleNamespace
 from typing import List
 
 import numpy as np
 from fastapi import HTTPException
 from pydantic import BaseModel
 from core.models import Rect, TextBubble
-from engines.common.textblock import TextBlock
-from services.job_service import job_manager
-from services.page_image_loader import ensure_page_image, invalidate_page_caches, load_cv_image
-from services.review_state_service import derive_bubble_status, refresh_bubble_status, refresh_page_status
+from infrastructure.image.loading import ensure_page_image, invalidate_page_caches, load_cv_image
+from core.state.review import derive_bubble_status, refresh_bubble_status, refresh_page_status
 from core.version import APP_NAME
 
 import logging
@@ -324,10 +323,13 @@ def re_ocr_bubble_response(state, page_id: str, bubble_id: int, detection_servic
         image = page.cv_image.copy()
         box = bubble.box
 
-    x1, y1, x2, y2 = (int(v) for v in box.to_xyxy())
-    tb_block = TextBlock(text_bbox=np.array([x1, y1, x2, y2]))
+    recognized_text = ""
     try:
-        detection_service.recognize_single_block(image, tb_block, lang=config.source_language)
+        recognized_text = detection_service.recognize_region(
+            image,
+            [int(v) for v in box.to_xyxy()],
+            lang=config.source_language,
+        )
     except Exception as e:
         logger.warning("Failed to re-OCR bubble %s: %s", bubble_id, e)
 
@@ -336,7 +338,7 @@ def re_ocr_bubble_response(state, page_id: str, bubble_id: int, detection_servic
         bubble = next((b for b in page.bubbles if b.id == bubble_id), None)
         if not bubble:
             raise HTTPException(status_code=404, detail="Bubble not found")
-        bubble.text = tb_block.text
+        bubble.text = recognized_text
         bubble.edited = True
         refresh_page_status(page)
         invalidate_page_caches(page)
@@ -344,7 +346,7 @@ def re_ocr_bubble_response(state, page_id: str, bubble_id: int, detection_servic
         return {"status": "ok", "text": bubble.text}
 
 
-def start_translate_bubble(state, page_id: str, bubble_id: int, translation_service, config):
+def start_translate_bubble(state, page_id: str, bubble_id: int, translation_service, config, job_manager):
     with state.lock:
         page = _resolve_page(state, page_id)
         page_idx = _resolve_page_index(state, page_id)
@@ -355,11 +357,13 @@ def start_translate_bubble(state, page_id: str, bubble_id: int, translation_serv
         "translate-bubble",
         page_idx,
         f"translate-bubble:{page_id}:{bubble_id}",
-        lambda job: _translate_single_bubble_job(state, job, page_id, bubble_id, translation_service, config),
+        lambda job: _translate_single_bubble_job(
+            state, job, page_id, bubble_id, translation_service, config, job_manager
+        ),
     )
 
 
-def _translate_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, translation_service, config):
+def _translate_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, translation_service, config, job_manager):
     with state.lock:
         page_idx = _resolve_page_index(state, page_id)
         page = state.pages[page_idx]
@@ -373,9 +377,10 @@ def _translate_single_bubble_job(state, job: dict, page_id: str, bubble_id: int,
 
     job_manager.ensure_not_cancelled(job)
     job_manager.update(job, progress=30, message="Translating selected bubble")
-    tb_block = TextBlock(
+    tb_block = SimpleNamespace(
         text_bbox=np.array(bubble_snapshot.source_xyxy()).astype(np.int32),
         text=bubble_snapshot.text,
+        translation="",
     )
     translation_service.translate_blocks([tb_block], config.source_language, config.target_language, image)
     job_manager.ensure_not_cancelled(job)

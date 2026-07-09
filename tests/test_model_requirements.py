@@ -10,7 +10,7 @@ if str(BACKEND) not in sys.path:
 
 from core.config import AppConfig
 from infrastructure.downloads import ModelID
-from services.model_requirements import get_required_model_ids, get_model_status
+from infrastructure.downloads.requirements import get_required_model_ids, get_model_status
 from api.routes import settings as settings_route
 from download_models import get_model_ids
 
@@ -77,7 +77,7 @@ class ModelRequirementsTests(unittest.TestCase):
         )
 
         with patch(
-            "services.model_requirements.ModelDownloader.is_downloaded",
+            "infrastructure.downloads.requirements.ModelDownloader.is_downloaded",
             side_effect=lambda model_id: model_id == ModelID.RTDETR_INT8_ONNX,
         ) as is_downloaded:
             status = get_model_status(cfg)
@@ -116,7 +116,7 @@ class ModelRequirementsTests(unittest.TestCase):
         )
 
         with (
-            patch("services.model_requirements.ModelDownloader.is_downloaded", return_value=True),
+            patch("infrastructure.downloads.requirements.ModelDownloader.is_downloaded", return_value=True),
         ):
             status = settings_route.get_models_status_for_config(cfg)
 

@@ -1,11 +1,11 @@
 from fastapi import HTTPException
 
 from pipeline.page_analysis import bubble_clip_boxes, inpaint_boxes
-from services.image_encoding_service import encode_preview_jpeg_bytes
-from services.job_service import job_manager
-from services.page_crud_service import resolve_page, resolve_page_index
-from services.page_image_loader import ensure_page_image, invalidate_page_caches
-from services.review_state_service import refresh_page_status
+from infrastructure.image.encoding import encode_preview_jpeg_bytes
+from infrastructure.image.loading import ensure_page_image, invalidate_page_caches
+from core.state.review import refresh_page_status
+
+from .page_crud import resolve_page, resolve_page_index
 
 
 def _ensure_project_revision(state, start_revision: int) -> None:
@@ -13,7 +13,7 @@ def _ensure_project_revision(state, start_revision: int) -> None:
         raise RuntimeError("Project changed while the operation was running. Please retry.")
 
 
-def start_inpaint_bubble(state, page_id: str, bubble_id: int, inpainting_service):
+def start_inpaint_bubble(state, page_id: str, bubble_id: int, inpainting_service, job_manager):
     with state.lock:
         page = resolve_page(state, page_id)
         page_idx = resolve_page_index(state, page_id)
@@ -26,17 +26,22 @@ def start_inpaint_bubble(state, page_id: str, bubble_id: int, inpainting_service
         "inpaint-bubble",
         page_idx,
         f"inpaint-bubble:{page_id}:{bubble_id}",
-        lambda job: _inpaint_single_bubble_job(state, job, page_id, bubble_id, inpainting_service),
+        lambda job: _inpaint_single_bubble_job(state, job, page_id, bubble_id, inpainting_service, job_manager),
     )
 
 
-def start_inpaint_page(state, page_id: str, inpainting_service):
+def start_inpaint_page(state, page_id: str, inpainting_service, job_manager):
     with state.lock:
         page_idx = resolve_page_index(state, page_id)
-    return job_manager.start("inpaint", page_idx, f"inpaint:{page_id}", lambda job: _inpaint_job(state, job, page_id, inpainting_service))
+    return job_manager.start(
+        "inpaint",
+        page_idx,
+        f"inpaint:{page_id}",
+        lambda job: _inpaint_job(state, job, page_id, inpainting_service, job_manager),
+    )
 
 
-def _inpaint_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, inpainting_service):
+def _inpaint_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, inpainting_service, job_manager):
     with state.lock:
         page_idx = resolve_page_index(state, page_id)
         page = state.pages[page_idx]
@@ -72,7 +77,7 @@ def _inpaint_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, i
         return {"status": "ok"}
 
 
-def _inpaint_job(state, job: dict, page_id: str, inpainting_service):
+def _inpaint_job(state, job: dict, page_id: str, inpainting_service, job_manager):
     with state.lock:
         page_idx = resolve_page_index(state, page_id)
         page = state.pages[page_idx]

@@ -1,26 +1,14 @@
 import io
 import os
-from functools import lru_cache
 from typing import Optional
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
 from core.models import MangaPage
-from services.page_crud_service import resolve_page
-from services.page_image_loader import ensure_page_image
+from infrastructure.image.loading import ensure_page_image
 
-
-@lru_cache(maxsize=64)
-def resolve_font_path(font_family: str | None) -> str | None:
-    from infrastructure.fonts import resolver as font_resolver
-
-    resolved, _chain = font_resolver.resolve(
-        text="",
-        requested_family=font_family,
-        target_lang="Korean",
-    )
-    return resolved.path
+from .page_crud import resolve_page
 
 
 def export_page_response(state, page_id: str, export_service, save_path: Optional[str] = None):
@@ -39,13 +27,12 @@ def export_page_response(state, page_id: str, export_service, save_path: Optiona
             bubble_counter=source.bubble_counter,
         )
 
-    font_path = resolve_font_path("Pretendard Variable")
-
+    # Font path and per-bubble font resolution default to the export service's
+    # bundled resolver; the API layer only names the family.
     pil_image = export_service.render_page(
         page,
-        font_path=font_path,
+        font_path=None,
         font_family="Pretendard Variable",
-        font_resolver=resolve_font_path,
     )
 
     if pil_image is None:

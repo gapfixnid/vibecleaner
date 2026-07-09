@@ -13,7 +13,7 @@ from infrastructure.logging import configure_logging
 from infrastructure.downloads import ModelDownloader, ModelID
 from infrastructure.storage import get_settings_file_path
 from core.config import AppConfig
-from services.model_requirements import get_required_model_ids
+from infrastructure.downloads.requirements import get_required_model_ids
 from core.version import APP_NAME
 
 configure_logging()

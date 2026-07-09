@@ -69,6 +69,23 @@ bundled fonts under `backend/infrastructure/assets/fonts/`.
 `core.models.geometry.Rect`; only rendering-engine code converts `Rect` to
 `QRectF` at its own boundary.
 
+The `backend/services` layer has been fully absorbed:
+
+| Former module | New home |
+| --- | --- |
+| `image_encoding_service`, `page_image_loader` | `infrastructure/image/{encoding,loading}.py` |
+| `cache_service` | `infrastructure/cache/tasks.py` |
+| `job_service` | `infrastructure/jobs.py` (`JobManager`, container-owned instance) |
+| `model_requirements` | `infrastructure/downloads/requirements.py` |
+| `review_state_service` | `core/state/review.py` |
+| `export_service` | `engines/rendering/export.py` |
+| `page_analysis_service`, `bubble_analysis_service` | `pipeline/analysis/{page,bubbles}.py` |
+| route use-case helpers | `backend/api/use_cases/*` |
+
+API use cases receive `job_manager` and engine services as explicit arguments
+from routes (sourced from the container); there is no module-level
+`job_manager` singleton.
+
 ## Settings And Engine Options
 
 Settings flow through explicit values:
@@ -124,12 +141,12 @@ Run these before claiming dependency boundaries are clean:
 rg "from engines|import engines" backend/pipeline backend/api
 rg "service_registry|state = ProjectState\(|config: AppConfig = AppConfig\(" backend
 rg "domain.project_state|legacy_state|from modules.config import config" backend tests
-rg "^service = .*Service\(|^[a-z_]+_service = [A-Z][A-Za-z]+Service\(" backend/services backend/pipeline
-rg "from services|import services" backend/pipeline
+rg "from services|import services" backend tests download_models.py scripts
 rg "from modules|import modules" backend tests download_models.py scripts
 rg "modules.logging_config" backend download_models.py tests scripts
 rg "^from app\.|^import app\." backend tests download_models.py scripts
 rg "PySide6" backend/core backend/pipeline
+rg "^from api|^import api" backend/pipeline backend/core backend/engines backend/infrastructure
 ```
 
 Expected result: no application imports or singleton definitions that violate

@@ -252,6 +252,23 @@ class DetectionService:
             if crop_hash:
                 self._remember_ocr(crop_hash, block.text)
 
+    def recognize_region(
+        self,
+        image: np.ndarray,
+        xyxy: List[float],
+        lang: str = "Japanese",
+        engine: str | None = None,
+    ) -> str:
+        """Run OCR on an image region given as [x1, y1, x2, y2].
+
+        Engine-domain wrapper so API callers do not need the TextBlock type.
+        """
+        from engines.common.textblock import TextBlock
+
+        block = TextBlock(text_bbox=np.array(xyxy, dtype=np.int32))
+        self.recognize_single_block(image, block, lang=lang, engine=engine)
+        return block.text
+
     def get_diagnostics(self) -> dict[str, Any]:
         total = self._ocr_hits + self._ocr_misses
         hit_rate = (self._ocr_hits / total * 100) if total > 0 else 0.0

@@ -154,4 +154,3 @@ class JobManager:
         }
 
 
-job_manager = JobManager()

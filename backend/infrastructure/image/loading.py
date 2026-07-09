@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 from core.models import MangaPage
 from core.version import APP_NAME
-from services.image_encoding_service import encode_thumbnail_bytes
+from infrastructure.image.encoding import encode_thumbnail_bytes
 
 
 logger = logging.getLogger(APP_NAME)

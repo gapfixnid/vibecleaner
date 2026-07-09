@@ -8,7 +8,7 @@ from api.dependencies import get_container
 from core.version import APP_NAME
 from core.container import AppContainer
 from core.config import OLLAMA_API_URL
-from services.model_requirements import download_required_models, get_model_status
+from infrastructure.downloads.requirements import download_required_models, get_model_status
 
 router = APIRouter()
 logger = logging.getLogger(APP_NAME)
@@ -305,5 +305,5 @@ def download_models(container: AppContainer = Depends(get_container)):
         kind="download_models",
         page_idx=-1,
         key="download_models",
-        worker=lambda job: download_required_models(container.config, job),
+        worker=lambda job: download_required_models(container.config, job, container.job_manager),
     )

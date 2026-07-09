@@ -93,20 +93,23 @@ def get_model_status(settings: AppConfig) -> dict[str, Any]:
     }
 
 
-def download_required_models(settings: AppConfig, job: dict[str, Any] | None = None) -> dict[str, Any]:
-    from services.job_service import job_manager
-
+def download_required_models(
+    settings: AppConfig,
+    job: dict[str, Any] | None = None,
+    job_manager: Any | None = None,
+) -> dict[str, Any]:
     cfg = settings
     model_ids = get_required_model_ids(cfg)
     total = len(model_ids)
     downloaded: list[str] = []
     already_present: list[str] = []
 
+    report_progress = job is not None and job_manager is not None
     for index, model_id in enumerate(model_ids, start=1):
         if ModelDownloader.is_downloaded(model_id):
             already_present.append(model_id.value)
         else:
-            if job:
+            if report_progress:
                 job_manager.update(
                     job,
                     progress=int(((index - 1) / max(total, 1)) * 95),
@@ -115,7 +118,7 @@ def download_required_models(settings: AppConfig, job: dict[str, Any] | None = N
             ModelDownloader.get(model_id)
             downloaded.append(model_id.value)
 
-    if job:
+    if report_progress:
         job_manager.update(job, progress=95, message="Checking downloaded models")
 
     return {

@@ -1,15 +1,29 @@
 import os
 import logging
+from functools import lru_cache
+
 import cv2
 from PIL import Image, ImageDraw, ImageFont
 from PySide6.QtGui import QFontMetricsF
 from typing import Optional, Any, Callable
 from core.models import MangaPage
-from engines.rendering.service import RenderService
+from .service import RenderService
 
 logger = logging.getLogger(__name__)
 
 FontResolver = Callable[[str | None], str | None]
+
+
+@lru_cache(maxsize=64)
+def resolve_font_path(font_family: str | None) -> str | None:
+    from infrastructure.fonts import resolver as font_resolver
+
+    resolved, _chain = font_resolver.resolve(
+        text="",
+        requested_family=font_family,
+        target_lang="Korean",
+    )
+    return resolved.path
 
 
 class ExportService:
@@ -24,6 +38,10 @@ class ExportService:
         font_resolver: FontResolver | None = None,
     ) -> Optional[Image.Image]:
         """Render a single page's export image using Pillow."""
+        if font_path is None and font_family is not None:
+            font_path = resolve_font_path(font_family)
+        if font_resolver is None:
+            font_resolver = resolve_font_path
         if page.inpainted_image is None:
             return None
 

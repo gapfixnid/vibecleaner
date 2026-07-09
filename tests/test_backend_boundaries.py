@@ -52,6 +52,7 @@ def test_removed_singleton_modules_and_imports_stay_removed():
     assert not (backend / "app").exists()
     assert not (backend / "routes").exists()
     assert not (backend / "domain").exists()
+    assert not (backend / "services").exists()
 
     scanned_files = [
         path
@@ -189,23 +190,22 @@ def test_infrastructure_does_not_import_legacy_or_upper_layers():
     assert offenders == []
 
 
-def test_services_do_not_define_module_level_service_singletons():
-    services = ROOT / "backend" / "services"
+def test_backend_does_not_import_removed_services_package():
+    backend = ROOT / "backend"
     offenders = []
 
-    for path in services.rglob("*.py"):
+    for path in backend.rglob("*.py"):
         if "__pycache__" in path.parts:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in tree.body:
-            if not isinstance(node, ast.Assign):
-                continue
-            target_names = [target.id for target in node.targets if isinstance(target, ast.Name)]
-            if "service" not in target_names:
-                continue
-            if isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name):
-                if node.value.func.id.endswith("Service"):
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                if node.module.split(".")[0] == "services":
                     offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.split(".")[0] == "services":
+                        offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
 
     assert offenders == []
 

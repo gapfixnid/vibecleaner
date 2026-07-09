@@ -30,17 +30,17 @@ def build_container(config: Any | None = None) -> AppContainer:
     from core.config import AppConfig
     from infrastructure.storage import get_settings_file_path
     from pipeline.page_translation_stages import build_page_translation_runner
-    from services.job_service import job_manager
-    from services.bubble_analysis_service import BubbleAnalysisService
+    from infrastructure.jobs import JobManager
+    from pipeline.analysis.bubbles import BubbleAnalysisService
     from engines.detection.service import DetectionService
-    from services.export_service import ExportService
-    from services.image_encoding_service import encode_preview_jpeg_bytes, encode_thumbnail_bytes
+    from engines.rendering.export import ExportService
+    from infrastructure.image.encoding import encode_preview_jpeg_bytes, encode_thumbnail_bytes
     from engines.inpainting.service import InpaintingService
     from engines.rendering.layout_planner import LayoutPlannerService
-    from services.page_analysis_service import PageAnalysisService
-    from services.page_image_loader import ensure_page_image, invalidate_page_caches
+    from pipeline.analysis.page import PageAnalysisService
+    from infrastructure.image.loading import ensure_page_image, invalidate_page_caches
     from engines.rendering.service import RenderService
-    from services.review_state_service import refresh_page_status
+    from core.state.review import refresh_page_status
     from engines.translation.service import TranslationService
 
     runtime_config = config or AppConfig(settings_path=get_settings_file_path())
@@ -71,7 +71,7 @@ def build_container(config: Any | None = None) -> AppContainer:
     return AppContainer(
         config=runtime_config,
         project_state=ProjectState(),
-        job_manager=job_manager,
+        job_manager=JobManager(),
         translation_service=translation_service,
         detection_service=detection_service,
         inpainting_service=inpainting_service,

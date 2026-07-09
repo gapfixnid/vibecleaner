@@ -22,7 +22,7 @@ flowchart LR
 
 - `frontend/`: React UI, state stores, API adapter, canvas/editor views.
 - `desktop/src-tauri/`: Tauri shell, backend process launcher, command forwarding to the local API.
-- `backend/api/`: FastAPI routes and dependency helpers. Routes receive application dependencies from the container instead of importing global services.
+- `backend/api/`: FastAPI routes, dependency helpers, and use-case helpers (`api/use_cases/`). Routes receive application dependencies from the container instead of importing global services.
 - `backend/core/`: application configuration snapshots, models, ports, state contracts, and the composition root in `backend/core/container.py`.
 - `backend/pipeline/`: page-processing plans, runner, stages, strategies, validation, and provenance capture.
 - `backend/engines/`: concrete detection, OCR, translation, inpainting, and rendering implementations and adapters behind core ports, plus shared engine domain types in `engines/common`.
@@ -40,7 +40,7 @@ Backend dependency direction is intentionally one-way:
 - `backend/engines` and `backend/infrastructure` adapt concrete libraries behind core ports.
 - `backend/core/container.py` is the only place that wires API-facing services, pipeline stages, concrete engines, infrastructure, configuration, and project state together.
 
-Routes must not import concrete engines, `services.service_registry`, module-level project state, or module-level config singletons. Runtime state and settings are container-owned instances, so tests can assemble fake ports and run the pipeline without local model files.
+Routes must not import concrete engines, module-level project state, or module-level config singletons. The legacy `backend/services` package has been fully absorbed into `infrastructure`, `core`, `engines`, `pipeline`, and `api/use_cases`. Runtime state, settings, and the job manager are container-owned instances, so tests can assemble fake ports and run the pipeline without local model files.
 
 The cleanup goal is that the application runs through the new architecture
 only. Any remaining legacy state/model wrapper dependency is migration debt,

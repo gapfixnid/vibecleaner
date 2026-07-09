@@ -13,7 +13,7 @@ if str(BACKEND) not in sys.path:
 import pipeline.page_analysis as page_analysis
 from core.models import TextBubble
 from core.config import AppConfig
-from services.bubble_analysis_service import BubbleAnalysisResult, BubbleData
+from pipeline.analysis.bubbles import BubbleAnalysisResult, BubbleData
 from engines.rendering.layout_planner import Insets
 
 

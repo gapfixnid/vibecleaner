@@ -10,9 +10,9 @@ from api.dependencies import get_container
 from core.models import MangaPage
 from core.version import APP_NAME
 from core.container import AppContainer
-from services.cache_service import submit_cache_task
-from services.image_encoding_service import encode_preview_jpeg_bytes
-from services.page_image_loader import load_cv_image, warm_original_thumbnail
+from infrastructure.cache.tasks import submit_cache_task
+from infrastructure.image.encoding import encode_preview_jpeg_bytes
+from infrastructure.image.loading import load_cv_image, warm_original_thumbnail
 
 router = APIRouter()
 logger = logging.getLogger(APP_NAME)

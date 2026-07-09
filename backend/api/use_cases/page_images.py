@@ -7,13 +7,13 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from core.models import MangaPage
 from core.version import APP_NAME
-from services.image_encoding_service import (
+from infrastructure.image.encoding import (
     encode_jpeg_bytes,
     encode_png_bytes,
     encode_preview_jpeg_bytes,
     encode_thumbnail_bytes,
 )
-from services.page_image_loader import ensure_original_thumbnail, load_cv_image
+from infrastructure.image.loading import ensure_original_thumbnail, load_cv_image
 
 import logging
 

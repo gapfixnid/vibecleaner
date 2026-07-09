@@ -16,7 +16,7 @@ from core.config import AppConfig
 from pipeline.page_translation import run_page_translation
 from pipeline.planner import PipelinePlanner
 from pipeline.page_translation_stages import build_page_translation_runner
-from services.job_service import job_manager
+from infrastructure.jobs import JobManager
 
 
 class FakeInpaintingService:
@@ -84,7 +84,7 @@ def test_page_translation_runner_uses_canonical_stages_and_updates_page_state():
         page_id="page_a",
         state=state,
         config=config,
-        job_manager=job_manager,
+        job_manager=JobManager(),
         runner=runner,
         planner=PipelinePlanner(),
         show_progress=False,

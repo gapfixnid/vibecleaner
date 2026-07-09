@@ -5,8 +5,8 @@ from fastapi import HTTPException
 from PIL import Image
 
 from core.models import MangaPage
-from services.page_image_loader import ensure_page_image
-from services.review_state_service import derive_page_status
+from infrastructure.image.loading import ensure_page_image
+from core.state.review import derive_page_status
 
 
 def get_page_by_id(state, page_id: str) -> MangaPage:

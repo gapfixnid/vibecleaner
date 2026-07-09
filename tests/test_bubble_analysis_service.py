@@ -9,8 +9,8 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from services import bubble_analysis_service as bubble_module
-from services.bubble_analysis_service import BubbleAnalysisService
+from pipeline.analysis import bubbles as bubble_module
+from pipeline.analysis.bubbles import BubbleAnalysisService
 
 
 class BubbleAnalysisServiceTests(unittest.TestCase):

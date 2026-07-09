@@ -353,7 +353,7 @@ class BubbleAnalysisService:
 
     def _get_reading_order(self, source_lang: str) -> str:
         """Determine reading order from source language."""
-        from services.page_analysis_service import infer_reading_order
+        from pipeline.analysis.page import infer_reading_order
 
         direction = infer_reading_order(source_lang).direction
         return "RTL" if direction == "rtl" else "LTR"

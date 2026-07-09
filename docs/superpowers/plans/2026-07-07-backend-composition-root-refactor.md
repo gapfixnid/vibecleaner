@@ -739,6 +739,46 @@ Progress note, 2026-07-09 (`backend/app` removal):
   `scripts/verify-packaging.py` passed; `create_app()` smoke boots with the
   container and the bundled font resolves.
 
+Progress note, 2026-07-09 (`backend/services` absorption):
+
+- The `backend/services` layer (absent from the target layout) was fully
+  absorbed:
+  - `image_encoding_service` -> `infrastructure/image/encoding.py`;
+    `page_image_loader` -> `infrastructure/image/loading.py` (matching the
+    design's `infrastructure/image/{encoding,loading}.py`).
+  - `cache_service` -> `infrastructure/cache/tasks.py`.
+  - `job_service` -> `infrastructure/jobs.py`; the module-level `job_manager`
+    singleton was deleted — the container builds `JobManager()` and routes
+    pass it into use cases explicitly.
+  - `model_requirements` -> `infrastructure/downloads/requirements.py`;
+    `download_required_models` now takes an explicit `job_manager` argument.
+  - `review_state_service` -> `core/state/review.py` (pure domain rules over
+    core models).
+  - `export_service` -> `engines/rendering/export.py`; the cached
+    `resolve_font_path` helper moved with it, so the API layer no longer
+    imports `infrastructure.fonts` — `ExportService.render_page` defaults its
+    font path/resolver from the bundled resolver.
+  - `page_analysis_service` -> `pipeline/analysis/page.py` and
+    `bubble_analysis_service` -> `pipeline/analysis/bubbles.py` (Qt-free
+    analysis consumed by the OCR stage via container injection).
+  - Route helpers `bubble_service`, `page_crud_service`, `page_image_service`,
+    `page_export_service`, `page_inpaint_service` ->
+    `backend/api/use_cases/{bubbles,page_crud,page_images,page_export,page_inpaint}.py`.
+- `api/use_cases/bubbles.py` no longer imports the concrete
+  `engines.common.textblock.TextBlock`: re-OCR calls the new
+  `DetectionService.recognize_region(image, xyxy, lang)` engine wrapper, and
+  single-bubble translation uses an attribute-compatible `SimpleNamespace`
+  block (same pattern as the page translation stage).
+- Boundary tests updated: `backend/services` must stay deleted, no backend
+  module may import `services.*`, and the api layer stays free of concrete
+  engine imports.
+- Remaining debt: api use cases and the project route still call
+  `infrastructure.image.{encoding,loading}` helpers directly instead of
+  receiving them via the container, and `infrastructure/image/loading.py`
+  raises FastAPI `HTTPException` (HTTP concern inside infrastructure).
+- Verification: `pytest -q` 81 passed; `verify-packaging.py` passed;
+  `create_app()` smoke boots with a container-owned `JobManager` instance.
+
 ---
 
 ## Self-Review

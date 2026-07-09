@@ -11,7 +11,7 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-import services.bubble_service as bubble_service
+import api.use_cases.bubbles as bubble_service
 from core.models import MangaPage, TextBubble
 from core.state.project_state import ProjectState
 

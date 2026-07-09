@@ -4,15 +4,15 @@ from pydantic import BaseModel
 
 from api.dependencies import get_container
 from core.container import AppContainer
-from services.bubble_service import (
+from api.use_cases.bubbles import (
     BubbleUpdateSchema,
     get_bubbles_response,
     re_ocr_bubble_response,
     start_translate_bubble,
     update_bubbles_response,
 )
-from services.page_image_service import get_page_image_response
-from services.page_crud_service import (
+from api.use_cases.page_images import get_page_image_response
+from api.use_cases.page_crud import (
     delete_page_batch_response,
     delete_page_response,
     duplicate_page_batch_response,
@@ -24,8 +24,8 @@ from services.page_crud_service import (
     resolve_page_index as _resolve_page_index,
     select_page_response,
 )
-from services.page_export_service import export_page_response
-from services.page_inpaint_service import start_inpaint_bubble, start_inpaint_page
+from api.use_cases.page_export import export_page_response
+from api.use_cases.page_inpaint import start_inpaint_bubble, start_inpaint_page
 from pipeline.page_translation import run_page_translation
 router = APIRouter()
 
@@ -114,15 +114,24 @@ def re_ocr_bubble(page_id: str, bubble_id: int, container: AppContainer = Depend
 
 @router.post("/api/pages/{page_id}/bubbles/{bubble_id}/translate")
 def translate_single_bubble(page_id: str, bubble_id: int, container: AppContainer = Depends(get_container)):
-    return start_translate_bubble(container.project_state, page_id, bubble_id, container.translation_service, container.config)
+    return start_translate_bubble(
+        container.project_state,
+        page_id,
+        bubble_id,
+        container.translation_service,
+        container.config,
+        container.job_manager,
+    )
 
 @router.post("/api/pages/{page_id}/bubbles/{bubble_id}/inpaint")
 def inpaint_single_bubble(page_id: str, bubble_id: int, container: AppContainer = Depends(get_container)):
-    return start_inpaint_bubble(container.project_state, page_id, bubble_id, container.inpainting_service)
+    return start_inpaint_bubble(
+        container.project_state, page_id, bubble_id, container.inpainting_service, container.job_manager
+    )
 
 @router.post("/api/pages/{page_id}/inpaint")
 def run_inpaint(page_id: str, container: AppContainer = Depends(get_container)):
-    return start_inpaint_page(container.project_state, page_id, container.inpainting_service)
+    return start_inpaint_page(container.project_state, page_id, container.inpainting_service, container.job_manager)
 
 @router.post("/api/pages/{page_id}/translate-all")
 def run_translate_all(page_id: str, container: AppContainer = Depends(get_container)):
