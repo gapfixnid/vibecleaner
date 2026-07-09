@@ -1,34 +1,45 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING
 
-from core.config import AppConfigSnapshot
+from core.config import AppConfig, AppConfigSnapshot
 from core.state.project_state import ProjectState
 from pipeline.planner import PipelinePlanner
 from pipeline.registry import StageRegistry
 from pipeline.runner import PipelineRunner
 
+if TYPE_CHECKING:
+    # Type-only imports: the composition root may know every concrete type,
+    # but importing engines/infrastructure at module load time would drag
+    # heavy dependencies into `from core.container import AppContainer`.
+    from engines.detection.service import DetectionService
+    from engines.inpainting.service import InpaintingService
+    from engines.rendering.export import ExportService
+    from engines.rendering.service import RenderService
+    from engines.translation.service import TranslationService
+    from infrastructure.cache.tasks import CacheTaskQueue
+    from infrastructure.jobs import JobManager
+
 
 @dataclass
 class AppContainer:
-    config: Any
+    config: AppConfig
     project_state: ProjectState
-    job_manager: Any
-    cache_tasks: Any
-    translation_service: Any
-    detection_service: Any
-    inpainting_service: Any
-    render_service: Any
-    export_service: Any
+    job_manager: JobManager
+    cache_tasks: CacheTaskQueue
+    translation_service: TranslationService
+    detection_service: DetectionService
+    inpainting_service: InpaintingService
+    render_service: RenderService
+    export_service: ExportService
     settings: AppConfigSnapshot
     stage_registry: StageRegistry
     pipeline_runner: PipelineRunner
     pipeline_planner: PipelinePlanner
 
 
-def build_container(config: Any | None = None) -> AppContainer:
-    from core.config import AppConfig
+def build_container(config: AppConfig | None = None) -> AppContainer:
     from infrastructure.storage import get_settings_file_path
     from pipeline.page_translation_stages import build_page_translation_runner
     from infrastructure.cache.tasks import CacheTaskQueue
