@@ -22,6 +22,7 @@ import infrastructure.runtime.qt  # noqa: F401
 
 from core.version import APP_NAME, __version__ as APP_VERSION
 from core.container import build_container
+from core.errors import PageImageLoadError, PageNotFoundError
 from infrastructure.logging import configure_logging
 from api.routes.jobs import router as jobs_router
 from api.routes.pages import router as pages_router
@@ -84,9 +85,19 @@ def include_routes(app: FastAPI) -> None:
     app.include_router(jobs_router)
 
 
+async def _page_not_found_handler(request: Request, exc: PageNotFoundError):
+    return JSONResponse({"detail": "Page not found"}, status_code=404)
+
+
+async def _page_image_load_handler(request: Request, exc: PageImageLoadError):
+    return JSONResponse({"detail": "Failed to load page image"}, status_code=500)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title=f"{APP_NAME} backend", version=APP_VERSION, lifespan=lifespan)
     app.state.container = build_container()
+    app.add_exception_handler(PageNotFoundError, _page_not_found_handler)
+    app.add_exception_handler(PageImageLoadError, _page_image_load_handler)
     app.middleware("http")(reject_untrusted_browser_origins)
     app.add_middleware(
         CORSMiddleware,

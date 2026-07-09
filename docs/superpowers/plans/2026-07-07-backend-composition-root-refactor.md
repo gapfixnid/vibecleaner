@@ -779,6 +779,32 @@ Progress note, 2026-07-09 (`backend/services` absorption):
 - Verification: `pytest -q` 81 passed; `verify-packaging.py` passed;
   `create_app()` smoke boots with a container-owned `JobManager` instance.
 
+Progress note, 2026-07-09 (HTTP concerns out of lower layers):
+
+- `backend/core/errors.py` now exists (per the design layout) with
+  `PageNotFoundError` and `PageImageLoadError` domain errors.
+- `infrastructure/image/loading.py` and
+  `pipeline/page_translation_stages.py` no longer import fastapi; they raise
+  the core domain errors. `main.py` registers exception handlers mapping
+  `PageNotFoundError` -> 404 and `PageImageLoadError` -> 500, preserving the
+  previous route behavior. The batch-translation route skips
+  `PageNotFoundError` pages the same way it skipped `HTTPException` pages.
+- The module-level cache executor in `infrastructure/cache/tasks.py` became
+  the `CacheTaskQueue` class; the container owns the instance
+  (`container.cache_tasks`) and the project route passes it into its warm-up
+  helpers.
+- New boundary test: `backend/{core,pipeline,engines,infrastructure}` must
+  not reference fastapi.
+- Debt re-scoped: direct api imports of the *stateless*
+  `infrastructure.image.{encoding,loading}` helper facades are now documented
+  as acceptable in the dependency contract ("infrastructure internals" means
+  private implementation modules and stateful resources). Threading nine pure
+  helper functions through every use-case signature added noise without
+  decoupling value; the stateful pieces (job manager, cache queue) are the
+  ones that must be container-owned, and now are.
+- Verification: `pytest -q` 82 passed; `create_app()` smoke confirms the
+  container-owned `CacheTaskQueue` and registered domain-error handlers.
+
 ---
 
 ## Self-Review

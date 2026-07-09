@@ -129,6 +129,23 @@ def test_core_and_pipeline_are_qt_free():
     assert "PySide6" not in combined
 
 
+def test_lower_layers_are_fastapi_free():
+    backend = ROOT / "backend"
+    scanned_files = (
+        list((backend / "core").rglob("*.py"))
+        + list((backend / "pipeline").rglob("*.py"))
+        + list((backend / "engines").rglob("*.py"))
+        + list((backend / "infrastructure").rglob("*.py"))
+    )
+    offenders = [
+        str(path.relative_to(ROOT))
+        for path in scanned_files
+        if "__pycache__" not in path.parts and "fastapi" in path.read_text(encoding="utf-8")
+    ]
+
+    assert offenders == []
+
+
 def test_pipeline_does_not_import_services():
     pipeline = ROOT / "backend" / "pipeline"
     offenders = []

@@ -2,8 +2,8 @@ import logging
 
 import cv2
 import numpy as np
-from fastapi import HTTPException
 
+from core.errors import PageImageLoadError
 from core.models import MangaPage
 from core.version import APP_NAME
 from infrastructure.image.encoding import encode_thumbnail_bytes
@@ -32,7 +32,7 @@ def ensure_original_thumbnail(page: MangaPage) -> bytes:
         img = load_cv_image(page.file_path)
         if img is None:
             logger.error("Failed to load image for thumbnail: %s", page.file_path)
-            raise HTTPException(status_code=500, detail="Failed to load page image")
+            raise PageImageLoadError(page.file_path)
     else:
         ensure_page_image(page)
         img = page.cv_image
@@ -78,7 +78,7 @@ def ensure_page_image(page: MangaPage) -> None:
         cv_img = load_cv_image(page.file_path)
         if cv_img is None:
             logger.error("Failed to load page image: %s", page.file_path)
-            raise HTTPException(status_code=500, detail="Failed to load page image")
+            raise PageImageLoadError(page.file_path)
         page.cv_image = cv_img
         page._width = cv_img.shape[1]
         page._height = cv_img.shape[0]

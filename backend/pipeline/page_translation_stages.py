@@ -4,8 +4,7 @@ import logging
 from types import SimpleNamespace
 from typing import Any
 
-from fastapi import HTTPException
-
+from core.errors import PageNotFoundError
 from core.models.image import ImageData
 from pipeline.page_analysis import (
     bubbles_from_analysis,
@@ -25,11 +24,11 @@ def _resolve_page_index(state: Any, page_id: str) -> int:
         idx = int(page_id)
         if 0 <= idx < len(state.pages):
             return idx
-        raise HTTPException(status_code=404, detail="Page not found")
+        raise PageNotFoundError(page_id)
     for idx, page in enumerate(state.pages):
         if page.page_id == page_id:
             return idx
-    raise HTTPException(status_code=404, detail="Page not found")
+    raise PageNotFoundError(page_id)
 
 
 def _ensure_project_revision(state: Any, start_revision: int) -> None:

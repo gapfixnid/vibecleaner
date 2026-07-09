@@ -15,6 +15,7 @@ class AppContainer:
     config: Any
     project_state: ProjectState
     job_manager: Any
+    cache_tasks: Any
     translation_service: Any
     detection_service: Any
     inpainting_service: Any
@@ -30,6 +31,7 @@ def build_container(config: Any | None = None) -> AppContainer:
     from core.config import AppConfig
     from infrastructure.storage import get_settings_file_path
     from pipeline.page_translation_stages import build_page_translation_runner
+    from infrastructure.cache.tasks import CacheTaskQueue
     from infrastructure.jobs import JobManager
     from pipeline.analysis.bubbles import BubbleAnalysisService
     from engines.detection.service import DetectionService
@@ -72,6 +74,7 @@ def build_container(config: Any | None = None) -> AppContainer:
         config=runtime_config,
         project_state=ProjectState(),
         job_manager=JobManager(),
+        cache_tasks=CacheTaskQueue(),
         translation_service=translation_service,
         detection_service=detection_service,
         inpainting_service=inpainting_service,

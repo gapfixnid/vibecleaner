@@ -84,7 +84,19 @@ The `backend/services` layer has been fully absorbed:
 
 API use cases receive `job_manager` and engine services as explicit arguments
 from routes (sourced from the container); there is no module-level
-`job_manager` singleton.
+`job_manager` singleton. The cache warm-up executor is likewise a
+container-owned `CacheTaskQueue` instance, not a module-level executor.
+
+HTTP concerns stay in the API layer: `backend/core`, `backend/pipeline`,
+`backend/engines`, and `backend/infrastructure` must not import `fastapi`.
+Lower layers raise `core.errors` domain errors (`PageNotFoundError`,
+`PageImageLoadError`); `backend/main.py` maps them to HTTP responses with
+exception handlers.
+
+API code may import stateless helper facades from `infrastructure`
+(e.g. `infrastructure.image.encoding`/`loading`) directly — "infrastructure
+internals" means private implementation modules and stateful resources, which
+must be container-owned.
 
 ## Settings And Engine Options
 
@@ -147,6 +159,7 @@ rg "modules.logging_config" backend download_models.py tests scripts
 rg "^from app\.|^import app\." backend tests download_models.py scripts
 rg "PySide6" backend/core backend/pipeline
 rg "^from api|^import api" backend/pipeline backend/core backend/engines backend/infrastructure
+rg "fastapi" backend/core backend/pipeline backend/engines backend/infrastructure
 ```
 
 Expected result: no application imports or singleton definitions that violate

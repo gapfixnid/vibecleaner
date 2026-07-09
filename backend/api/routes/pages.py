@@ -26,6 +26,7 @@ from api.use_cases.page_crud import (
 )
 from api.use_cases.page_export import export_page_response
 from api.use_cases.page_inpaint import start_inpaint_bubble, start_inpaint_page
+from core.errors import PageNotFoundError
 from pipeline.page_translation import run_page_translation
 router = APIRouter()
 
@@ -198,7 +199,7 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
                 planner=container.pipeline_planner,
                 show_progress=False,
             )
-        except HTTPException:
+        except (HTTPException, PageNotFoundError):
             pass
         except RuntimeError as exc:
             if "cancelled" in str(exc).lower():

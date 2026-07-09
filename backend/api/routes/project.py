@@ -10,7 +10,6 @@ from api.dependencies import get_container
 from core.models import MangaPage
 from core.version import APP_NAME
 from core.container import AppContainer
-from infrastructure.cache.tasks import submit_cache_task
 from infrastructure.image.encoding import encode_preview_jpeg_bytes
 from infrastructure.image.loading import load_cv_image, warm_original_thumbnail
 
@@ -50,15 +49,15 @@ def _warm_original_thumbnail_caches(pages: list[MangaPage]) -> None:
         warm_original_thumbnail(page)
 
 
-def _start_original_thumbnail_warmup(pages: list[MangaPage]) -> None:
+def _start_original_thumbnail_warmup(cache_tasks, pages: list[MangaPage]) -> None:
     if not pages:
         return
 
     pages_snapshot = list(pages)
-    submit_cache_task(lambda: _warm_original_thumbnail_caches(pages_snapshot))
+    cache_tasks.submit(lambda: _warm_original_thumbnail_caches(pages_snapshot))
 
 
-def _start_project_cache_warmup(state, page_count: int, current_index: int) -> None:
+def _start_project_cache_warmup(cache_tasks, state, page_count: int, current_index: int) -> None:
     if page_count <= 0:
         return
 
@@ -68,7 +67,7 @@ def _start_project_cache_warmup(state, page_count: int, current_index: int) -> N
             if 0 <= idx < page_count and idx not in warm_indices:
                 warm_indices.append(idx)
 
-    submit_cache_task(lambda: _warm_inpainted_response_caches(state, warm_indices))
+    cache_tasks.submit(lambda: _warm_inpainted_response_caches(state, warm_indices))
 
 @router.post("/api/project/new")
 def new_project(container: AppContainer = Depends(get_container)):
@@ -128,7 +127,7 @@ def open_directory(directory: str = Form(...), container: AppContainer = Depends
             "current_index": state.current_page_idx,
             "added": len(added),
         }
-    _start_original_thumbnail_warmup(added)
+    _start_original_thumbnail_warmup(container.cache_tasks, added)
     return result
 
 @router.post("/api/project/open-files")
@@ -178,7 +177,7 @@ def open_files(files_json: str = Form(...), container: AppContainer = Depends(ge
             "current_index": state.current_page_idx,
             "added": len(added),
         }
-    _start_original_thumbnail_warmup(added)
+    _start_original_thumbnail_warmup(container.cache_tasks, added)
     return result
 
 @router.post("/api/project/save")
@@ -396,8 +395,8 @@ def load_project(file_path: str = Form(...), container: AppContainer = Depends(g
             state.touch()
             page_count = len(state.pages)
             current_index = state.current_page_idx
-        _start_original_thumbnail_warmup(loaded_pages)
-        _start_project_cache_warmup(state, page_count, current_index)
+        _start_original_thumbnail_warmup(container.cache_tasks, loaded_pages)
+        _start_project_cache_warmup(container.cache_tasks, state, page_count, current_index)
         return {
             "page_count": page_count,
             "current_index": current_index,
