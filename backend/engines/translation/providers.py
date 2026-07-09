@@ -1,4 +1,5 @@
 # engines/translation/providers.py
+import re
 import base64
 import logging
 import time
@@ -199,16 +200,12 @@ Requirements:
                         self.last_error = None
                         return blocks
                 except TranslationParseError:
-                    plain_text = translated_text.strip()
-                    if (
-                        len(blocks) == 1
-                        and plain_text
-                        and not plain_text.startswith("{")
-                        and not plain_text.startswith("[")
-                    ):
-                        blocks[0].translation = plain_text
-                        self.last_error = None
-                        return blocks
+                    if len(blocks) == 1:
+                        recovered = self._recover_single_block_translation(translated_text)
+                        if recovered:
+                            blocks[0].translation = recovered
+                            self.last_error = None
+                            return blocks
                     raise
 
                 self.last_error = "Translation response did not match block keys"
@@ -353,6 +350,37 @@ Requirements:
             ),
         }
         return fallbacks.get(text.strip(), "")
+
+    def _recover_single_block_translation(self, response_text: str) -> str:
+        """Recover translation from a single-block plain text or malformed JSON response."""
+        text = response_text.strip()
+        if not text:
+            return ""
+
+        if not text.startswith("{") and not text.startswith("["):
+            return text
+
+        match = re.search(r'"block_0"\s*:\s*"(?P<value>.*)', text, re.DOTALL)
+        if not match:
+            return ""
+
+        recovered = match.group("value").strip()
+
+        # Remove common unfinished JSON tails.
+        recovered = recovered.removesuffix('"}').removesuffix('"').strip()
+
+        # If the model/log output leaked after the unfinished value, trim obvious log-looking tail.
+        for marker in (
+            "\n2026-",
+            "\n20",
+            "\n[ERROR]",
+            "\n[WARNING]",
+            "\nTraceback",
+        ):
+            if marker in recovered:
+                recovered = recovered.split(marker, 1)[0].strip()
+
+        return recovered
 
 
 class OllamaTranslator(OpenAICompatibleTranslator):
