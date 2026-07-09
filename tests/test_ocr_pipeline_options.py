@@ -40,8 +40,8 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         image = np.zeros((16, 16, 3), dtype=np.uint8)
 
         with (
-            patch("engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
+            patch("backend.engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
+            patch("backend.engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="ppocr")
 
@@ -52,8 +52,8 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         image = np.zeros((16, 16, 3), dtype=np.uint8)
 
         with (
-            patch("engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
+            patch("backend.engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
+            patch("backend.engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="ppocr")
 
@@ -64,8 +64,8 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         image = np.zeros((16, 16, 3), dtype=np.uint8)
 
         with (
-            patch("engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
+            patch("backend.engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
+            patch("backend.engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="fast")
 
@@ -77,8 +77,8 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         FakePPOCREngine.calls = []
 
         with (
-            patch("engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
+            patch("backend.engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
+            patch("backend.engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(
                 image,
@@ -113,9 +113,9 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         crop = np.full((12, 12, 3), 128, dtype=np.uint8)
 
         with (
-            patch("engines.ocr.ppocr.preprocessing.cv2.createCLAHE") as create_clahe,
-            patch("engines.ocr.ppocr.preprocessing.cv2.adaptiveThreshold", return_value=np.zeros((12, 12), dtype=np.uint8)),
-            patch("engines.ocr.ppocr.preprocessing.cv2.cvtColor", side_effect=lambda image, *_args: image[:, :, 0] if image.ndim == 3 else np.dstack([image] * 3)),
+            patch("backend.engines.ocr.ppocr.preprocessing.cv2.createCLAHE") as create_clahe,
+            patch("backend.engines.ocr.ppocr.preprocessing.cv2.adaptiveThreshold", return_value=np.zeros((12, 12), dtype=np.uint8)),
+            patch("backend.engines.ocr.ppocr.preprocessing.cv2.cvtColor", side_effect=lambda image, *_args: image[:, :, 0] if image.ndim == 3 else np.dstack([image] * 3)),
         ):
             create_clahe.return_value.apply.side_effect = lambda gray: gray
             apply_adaptive_binarization(crop, strength=cfg.adaptive_binarization_strength)

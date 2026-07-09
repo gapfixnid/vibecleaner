@@ -370,7 +370,7 @@ def _replace_low_density_line_with_inverse_mask(
     return inverse_lines, inverse_mask
 
 def _large_inverse_component_title_line(inverse_mask: np.ndarray, current_box: list[int]) -> list[int] | None:
-    from infrastructure import image as imk
+    from ....infrastructure import image as imk
 
     height, width = inverse_mask.shape[:2]
     num_labels, _, stats, _ = imk.connected_components_with_stats(

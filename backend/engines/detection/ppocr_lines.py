@@ -36,7 +36,7 @@ class PPOCRLineDetector:
         self.det_model = det_model
 
         if backend == "torch":
-            from engines.ocr.ppocr.torch.inference_engine.torch_session import TorchInferSession
+            from ..ocr.ppocr.torch.inference_engine.torch_session import TorchInferSession
 
             det_id = ModelID.PPOCR_V5_DET_MOBILE_TORCH
             ModelDownloader.ensure([det_id])

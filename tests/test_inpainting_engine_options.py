@@ -12,8 +12,8 @@ class InpaintingEngineOptionsTests(unittest.TestCase):
         output_crop = np.full((20, 20, 3), 200, dtype=np.uint8)
 
         with (
-            patch("engines.inpainting.hybrid.cv2.inpaint", return_value=output_crop) as cv_inpaint,
-            patch("engines.inpainting.lama.LaMa") as lama_cls,
+            patch("backend.engines.inpainting.hybrid.cv2.inpaint", return_value=output_crop) as cv_inpaint,
+            patch("backend.engines.inpainting.lama.LaMa") as lama_cls,
         ):
             result = HybridInpainter().inpaint(
                 image,
@@ -33,8 +33,8 @@ class InpaintingEngineOptionsTests(unittest.TestCase):
         output_crop = np.full((20, 20, 3), 200, dtype=np.uint8)
 
         with (
-            patch("engines.inpainting.hybrid.cv2.inpaint", return_value=output_crop) as cv_inpaint,
-            patch("engines.inpainting.lama.LaMa") as lama_cls,
+            patch("backend.engines.inpainting.hybrid.cv2.inpaint", return_value=output_crop) as cv_inpaint,
+            patch("backend.engines.inpainting.lama.LaMa") as lama_cls,
         ):
             result = HybridInpainter().inpaint(image, [[10, 10, 14, 14]], engine="opencv")
 
@@ -55,8 +55,8 @@ class InpaintingEngineOptionsTests(unittest.TestCase):
                 return output_crop
 
         with (
-            patch("engines.inpainting.lama.LaMa", side_effect=FakeLaMa) as lama_cls,
-            patch("engines.inpainting.aot.AOT") as aot_cls,
+            patch("backend.engines.inpainting.lama.LaMa", side_effect=FakeLaMa) as lama_cls,
+            patch("backend.engines.inpainting.aot.AOT") as aot_cls,
         ):
             result = HybridInpainter().inpaint(image, [[10, 10, 14, 14]], engine="aot")
 

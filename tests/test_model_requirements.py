@@ -69,7 +69,7 @@ class ModelRequirementsTests(unittest.TestCase):
         )
 
         with patch(
-            "infrastructure.downloads.requirements.ModelDownloader.is_downloaded",
+            "backend.infrastructure.downloads.requirements.ModelDownloader.is_downloaded",
             side_effect=lambda model_id: model_id == ModelID.RTDETR_INT8_ONNX,
         ) as is_downloaded:
             status = get_model_status(cfg)
@@ -108,7 +108,7 @@ class ModelRequirementsTests(unittest.TestCase):
         )
 
         with (
-            patch("infrastructure.downloads.requirements.ModelDownloader.is_downloaded", return_value=True),
+            patch("backend.infrastructure.downloads.requirements.ModelDownloader.is_downloaded", return_value=True),
         ):
             status = settings_route.get_models_status_for_config(cfg)
 

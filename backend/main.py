@@ -1,5 +1,7 @@
 import argparse
+import asyncio
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
@@ -9,19 +11,27 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+# This entry point runs in three modes:
+#   1. `python -m backend.main`      — repo root already on sys.path
+#   2. `python backend/main.py`      — dev Tauri launcher (script mode)
+#   3. PyInstaller sidecar entry     — frozen script mode
+# In script modes there is no parent package, so register the repo root and
+# use absolute `backend.*` imports (the rest of the package stays relative).
+if __package__ in (None, ""):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Text layout uses QFontMetricsF in request handlers, so the backend process
 # needs an offscreen QApplication before routes start serving bubble data.
-from .infrastructure.runtime import qt  # noqa: F401
+from backend.infrastructure.runtime import qt  # noqa: F401
 
-from .core.version import APP_NAME, __version__ as APP_VERSION
-from .core.container import build_container
-from .core.errors import PageImageLoadError, PageNotFoundError
-from .infrastructure.logging import configure_logging
-from .api.routes.jobs import router as jobs_router
-from .api.routes.pages import router as pages_router
-from .api.routes.project import router as project_router
-from .api.routes.settings import router as settings_router
+from backend.core.version import APP_NAME, __version__ as APP_VERSION
+from backend.core.container import build_container
+from backend.core.errors import PageImageLoadError, PageNotFoundError
+from backend.infrastructure.logging import configure_logging
+from backend.api.routes.jobs import router as jobs_router
+from backend.api.routes.pages import router as pages_router
+from backend.api.routes.project import router as project_router
+from backend.api.routes.settings import router as settings_router
 
 
 configure_logging()

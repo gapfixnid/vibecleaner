@@ -5,10 +5,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+# Make the `backend` package importable when run as a script
+# (`python scripts/verify-packaging.py` puts scripts/ on sys.path, not the repo root).
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 BACKEND_ROOT = REPO_ROOT / "backend"
 TAURI_ROOT = REPO_ROOT / "desktop" / "src-tauri"
 TAURI_CONFIG = TAURI_ROOT / "tauri.conf.json"

@@ -12,14 +12,14 @@ from ..pipeline.runner import PipelineRunner
 if TYPE_CHECKING:
     # Type-only imports: the composition root may know every concrete type,
     # but importing engines/infrastructure at module load time would drag
-    # heavy dependencies into `from core.container import AppContainer`.
-    from engines.detection.service import DetectionService
-    from engines.inpainting.service import InpaintingService
-    from engines.rendering.export import ExportService
-    from engines.rendering.service import RenderService
-    from engines.translation.service import TranslationService
-    from infrastructure.cache.tasks import CacheTaskQueue
-    from infrastructure.jobs import JobManager
+    # heavy dependencies into `from .container import AppContainer`.
+    from ..engines.detection.service import DetectionService
+    from ..engines.inpainting.service import InpaintingService
+    from ..engines.rendering.export import ExportService
+    from ..engines.rendering.service import RenderService
+    from ..engines.translation.service import TranslationService
+    from ..infrastructure.cache.tasks import CacheTaskQueue
+    from ..infrastructure.jobs import JobManager
 
 
 @dataclass
@@ -40,21 +40,21 @@ class AppContainer:
 
 
 def build_container(config: AppConfig | None = None) -> AppContainer:
-    from infrastructure.storage import get_settings_file_path
-    from pipeline.page_translation_stages import build_page_translation_runner
-    from infrastructure.cache.tasks import CacheTaskQueue
-    from infrastructure.jobs import JobManager
-    from pipeline.analysis.bubbles import BubbleAnalysisService
-    from engines.detection.service import DetectionService
-    from engines.rendering.export import ExportService
-    from infrastructure.image.encoding import encode_preview_jpeg_bytes, encode_thumbnail_bytes
-    from engines.inpainting.service import InpaintingService
-    from engines.rendering.layout_planner import LayoutPlannerService
-    from pipeline.analysis.page import PageAnalysisService
-    from infrastructure.image.loading import ensure_page_image, invalidate_page_caches
-    from engines.rendering.service import RenderService
-    from core.state.review import refresh_page_status
-    from engines.translation.service import TranslationService
+    from ..infrastructure.storage import get_settings_file_path
+    from ..pipeline.page_translation_stages import build_page_translation_runner
+    from ..infrastructure.cache.tasks import CacheTaskQueue
+    from ..infrastructure.jobs import JobManager
+    from ..pipeline.analysis.bubbles import BubbleAnalysisService
+    from ..engines.detection.service import DetectionService
+    from ..engines.rendering.export import ExportService
+    from ..infrastructure.image.encoding import encode_preview_jpeg_bytes, encode_thumbnail_bytes
+    from ..engines.inpainting.service import InpaintingService
+    from ..engines.rendering.layout_planner import LayoutPlannerService
+    from ..pipeline.analysis.page import PageAnalysisService
+    from ..infrastructure.image.loading import ensure_page_image, invalidate_page_caches
+    from ..engines.rendering.service import RenderService
+    from .state.review import refresh_page_status
+    from ..engines.translation.service import TranslationService
 
     runtime_config = config or AppConfig(settings_path=get_settings_file_path())
     if config is None:

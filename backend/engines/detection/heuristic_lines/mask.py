@@ -610,8 +610,8 @@ def _split_mask_by_tall_vertical_columns(mask: np.ndarray) -> list[np.ndarray]:
         return [mask]
         
     # 5. Check Y-alignment of lines in non-dominant columns vs dominant column
-    from engines.detection.heuristic_lines.clustering import _detect_lines_from_mask
-    from engines.detection.heuristic_lines.skew import _filter_noise_lines
+    from .clustering import _detect_lines_from_mask
+    from .skew import _filter_noise_lines
     dom_cx1, dom_cx2 = columns[max_idx]
     dom_mask = np.zeros_like(mask)
     dom_mask[:, dom_cx1:dom_cx2] = mask[:, dom_cx1:dom_cx2]

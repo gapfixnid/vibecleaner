@@ -16,7 +16,7 @@ FontResolver = Callable[[str | None], str | None]
 
 @lru_cache(maxsize=64)
 def resolve_font_path(font_family: str | None) -> str | None:
-    from infrastructure.fonts import resolver as font_resolver
+    from ...infrastructure.fonts import resolver as font_resolver
 
     resolved, _chain = font_resolver.resolve(
         text="",

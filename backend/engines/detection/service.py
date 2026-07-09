@@ -75,7 +75,7 @@ class DetectionService:
 
     def _cache_file_path(self) -> str:
         """Return the path for the persistent OCR cache file."""
-        from infrastructure.storage import get_app_data_dir
+        from ...infrastructure.storage import get_app_data_dir
 
         return os.path.join(get_app_data_dir(), "ocr_cache.json")
 
@@ -264,7 +264,7 @@ class DetectionService:
 
         Engine-domain wrapper so API callers do not need the TextBlock type.
         """
-        from engines.common.textblock import TextBlock
+        from ..common.textblock import TextBlock
 
         block = TextBlock(text_bbox=np.array(xyxy, dtype=np.int32))
         self.recognize_single_block(image, block, lang=lang, engine=engine)
