@@ -42,14 +42,14 @@ def get_required_model_ids(settings: AppConfig) -> list[ModelID]:
     cfg = settings
     required: list[ModelID] = []
 
-    detect_model = _normalized(getattr(cfg, "detect_model", "High Precision (FP32)"))
+    detect_model = _normalized(cfg.detect_model)
     if detect_model in {"small (int8)", "small (int8) [기본값]", "int8", "fast"}:
         _append_unique(required, [ModelID.RTDETR_INT8_ONNX])
     else:
         _append_unique(required, [ModelID.RTDETR_V2_ONNX])
 
-    ocr_engine = _normalized(getattr(cfg, "ocr_engine", "balanced"))
-    source_language = getattr(cfg, "source_language", "Japanese")
+    ocr_engine = _normalized(cfg.ocr_engine)
+    source_language = cfg.source_language
     source_lang = _normalized(source_language)
     if ocr_engine in {"fast", "speed", "ppocr", "paddleocr", "paddle_ocr"}:
         _append_unique(required, [ModelID.PPOCR_V5_DET_MOBILE, _ppocr_recognition_model(source_language)])
@@ -58,7 +58,7 @@ def get_required_model_ids(settings: AppConfig) -> list[ModelID]:
     else:
         _append_unique(required, [ModelID.PPOCR_V5_DET_MOBILE, _ppocr_recognition_model(source_language)])
 
-    inpaint_engine = _normalized(getattr(cfg, "inpaint_engine", "lama"))
+    inpaint_engine = _normalized(cfg.inpaint_engine)
     if inpaint_engine not in {"opencv", "fast", "speed", "telea"}:
         _append_unique(required, [ModelID.LAMA_ONNX])
 
@@ -84,7 +84,7 @@ def get_model_status(settings: AppConfig) -> dict[str, Any]:
     items = [_model_item(model_id) for model_id in get_required_model_ids(cfg)]
     missing = [item for item in items if not item["downloaded"]]
     return {
-        "setup_completed": bool(getattr(cfg, "setup_completed", False)),
+        "setup_completed": bool(cfg.setup_completed),
         "required": items,
         "missing": missing,
         "required_count": len(items),

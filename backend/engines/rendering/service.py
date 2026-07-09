@@ -4,6 +4,7 @@ import numpy as np
 from PySide6.QtCore import QRectF
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
+from core.config import config_value
 from core.models import Rect, TextBubble
 from .renderer import TextRenderer, TextLayoutResult
 from infrastructure.image.masks import build_bubble_clip_mask
@@ -25,10 +26,10 @@ class RenderService:
         )
 
     def _min_font_size(self) -> float:
-        return float(getattr(self.config, "min_font_size", 6.0))
+        return float(config_value(self.config, "min_font_size"))
 
     def _max_font_size(self) -> float:
-        return float(getattr(self.config, "max_font_size", 48.0))
+        return float(config_value(self.config, "max_font_size"))
 
     def get_optimal_font(
         self, text: str, rect: QRectF, font_family: str | None = None

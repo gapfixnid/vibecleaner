@@ -805,6 +805,22 @@ Progress note, 2026-07-09 (HTTP concerns out of lower layers):
 - Verification: `pytest -q` 82 passed; `create_app()` smoke confirms the
   container-owned `CacheTaskQueue` and registered domain-error handlers.
 
+Progress note, 2026-07-09 (settings defaults single-sourced):
+
+- `AppContainer` fields are now typed with the real service classes via
+  `TYPE_CHECKING` imports; importing `core.container` still loads no
+  engine/infrastructure modules (verified at runtime).
+- `core.config.config_value(config, name)` reads a settings attribute with
+  the `AppConfig` dataclass default as fallback. The scattered
+  `getattr(config, "x", <duplicated literal>)` fallbacks in
+  `engines/{detection,rendering,inpainting}` services were replaced with it,
+  and `infrastructure/downloads/requirements.py` now reads `AppConfig`
+  attributes directly (its callers always pass a real config).
+- This also removed a latent default drift: the detection service's OCR
+  engine fallback was `"auto"` while `AppConfig.ocr_engine` defaults to
+  `"balanced"` (behavior-neutral — `LocalOCR` treats both identically — but
+  exactly the kind of divergence single-sourcing prevents).
+
 ---
 
 ## Self-Review

@@ -65,6 +65,17 @@ class AppConfigSnapshot:
         return cls(**values)
 
 
+def config_value(config: Any, name: str) -> Any:
+    """Read a settings attribute, falling back to the AppConfig default.
+
+    Keeps AppConfig the single source of default values: callers that hold a
+    partial/fake config (tests) or no config at all still get the canonical
+    default instead of a locally duplicated literal.
+    """
+    default = AppConfig.__dataclass_fields__[name].default
+    return getattr(config, name, default)
+
+
 # ---------------------------------------------------------------------------
 # AppConfig — mutable settings container
 # ---------------------------------------------------------------------------

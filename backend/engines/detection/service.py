@@ -7,6 +7,7 @@ import threading
 import time
 import numpy as np
 from typing import List, Optional, Any, Dict
+from core.config import config_value
 from .wrapper import RTDETRv2Detector
 from engines.ocr.local import LocalOCR
 
@@ -35,38 +36,38 @@ class DetectionService:
         self._load_cache_from_disk()
 
     def _ocr_engine_name(self, engine: str | None = None) -> str:
-        return engine or getattr(self.config, "ocr_engine", "auto")
+        return engine or config_value(self.config, "ocr_engine")
 
     def _detect_model_name(self, model_name: str | None = None) -> str:
-        return model_name or getattr(self.config, "detect_model", "High Precision (FP32)")
+        return model_name or config_value(self.config, "detect_model")
 
     def _confidence_threshold(self, confidence_threshold: float | None = None) -> float:
         if confidence_threshold is not None:
             return float(confidence_threshold)
-        return float(getattr(self.config, "confidence_threshold", 0.45))
+        return float(config_value(self.config, "confidence_threshold"))
 
     def _tiling_enabled(self, tiling_enabled: bool | None = None) -> bool:
         if tiling_enabled is not None:
             return bool(tiling_enabled)
-        return bool(getattr(self.config, "tiling_enabled", True))
+        return bool(config_value(self.config, "tiling_enabled"))
 
     def _bubbles_only(self, bubbles_only: bool | None = None) -> bool:
         if bubbles_only is not None:
             return bool(bubbles_only)
-        return bool(getattr(self.config, "bubbles_only", False))
+        return bool(config_value(self.config, "bubbles_only"))
 
     def _line_merge_sensitivity(self, line_merge_sensitivity: float | None = None) -> float:
         if line_merge_sensitivity is not None:
             return float(line_merge_sensitivity)
-        return float(getattr(self.config, "line_merge_sensitivity", 1.2))
+        return float(config_value(self.config, "line_merge_sensitivity"))
 
     def _smart_direction(self, smart_direction: bool | None = None) -> bool:
         if smart_direction is not None:
             return bool(smart_direction)
-        return bool(getattr(self.config, "smart_direction", True))
+        return bool(config_value(self.config, "smart_direction"))
 
     def _text_direction_override(self, text_direction_override: str | None = None) -> str:
-        return str(text_direction_override or getattr(self.config, "text_direction_override", "auto") or "auto")
+        return str(text_direction_override or config_value(self.config, "text_direction_override") or "auto")
 
     # ------------------------------------------------------------------ #
     #  Cache persistence (disk)

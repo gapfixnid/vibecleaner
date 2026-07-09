@@ -1,5 +1,7 @@
 import numpy as np
 from typing import Any, List, Optional
+
+from core.config import config_value
 from .hybrid import HybridInpainter
 
 
@@ -19,13 +21,13 @@ class InpaintingService:
         clip_to_bubble: bool | None = None,
     ) -> np.ndarray:
         """Removes text within the specified bounding boxes using inpainting."""
-        resolved_engine = engine or getattr(self.config, "inpaint_engine", "lama")
+        resolved_engine = engine or config_value(self.config, "inpaint_engine")
         resolved_dilation = mask_dilation
         if resolved_dilation is None:
-            resolved_dilation = getattr(self.config, "inpaint_mask_dilation", 2)
+            resolved_dilation = config_value(self.config, "inpaint_mask_dilation")
         resolved_clip = clip_to_bubble
         if resolved_clip is None:
-            resolved_clip = getattr(self.config, "inpaint_clip_to_bubble", True)
+            resolved_clip = config_value(self.config, "inpaint_clip_to_bubble")
 
         int_boxes = [[int(val) for val in box] for box in boxes]
         if bubble_boxes is not None:
