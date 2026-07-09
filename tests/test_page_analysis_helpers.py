@@ -14,7 +14,7 @@ import pipeline.page_analysis as page_analysis
 from core.models import TextBubble
 from core.config import AppConfig
 from pipeline.analysis.bubbles import BubbleAnalysisResult, BubbleData
-from engines.rendering.layout_planner import Insets
+from core.models import Insets
 
 
 def test_bubbles_from_analysis_preserves_detected_font_color():

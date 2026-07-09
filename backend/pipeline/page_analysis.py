@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
 
-from core.models import Rect, TextBubble
+from core.models import Rect, TextBubble, BubbleLayoutInput
 
 
 def inpaint_boxes(bubbles, *, use_textbox_only: bool = True) -> list:
@@ -95,7 +94,7 @@ def bubbles_from_analysis(
         text_rect = _rect_from_xyxy(bubble_data.text_box)
         bubble_rect = _rect_from_xyxy(bubble_data.bubble_box)
         layout_box = _rect_from_xyxy(bubble_data.layout_box)
-        layout_input = SimpleNamespace(
+        layout_input = BubbleLayoutInput(
             bubble_box=bubble_rect,
             layout_box=layout_box,
             text=bubble_data.text,
