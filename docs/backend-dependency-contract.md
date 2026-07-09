@@ -129,6 +129,17 @@ must record stage execution, strategies must translate settings into options,
 and validation must return structured issues that can stop unsafe downstream
 work.
 
+## OCR Concurrency And Cache
+
+Detection and OCR model inference must use separate locks. Cache lookup and
+LRU mutation must hold only the cache lock, so a cache hit or manual single
+block lookup is never blocked by a different page's OCR inference.
+
+Persistent OCR cache writes use SQLite and are deferred behind a short
+write-behind interval. Each flush writes only changed keys in one transaction;
+the FastAPI lifespan and process exit handler flush pending changes before
+shutdown. The old `ocr_cache.json` is read only for one-time migration.
+
 ## Dependency Sets
 
 Use the dependency files for distinct purposes:

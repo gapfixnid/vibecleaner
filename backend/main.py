@@ -63,7 +63,14 @@ async def lifespan(app: FastAPI):
             loop.set_exception_handler(_silent_exception_handler)
         except Exception:
             pass
-    yield
+    try:
+        yield
+    finally:
+        container = getattr(app.state, "container", None)
+        detection_service = getattr(container, "detection_service", None)
+        shutdown = getattr(detection_service, "shutdown", None)
+        if callable(shutdown):
+            shutdown()
 
 
 def _referer_origin(referer: str | None) -> str | None:

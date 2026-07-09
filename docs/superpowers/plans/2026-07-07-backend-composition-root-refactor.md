@@ -484,6 +484,10 @@ Expected: PASS.
 - `backend/infrastructure` now exists as a concrete package. Logging setup and
   user-data path helpers moved from `backend/modules` into
   `backend/infrastructure/logging` and `backend/infrastructure/storage`.
+- `DetectionService` now separates detector, OCR-engine, and cache locks.
+  OCR cache persistence uses deferred SQLite transactions with explicit
+  lifespan and process-exit flushes instead of dumping the full JSON cache
+  after every OCR request.
 - Model download helpers (`ModelDownloader`, `ModelID`, `download_url_to_file`)
   moved from `backend/modules/utils/download*.py` into
   `backend/infrastructure/downloads`. `tests/test_backend_boundaries.py` now

@@ -1,8 +1,10 @@
+import atexit
 import collections
 import hashlib
 import json
 import logging
 import os
+import sqlite3
 import threading
 import time
 import numpy as np
@@ -22,17 +24,31 @@ class DetectionService:
         detector: Optional[RTDETRv2Detector] = None,
         ocr_engine: Optional[LocalOCR] = None,
         config: Any = None,
+        cache_file_path: str | None = None,
+        cache_flush_interval: float = 2.0,
     ) -> None:
         self.detector: RTDETRv2Detector = detector or RTDETRv2Detector()
         self.ocr_engine: LocalOCR = ocr_engine or LocalOCR()
         self.config = config
         self._ocr_cache: collections.OrderedDict[str, str] = collections.OrderedDict()
-        self._lock = threading.RLock()
+        self._detector_lock = threading.RLock()
+        self._ocr_engine_lock = threading.RLock()
+        self._cache_lock = threading.RLock()
+        self._cache_flush_lock = threading.Lock()
+        self._state_lock = threading.Lock()
+        self._cache_file_path_override = cache_file_path
+        self._cache_flush_interval = max(0.0, float(cache_flush_interval))
+        self._cache_flush_timer: threading.Timer | None = None
+        self._cache_dirty = False
+        self._cache_revision = 0
+        self._pending_cache_upserts: dict[str, str] = {}
+        self._pending_cache_deletes: set[str] = set()
+        self._legacy_cache_path_to_remove: str | None = None
         self.last_error: str | None = None
         self._ocr_hits: int = 0
         self._ocr_misses: int = 0
 
-        # Load disk cache on startup
+        atexit.register(self.flush_ocr_cache)
         self._load_cache_from_disk()
 
     def _ocr_engine_name(self, engine: str | None = None) -> str:
@@ -74,38 +90,174 @@ class DetectionService:
     # ------------------------------------------------------------------ #
 
     def _cache_file_path(self) -> str:
-        """Return the path for the persistent OCR cache file."""
+        """Return the path for the persistent OCR cache database."""
+        if self._cache_file_path_override:
+            return self._cache_file_path_override
+        from ...infrastructure.storage import get_app_data_dir
+
+        return os.path.join(get_app_data_dir(), "ocr_cache.sqlite3")
+
+    def _legacy_cache_file_path(self) -> str | None:
+        if self._cache_file_path_override:
+            return None
         from ...infrastructure.storage import get_app_data_dir
 
         return os.path.join(get_app_data_dir(), "ocr_cache.json")
 
     def _load_cache_from_disk(self) -> None:
-        """Load OCR cache from disk (survives app restart)."""
+        """Load OCR cache from SQLite, migrating the legacy JSON file once."""
         path = self._cache_file_path()
-        if not path:
-            return
         try:
             if os.path.exists(path):
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                # Re-insert in order (most recent first)
-                for k, v in reversed(list(data.items())):
-                    self._ocr_cache[k] = v
-                logger.info("OCR cache loaded: %d entries from disk", len(self._ocr_cache))
+                connection = sqlite3.connect(path)
+                try:
+                    self._ensure_cache_schema(connection)
+                    rows = connection.execute(
+                        "SELECT crop_hash, text FROM ocr_cache ORDER BY updated_at ASC LIMIT ?",
+                        (self._OCR_CACHE_MAX,),
+                    ).fetchall()
+                finally:
+                    connection.close()
+                with self._cache_lock:
+                    for crop_hash, text in rows:
+                        self._ocr_cache[str(crop_hash)] = str(text)
+                logger.info("OCR cache loaded: %d entries from SQLite", len(rows))
+                return
+
+            legacy_path = self._legacy_cache_file_path()
+            if not legacy_path or not os.path.exists(legacy_path):
+                return
+            with open(legacy_path, "r", encoding="utf-8") as cache_file:
+                legacy_data = json.load(cache_file)
+            if not isinstance(legacy_data, dict):
+                return
+            with self._cache_lock:
+                for crop_hash, text in reversed(list(legacy_data.items())):
+                    self._ocr_cache[str(crop_hash)] = str(text)
+                while len(self._ocr_cache) > self._OCR_CACHE_MAX:
+                    self._ocr_cache.popitem(last=False)
+                self._pending_cache_upserts.update(self._ocr_cache)
+                self._cache_dirty = bool(self._ocr_cache)
+                self._cache_revision += 1
+                if self._cache_dirty:
+                    self._legacy_cache_path_to_remove = legacy_path
+                    self._schedule_cache_flush_locked()
+            logger.info("OCR cache migration queued: %d entries from JSON", len(self._ocr_cache))
         except Exception:
             logger.warning("Failed to load OCR cache from disk", exc_info=True)
 
-    def _save_cache_to_disk(self) -> None:
-        """Persist OCR cache to disk. Called after detect completes."""
-        path = self._cache_file_path()
-        if not path:
+    @staticmethod
+    def _ensure_cache_schema(connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ocr_cache (
+                crop_hash TEXT PRIMARY KEY,
+                text TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+
+    def _schedule_cache_flush_locked(self) -> None:
+        if not self._cache_dirty:
             return
-        try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(dict(self._ocr_cache), f, ensure_ascii=False)
-        except Exception:
-            logger.warning("Failed to save OCR cache to disk", exc_info=True)
+        if self._cache_flush_timer and self._cache_flush_timer.is_alive():
+            return
+        timer = threading.Timer(self._cache_flush_interval, self.flush_ocr_cache)
+        timer.daemon = True
+        self._cache_flush_timer = timer
+        timer.start()
+
+    def flush_ocr_cache(self) -> None:
+        """Persist pending OCR cache changes in one short SQLite transaction."""
+        with self._cache_flush_lock:
+            with self._cache_lock:
+                self._cache_flush_timer = None
+                if not self._cache_dirty:
+                    return
+                upserts = dict(self._pending_cache_upserts)
+                deletes = set(self._pending_cache_deletes)
+                revision = self._cache_revision
+                legacy_path = self._legacy_cache_path_to_remove
+
+            try:
+                path = self._cache_file_path()
+                cache_directory = os.path.dirname(path)
+                if cache_directory:
+                    os.makedirs(cache_directory, exist_ok=True)
+                timestamp = time.time_ns()
+                connection = sqlite3.connect(path)
+                try:
+                    self._ensure_cache_schema(connection)
+                    with connection:
+                        if deletes:
+                            connection.executemany(
+                                "DELETE FROM ocr_cache WHERE crop_hash = ?",
+                                [(crop_hash,) for crop_hash in deletes],
+                            )
+                        if upserts:
+                            connection.executemany(
+                                """
+                                INSERT INTO ocr_cache (crop_hash, text, updated_at)
+                                VALUES (?, ?, ?)
+                                ON CONFLICT(crop_hash) DO UPDATE SET
+                                    text = excluded.text,
+                                    updated_at = excluded.updated_at
+                                """,
+                                [
+                                    (crop_hash, text, timestamp + index)
+                                    for index, (crop_hash, text) in enumerate(upserts.items())
+                                ],
+                            )
+                        connection.execute(
+                            """
+                            DELETE FROM ocr_cache
+                            WHERE crop_hash IN (
+                                SELECT crop_hash FROM ocr_cache
+                                ORDER BY updated_at DESC, rowid DESC
+                                LIMIT -1 OFFSET ?
+                            )
+                            """,
+                            (self._OCR_CACHE_MAX,),
+                        )
+                finally:
+                    connection.close()
+            except Exception:
+                logger.warning("Failed to flush OCR cache to SQLite", exc_info=True)
+                with self._cache_lock:
+                    self._schedule_cache_flush_locked()
+                return
+
+            with self._cache_lock:
+                if revision == self._cache_revision:
+                    self._pending_cache_upserts.clear()
+                    self._pending_cache_deletes.clear()
+                    self._cache_dirty = False
+                else:
+                    for crop_hash, text in upserts.items():
+                        if self._pending_cache_upserts.get(crop_hash) == text:
+                            self._pending_cache_upserts.pop(crop_hash, None)
+                    self._pending_cache_deletes.difference_update(deletes)
+                    self._cache_dirty = bool(self._pending_cache_upserts or self._pending_cache_deletes)
+                    self._schedule_cache_flush_locked()
+                if legacy_path and self._legacy_cache_path_to_remove == legacy_path:
+                    self._legacy_cache_path_to_remove = None
+
+            if legacy_path:
+                try:
+                    if os.path.exists(legacy_path):
+                        os.remove(legacy_path)
+                except OSError:
+                    logger.warning("Failed to remove migrated OCR JSON cache: %s", legacy_path)
+
+    def shutdown(self) -> None:
+        """Cancel deferred work and flush pending cache writes before shutdown."""
+        with self._cache_lock:
+            timer = self._cache_flush_timer
+            self._cache_flush_timer = None
+        if timer:
+            timer.cancel()
+        self.flush_ocr_cache()
 
     # ------------------------------------------------------------------ #
     #  LRU cache helpers
@@ -129,21 +281,42 @@ class DetectionService:
 
     def _remember_ocr(self, crop_hash: str, text: str) -> None:
         """Store an OCR result using LRU eviction (OrderedDict)."""
-        cache = self._ocr_cache
-        # If already present, move to end (most recent)
-        if crop_hash in cache:
-            cache.move_to_end(crop_hash)
-        else:
-            cache[crop_hash] = text
-        # Evict oldest entries if over limit
-        while len(cache) > self._OCR_CACHE_MAX:
-            cache.popitem(last=False)
+        with self._cache_lock:
+            cache = self._ocr_cache
+            if crop_hash in cache:
+                cache.move_to_end(crop_hash)
+            else:
+                cache[crop_hash] = text
+            self._pending_cache_upserts[crop_hash] = text
+            self._pending_cache_deletes.discard(crop_hash)
+            while len(cache) > self._OCR_CACHE_MAX:
+                evicted_hash, _ = cache.popitem(last=False)
+                self._pending_cache_upserts.pop(evicted_hash, None)
+                self._pending_cache_deletes.add(evicted_hash)
+            self._cache_dirty = True
+            self._cache_revision += 1
+            self._schedule_cache_flush_locked()
 
-    def _cache_hit(self, crop_hash: str) -> str:
-        """Retrieve from LRU cache, moving to end (most recent)."""
-        self._ocr_cache.move_to_end(crop_hash)
-        self._ocr_hits += 1
-        return self._ocr_cache[crop_hash]
+    def _get_cached_ocr(self, crop_hash: str | None) -> str | None:
+        if not crop_hash:
+            return None
+        with self._cache_lock:
+            text = self._ocr_cache.get(crop_hash)
+            if text is None:
+                return None
+            self._ocr_cache.move_to_end(crop_hash)
+            self._ocr_hits += 1
+            return text
+
+    def _record_ocr_misses(self, count: int) -> None:
+        if count <= 0:
+            return
+        with self._cache_lock:
+            self._ocr_misses += count
+
+    def _set_last_error(self, value: str | None) -> None:
+        with self._state_lock:
+            self.last_error = value
 
     # ------------------------------------------------------------------ #
     #  Public API
@@ -164,11 +337,9 @@ class DetectionService:
     ) -> List[Any]:
         """Detect text blocks and run OCR on them, utilizing OCR cache."""
         t0 = time.perf_counter()
-        with self._lock:
-            # --- Detect ---
-            t_detect = time.perf_counter()
-            try:
-                self.ocr_engine.lang = lang
+        t_detect = time.perf_counter()
+        try:
+            with self._detector_lock:
                 blocks = self.detector.detect_bubbles(
                     image,
                     model_name=self._detect_model_name(model_name),
@@ -179,54 +350,51 @@ class DetectionService:
                     smart_direction=self._smart_direction(smart_direction),
                     text_direction_override=self._text_direction_override(text_direction_override),
                 )
-            except Exception as exc:
-                self.last_error = str(exc)
-                logger.exception("Detection failed. lang=%s", lang)
-                raise
-            detect_ms = (time.perf_counter() - t_detect) * 1000
+        except Exception as exc:
+            self._set_last_error(str(exc))
+            logger.exception("Detection failed. lang=%s", lang)
+            raise
+        detect_ms = (time.perf_counter() - t_detect) * 1000
 
-            # Check cache for each block
-            uncached_blocks = []
-            block_hashes = {}
-            cached_count = 0
-            for block in blocks:
-                crop_hash = self._get_crop_hash(image, block.xyxy)
-                if crop_hash and crop_hash in self._ocr_cache:
-                    block.text = self._cache_hit(crop_hash)
-                    cached_count += 1
-                else:
-                    uncached_blocks.append(block)
-                    if crop_hash:
-                        block_hashes[block] = crop_hash
-            self._ocr_misses += len(uncached_blocks)
+        uncached_blocks = []
+        block_hashes = {}
+        cached_count = 0
+        for block in blocks:
+            crop_hash = self._get_crop_hash(image, block.xyxy)
+            cached_text = self._get_cached_ocr(crop_hash)
+            if cached_text is not None:
+                block.text = cached_text
+                cached_count += 1
+            else:
+                uncached_blocks.append(block)
+                if crop_hash:
+                    block_hashes[block] = crop_hash
+        self._record_ocr_misses(len(uncached_blocks))
 
-            # --- OCR (uncached only) ---
-            t_ocr = time.perf_counter()
-            if uncached_blocks:
-                try:
+        t_ocr = time.perf_counter()
+        if uncached_blocks:
+            try:
+                with self._ocr_engine_lock:
+                    self.ocr_engine.lang = lang
                     self.ocr_engine.recognize_text(image, uncached_blocks, engine=self._ocr_engine_name(engine))
-                except Exception as exc:
-                    self.last_error = str(exc)
-                    logger.exception("OCR failed. lang=%s block_count=%s", lang, len(uncached_blocks))
-                    raise
-                # Store in cache
-                for block in uncached_blocks:
-                    crop_hash = block_hashes.get(block)
-                    if crop_hash:
-                        self._remember_ocr(crop_hash, block.text)
-            ocr_ms = (time.perf_counter() - t_ocr) * 1000
+            except Exception as exc:
+                self._set_last_error(str(exc))
+                logger.exception("OCR failed. lang=%s block_count=%s", lang, len(uncached_blocks))
+                raise
+            for block in uncached_blocks:
+                crop_hash = block_hashes.get(block)
+                if crop_hash:
+                    self._remember_ocr(crop_hash, block.text)
+        ocr_ms = (time.perf_counter() - t_ocr) * 1000
 
-            total_ms = (time.perf_counter() - t0) * 1000
-            logger.debug(
-                "detect: %.0fms, ocr: %.0fms, total: %.0fms (bubbles=%d, cached=%d, uncached=%d)",
-                detect_ms, ocr_ms, total_ms, len(blocks), cached_count, len(uncached_blocks)
-            )
+        total_ms = (time.perf_counter() - t0) * 1000
+        logger.debug(
+            "detect: %.0fms, ocr: %.0fms, total: %.0fms (bubbles=%d, cached=%d, uncached=%d)",
+            detect_ms, ocr_ms, total_ms, len(blocks), cached_count, len(uncached_blocks)
+        )
 
-            # Persist cache to disk after each successful detect
-            self._save_cache_to_disk()
-
-            self.last_error = None
-            return blocks
+        self._set_last_error(None)
+        return blocks
 
     def recognize_single_block(
         self,
@@ -235,23 +403,25 @@ class DetectionService:
         lang: str = "Japanese",
         engine: str | None = None,
     ) -> None:
-        """Run OCR on a single block (for manual drag-select), utilizing OCR cache."""
-        with self._lock:
-            self.ocr_engine.lang = lang
-            crop_hash = self._get_crop_hash(image, block.xyxy)
-            if crop_hash and crop_hash in self._ocr_cache:
-                block.text = self._cache_hit(crop_hash)
-                return
-            self._ocr_misses += 1
+        """Run OCR on a single block without blocking cache hits on model inference."""
+        crop_hash = self._get_crop_hash(image, block.xyxy)
+        cached_text = self._get_cached_ocr(crop_hash)
+        if cached_text is not None:
+            block.text = cached_text
+            return
+        self._record_ocr_misses(1)
 
-            try:
+        try:
+            with self._ocr_engine_lock:
+                self.ocr_engine.lang = lang
                 self.ocr_engine.recognize_text(image, [block], engine=self._ocr_engine_name(engine))
-            except Exception as exc:
-                self.last_error = str(exc)
-                logger.exception("Single-block OCR failed. lang=%s bbox=%s", lang, getattr(block, "xyxy", None))
-                raise
-            if crop_hash:
-                self._remember_ocr(crop_hash, block.text)
+        except Exception as exc:
+            self._set_last_error(str(exc))
+            logger.exception("Single-block OCR failed. lang=%s bbox=%s", lang, getattr(block, "xyxy", None))
+            raise
+        if crop_hash:
+            self._remember_ocr(crop_hash, block.text)
+        self._set_last_error(None)
 
     def recognize_region(
         self,
@@ -271,19 +441,27 @@ class DetectionService:
         return block.text
 
     def get_diagnostics(self) -> dict[str, Any]:
-        total = self._ocr_hits + self._ocr_misses
-        hit_rate = (self._ocr_hits / total * 100) if total > 0 else 0.0
+        with self._cache_lock:
+            total = self._ocr_hits + self._ocr_misses
+            cache_entries = len(self._ocr_cache)
+            cache_hits = self._ocr_hits
+            cache_misses = self._ocr_misses
+            cache_dirty = self._cache_dirty
+        hit_rate = (cache_hits / total * 100) if total > 0 else 0.0
         detector_available = bool(getattr(self.detector, "available", True))
         detector_error = getattr(self.detector, "engine_error", None)
+        with self._state_lock:
+            last_error = self.last_error
         return {
             "detector": self.detector.__class__.__name__,
             "detector_available": detector_available,
             "detector_error": detector_error,
             "ocr_engine": self.ocr_engine.__class__.__name__,
-            "ocr_cache_entries": len(self._ocr_cache),
+            "ocr_cache_entries": cache_entries,
             "ocr_cache_max": self._OCR_CACHE_MAX,
-            "ocr_cache_hits": self._ocr_hits,
-            "ocr_cache_misses": self._ocr_misses,
+            "ocr_cache_hits": cache_hits,
+            "ocr_cache_misses": cache_misses,
             "ocr_cache_hit_rate": f"{hit_rate:.1f}%",
-            "last_error": self.last_error,
+            "ocr_cache_dirty": cache_dirty,
+            "last_error": last_error,
         }
