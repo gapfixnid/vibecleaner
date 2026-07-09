@@ -194,9 +194,23 @@ Requirements:
                     continue
 
                 translated_text = self._extract_message_content(response)
-                if set_texts_from_json(blocks, translated_text):
-                    self.last_error = None
-                    return blocks
+                try:
+                    if set_texts_from_json(blocks, translated_text):
+                        self.last_error = None
+                        return blocks
+                except TranslationParseError:
+                    plain_text = translated_text.strip()
+                    if (
+                        len(blocks) == 1
+                        and plain_text
+                        and not plain_text.startswith("{")
+                        and not plain_text.startswith("[")
+                    ):
+                        blocks[0].translation = plain_text
+                        self.last_error = None
+                        return blocks
+                    raise
+
                 self.last_error = "Translation response did not match block keys"
                 logger.error(
                     "Translation response did not apply to blocks. snippet=%s",
