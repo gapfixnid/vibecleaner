@@ -5,7 +5,6 @@ import os
 from fastapi import HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
-from core.models import MangaPage
 from core.version import APP_NAME
 from infrastructure.image.encoding import (
     encode_jpeg_bytes,
