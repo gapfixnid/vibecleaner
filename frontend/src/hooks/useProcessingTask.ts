@@ -137,7 +137,13 @@ export function useProcessingTask(
             return job.result;
           }
           if (job.status === "failed") {
-            throw new Error(job.error || `${job.kind || "Job"} failed`);
+            const errorMsg = job.error || `${job.kind || "Job"} failed`;
+            // Backend cancellation exceptions surface as failed+"cancelled" error.
+            // Treat them as user cancellation so the i18n message is shown.
+            if (errorMsg.toLowerCase().includes("cancelled")) {
+              throw new Error(CANCELLED);
+            }
+            throw new Error(errorMsg);
           }
           if (job.status === "cancelled") {
             throw new Error(CANCELLED);

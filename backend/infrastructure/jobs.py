@@ -60,7 +60,7 @@ class JobManager:
                 "key": key,
                 "status": "queued",
                 "progress": 0,
-                "message": "Queued",
+                "message": None,  # let frontend show its localized fallback label
                 "result": None,
                 "error": None,
                 "cancel_requested": False,
@@ -77,13 +77,14 @@ class JobManager:
             job = self._jobs[job_id]
             if job["cancel_requested"]:
                 job["status"] = "cancelled"
-                job["message"] = "Cancelled"
+                job["message"] = None  # frontend shows localized fallback
                 job["updated_at"] = time.time()
+                job["cancel_requested"] = False  # reset so stale ref reuse is harmless
                 self._active_keys.pop(job["key"], None)
                 return
             job["status"] = "running"
             job["progress"] = 5
-            job["message"] = "Starting"
+            job["message"] = None  # let frontend show its localized fallback label
             job["updated_at"] = time.time()
 
         try:
@@ -91,23 +92,23 @@ class JobManager:
             with self._lock:
                 if job["cancel_requested"]:
                     job["status"] = "cancelled"
-                    job["message"] = "Cancelled"
+                    job["message"] = None  # frontend shows localized fallback
                 else:
                     job["status"] = "succeeded"
                     job["progress"] = 100
-                    job["message"] = "Complete"
+                    job["message"] = None  # frontend shows localized fallback
                     job["result"] = result
                 job["updated_at"] = time.time()
         except Exception as exc:
             logger.exception("Background job failed: %s", job_id)
             with self._lock:
-                if job["cancel_requested"]:
+                if job["cancel_requested"] or "cancelled" in str(exc).lower():
                     job["status"] = "cancelled"
-                    job["message"] = "Cancelled"
+                    job["message"] = None  # frontend shows localized fallback
                 else:
                     job["status"] = "failed"
                     job["error"] = str(exc)
-                    job["message"] = "Failed"
+                    job["message"] = None  # frontend shows localized fallback
                 job["updated_at"] = time.time()
         finally:
             with self._lock:
@@ -135,9 +136,16 @@ class JobManager:
             job = self._jobs.get(job_id)
             if not job:
                 return None
+            # Only cancel if this job is still the active one for its key.
+            # This prevents a stale cancel request (e.g. from a previous job's
+            # Cancel button) from accidentally cancelling a new job that reused
+            # the same key or was started in the meantime.
+            active_id = self._active_keys.get(job["key"])
+            if active_id != job_id:
+                return self._public(job)
             if job["status"] in {"queued", "running"}:
                 job["cancel_requested"] = True
-                job["message"] = "Cancellation requested"
+                job["message"] = None  # frontend shows localized fallback
                 job["updated_at"] = time.time()
             return self._public(job)
 
