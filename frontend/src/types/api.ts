@@ -18,7 +18,7 @@ export interface LoadProjectResultDto {
   selected_indices?: number[];
 }
 
-export type JobStateDto = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+export type JobStateDto = "queued" | "running" | "succeeded" | "succeeded_with_errors" | "failed" | "cancelled";
 
 export interface JobStatusDto {
   job_id: string;

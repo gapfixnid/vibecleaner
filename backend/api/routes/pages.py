@@ -27,7 +27,6 @@ from ..use_cases.page_crud import (
 )
 from ..use_cases.page_export import export_page_response
 from ..use_cases.page_inpaint import start_inpaint_bubble, start_inpaint_page
-from ...core.errors import PageNotFoundError
 from ...pipeline.page_translation import run_page_translation
 router = APIRouter()
 
@@ -176,8 +175,9 @@ def run_translate_batch(req: TranslateBatchRequest, container: AppContainer = De
 
 def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppContainer) -> dict:
     total = len(page_ids)
-    completed = 0
-    completed_page_indices = []
+    attempted_pages = 0
+    successful_page_indices: list[int] = []
+    failed_pages: list[dict[str, object]] = []
     ui_lang = container.config.ui_language
 
     for page_id in page_ids:
@@ -187,10 +187,9 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
                 page_idx = _resolve_page_index(container.project_state, page_id)
             container.job_manager.update(
                 job,
-                progress=int((completed / total) * 100),
-                message=msg("batch_translation.translating_page", ui_lang, current=completed + 1, total=total),
+                progress=int((attempted_pages / total) * 100),
+                message=msg("batch_translation.translating_page", ui_lang, current=attempted_pages + 1, total=total),
             )
-            job["result"] = {"completed_pages": list(completed_page_indices), "total_pages": total}
             run_page_translation(
                 job=job,
                 page_id=page_id,
@@ -201,21 +200,41 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
                 planner=container.pipeline_planner,
                 show_progress=False,
             )
-        except (HTTPException, PageNotFoundError):
-            pass
-        except RuntimeError as exc:
+        except Exception as exc:
             if "cancelled" in str(exc).lower():
                 raise
-            completed += 1
-            continue
+            error = str(exc.detail) if isinstance(exc, HTTPException) else str(exc)
+            failed_pages.append({"page_id": page_id, "page_idx": page_idx, "error": error})
+        else:
+            if page_idx is not None:
+                successful_page_indices.append(page_idx)
+        finally:
+            attempted_pages += 1
+            job["result"] = {
+                "successful_pages": len(successful_page_indices),
+                "total_pages": total,
+                "successful_page_indices": list(successful_page_indices),
+                "failed_pages": list(failed_pages),
+            }
 
-        completed += 1
-        if page_idx is not None:
-            completed_page_indices.append(page_idx)
-            container.job_manager.ensure_not_cancelled(job)
+        container.job_manager.ensure_not_cancelled(job)
 
+    if failed_pages and successful_page_indices:
+        status = "succeeded_with_errors"
+    elif failed_pages:
+        status = "failed"
+    else:
+        status = "succeeded"
+
+    result = {
+        "status": status,
+        "successful_pages": len(successful_page_indices),
+        "total_pages": total,
+        "successful_page_indices": successful_page_indices,
+        "failed_pages": failed_pages,
+    }
     container.job_manager.update(job, progress=100, message=msg("batch_translation.complete", ui_lang))
-    return {"translated_pages": completed, "total_pages": total, "completed_pages": completed_page_indices}
+    return result
 
 
 @router.post("/api/pages/{page_id}/export")

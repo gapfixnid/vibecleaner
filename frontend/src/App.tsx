@@ -125,6 +125,7 @@ function App() {
     currentIndexRef,
     runTask,
     waitForJob,
+    showError,
     syncBubblesToBackend,
     setIsWaitingForImageReload,
     bumpPageVersion: pagesApi.bumpPageVersion,

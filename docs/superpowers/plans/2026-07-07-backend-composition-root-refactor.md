@@ -488,6 +488,9 @@ Expected: PASS.
   OCR cache persistence uses deferred SQLite transactions with explicit
   lifespan and process-exit flushes instead of dumping the full JSON cache
   after every OCR request.
+- Batch translation now reports `successful_pages` and page-scoped
+  `failed_pages` accurately. Mixed outcomes complete with
+  `succeeded_with_errors`; fully failed batches report `failed`.
 - Model download helpers (`ModelDownloader`, `ModelID`, `download_url_to_file`)
   moved from `backend/modules/utils/download*.py` into
   `backend/infrastructure/downloads`. `tests/test_backend_boundaries.py` now

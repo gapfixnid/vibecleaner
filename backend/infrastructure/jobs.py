@@ -12,7 +12,7 @@ logger = logging.getLogger(APP_NAME)
 
 
 class JobManager:
-    _TERMINAL_STATES = {"succeeded", "failed", "cancelled"}
+    _TERMINAL_STATES = {"succeeded", "succeeded_with_errors", "failed", "cancelled"}
     _MAX_TERMINAL_JOBS = 50
     _JOB_TTL_SECONDS = 3600
 
@@ -94,10 +94,22 @@ class JobManager:
                     job["status"] = "cancelled"
                     job["message"] = None  # frontend shows localized fallback
                 else:
-                    job["status"] = "succeeded"
+                    worker_status = result.get("status") if isinstance(result, dict) else None
+                    job["status"] = worker_status if worker_status in self._TERMINAL_STATES else "succeeded"
                     job["progress"] = 100
                     job["message"] = None  # frontend shows localized fallback
                     job["result"] = result
+                    if job["status"] == "failed":
+                        failed_pages = result.get("failed_pages") if isinstance(result, dict) else None
+                        if isinstance(failed_pages, list) and failed_pages:
+                            details = "; ".join(
+                                f"{page.get('page_id', 'page')}: {page.get('error', 'unknown error')}"
+                                for page in failed_pages
+                                if isinstance(page, dict)
+                            )
+                            job["error"] = result.get("error") or details
+                        else:
+                            job["error"] = result.get("error") or "Job completed without successful results"
                 job["updated_at"] = time.time()
         except Exception as exc:
             logger.exception("Background job failed: %s", job_id)

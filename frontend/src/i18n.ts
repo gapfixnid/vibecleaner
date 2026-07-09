@@ -114,6 +114,8 @@ export type TranslationKey =
   | "bubbles.deleteFailedMessage"
   | "task.translationFailed"
   | "task.multiPageTranslationFailed"
+  | "task.multiPageTranslationPartial"
+  | "task.failedPage"
   | "task.translatingPage"
   | "task.translatingPages"
   | "task.failed"
@@ -383,6 +385,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "bubbles.deleteFailedMessage": "Failed to delete the speech bubble.",
     "task.translationFailed": "Translation Failed",
     "task.multiPageTranslationFailed": "Multi-Page Translation Failed",
+    "task.multiPageTranslationPartial": "Some Pages Could Not Be Translated",
+    "task.failedPage": "Page {page}: {error}",
     "task.translatingPage": "Translating page...",
     "task.translatingPages": "Translating {count} pages...",
     "task.failed": "Task Failed",
@@ -651,6 +655,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "bubbles.deleteFailedMessage": "말풍선을 삭제하지 못했습니다.",
     "task.translationFailed": "번역 실패",
     "task.multiPageTranslationFailed": "여러 페이지 번역 실패",
+    "task.multiPageTranslationPartial": "일부 페이지를 번역하지 못했습니다",
+    "task.failedPage": "{page}페이지: {error}",
     "task.translatingPage": "페이지 번역 중...",
     "task.translatingPages": "{count}개 페이지 번역 중...",
     "task.failed": "작업 실패",

@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import * as api from "../services/api";
 import type { PageInfo } from "../types";
-import type { RunTask, WaitForJob } from "./useProcessingTask";
+import type { RunTask, ShowError, WaitForJob } from "./useProcessingTask";
+
+interface BatchTranslationResult {
+  successful_page_indices?: number[];
+  failed_pages?: Array<{ page_id: string; page_idx: number | null; error: string }>;
+}
 
 interface UsePageTranslationDeps {
   pages: PageInfo[];
@@ -9,6 +14,7 @@ interface UsePageTranslationDeps {
   currentIndexRef: MutableRefObject<number>;
   runTask: RunTask;
   waitForJob: WaitForJob;
+  showError: ShowError;
   syncBubblesToBackend: () => Promise<void>;
   setIsWaitingForImageReload: Dispatch<SetStateAction<boolean>>;
   bumpPageVersion: (idx: number) => void;
@@ -34,6 +40,7 @@ export function usePageTranslation({
   currentIndexRef,
   runTask,
   waitForJob,
+  showError,
   syncBubblesToBackend,
   setIsWaitingForImageReload,
   bumpPageVersion,
@@ -92,17 +99,32 @@ export function usePageTranslation({
         await syncBubblesToBackend();
 
         const job = await api.translateBatch(sorted);
-        await waitForJob(job, t("task.translatingPages").replace("{count}", String(total)), {
+        const result = await waitForJob(job, t("task.translatingPages").replace("{count}", String(total)), {
           ignoreBackendMessage: true,
-        });
+        }) as BatchTranslationResult | undefined;
+        const successfulPageIndices = result?.successful_page_indices ?? sorted;
+        const failedPages = result?.failed_pages ?? [];
+        const reloadIdx = successfulPageIndices.includes(displayIdx)
+          ? displayIdx
+          : successfulPageIndices[0] ?? displayIdx;
 
         setIsWaitingForImageReload(true);
-        for (const idx of sorted) bumpPageVersion(idx);
+        for (const idx of successfulPageIndices) bumpPageVersion(idx);
 
-        setSelectedPageIds([displayIdx]);
-        selectPage(displayIdx);
-        await loadPagesFromServer(displayIdx, { skipPageActivation: true });
-        await fetchBubblesForPage(displayIdx);
+        setSelectedPageIds([reloadIdx]);
+        selectPage(reloadIdx);
+        await loadPagesFromServer(reloadIdx, { skipPageActivation: true });
+        await fetchBubblesForPage(reloadIdx);
+
+        if (failedPages.length > 0) {
+          const details = failedPages
+            .map((page) => {
+              const pageLabel = page.page_idx == null ? page.page_id : String(page.page_idx + 1);
+              return t("task.failedPage").replace("{page}", pageLabel).replace("{error}", page.error);
+            })
+            .join("\n");
+          showError(t("task.multiPageTranslationPartial"), details);
+        }
       },
       { errorTitle: t("task.multiPageTranslationFailed"), keepBusyOnSuccess: true }
     );
@@ -110,6 +132,7 @@ export function usePageTranslation({
     runTask,
     syncBubblesToBackend,
     waitForJob,
+    showError,
     currentIndexRef,
     setIsWaitingForImageReload,
     bumpPageVersion,

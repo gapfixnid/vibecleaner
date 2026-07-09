@@ -14,7 +14,7 @@ import type { BubbleInfo, PageInfo } from "./types/domain";
 
 export type Settings = SettingsDto;
 
-export type JobState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+export type JobState = "queued" | "running" | "succeeded" | "succeeded_with_errors" | "failed" | "cancelled";
 
 export interface JobStatus {
   job_id: string;

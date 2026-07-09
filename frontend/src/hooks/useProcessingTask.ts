@@ -133,7 +133,7 @@ export function useProcessingTask(
           if (cancelRequestedRef.current) {
             throw new Error(CANCELLED);
           }
-          if (job.status === "succeeded") {
+          if (job.status === "succeeded" || job.status === "succeeded_with_errors") {
             return job.result;
           }
           if (job.status === "failed") {

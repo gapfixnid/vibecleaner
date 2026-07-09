@@ -140,6 +140,18 @@ write-behind interval. Each flush writes only changed keys in one transaction;
 the FastAPI lifespan and process exit handler flush pending changes before
 shutdown. The old `ocr_cache.json` is read only for one-time migration.
 
+## Batch Job Results
+
+Batch page translation must report page-scoped outcomes. `successful_pages`
+counts only pages whose translation completed; it must never mean loop
+iterations. Results include `successful_page_indices` and
+`failed_pages[{page_id, page_idx, error}]`.
+
+Job status is `succeeded` when every page succeeds,
+`succeeded_with_errors` for a mixed outcome, and `failed` when no page
+succeeds. Clients must treat `succeeded_with_errors` as a completed operation
+and surface its failed page details.
+
 ## Dependency Sets
 
 Use the dependency files for distinct purposes:
