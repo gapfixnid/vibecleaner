@@ -1,7 +1,7 @@
 # engines/translation/providers.py
-import re
 import base64
 import logging
+import re
 import time
 
 import cv2
@@ -357,9 +357,17 @@ Requirements:
         if not text:
             return ""
 
+        # Pure plain text - return as-is
         if not text.startswith("{") and not text.startswith("["):
             return text
 
+        # Case 1: JSON-like string with a closing quote.
+        # Handles escaped characters inside the JSON string.
+        match = re.search(r'"block_0"\s*:\s*"(?P<value>(?:\\.|[^"\\])*)"', text)
+        if match:
+            return match.group("value").strip()
+
+        # Case 2: Malformed JSON without a closing quote.
         match = re.search(r'"block_0"\s*:\s*"(?P<value>.*)', text, re.DOTALL)
         if not match:
             return ""
@@ -369,14 +377,8 @@ Requirements:
         # Remove common unfinished JSON tails.
         recovered = recovered.removesuffix('"}').removesuffix('"').strip()
 
-        # If the model/log output leaked after the unfinished value, trim obvious log-looking tail.
-        for marker in (
-            "\n2026-",
-            "\n20",
-            "\n[ERROR]",
-            "\n[WARNING]",
-            "\nTraceback",
-        ):
+        # Trim obvious log/traceback tails if model output leaked.
+        for marker in ("\n2026-", "\n[ERROR]", "\n[WARNING]", "\nTraceback"):
             if marker in recovered:
                 recovered = recovered.split(marker, 1)[0].strip()
 
