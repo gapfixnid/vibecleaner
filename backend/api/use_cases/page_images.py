@@ -14,6 +14,7 @@ from infrastructure.image.encoding import (
     encode_thumbnail_bytes,
 )
 from infrastructure.image.loading import ensure_original_thumbnail, load_cv_image
+from .page_crud import resolve_page, resolve_page_index
 
 import logging
 
@@ -22,36 +23,6 @@ logger = logging.getLogger(APP_NAME)
 IMAGE_CACHE_HEADERS = {"Cache-Control": "public, max-age=3600"}
 
 
-def _get_page_by_id(state, page_id: str) -> MangaPage:
-    for page in state.pages:
-        if page.page_id == page_id:
-            return page
-    raise HTTPException(status_code=404, detail="Page not found")
-
-
-def _get_page_index_by_id(state, page_id: str) -> int:
-    for idx, page in enumerate(state.pages):
-        if page.page_id == page_id:
-            return idx
-    raise HTTPException(status_code=404, detail="Page not found")
-
-
-def _resolve_page(state, page_id: str) -> MangaPage:
-    if page_id.isdigit():
-        idx = int(page_id)
-        if 0 <= idx < len(state.pages):
-            return state.pages[idx]
-        raise HTTPException(status_code=404, detail="Page not found")
-    return _get_page_by_id(state, page_id)
-
-
-def _resolve_page_index(state, page_id: str) -> int:
-    if page_id.isdigit():
-        idx = int(page_id)
-        if 0 <= idx < len(state.pages):
-            return idx
-        raise HTTPException(status_code=404, detail="Page not found")
-    return _get_page_index_by_id(state, page_id)
 
 
 def get_page_image_response(
@@ -63,8 +34,8 @@ def get_page_image_response(
 ):
     # Fast paths / source capture: hold the project lock only briefly.
     with state.lock:
-        page = _resolve_page(state, page_id)
-        page_idx = _resolve_page_index(state, page_id)
+        page = resolve_page(state, page_id)
+        page_idx = resolve_page_index(state, page_id)
 
         if thumbnail:
             if image_type == "inpainted" and page.inpainted_image is not None:
