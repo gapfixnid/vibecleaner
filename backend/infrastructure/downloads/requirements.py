@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from ...core.config import AppConfig
+from ..job_messages import msg
 from . import ModelDownloader, ModelID
 
 
@@ -99,6 +100,7 @@ def download_required_models(
     job_manager: Any | None = None,
 ) -> dict[str, Any]:
     cfg = settings
+    ui_lang = cfg.ui_language if cfg else "en"
     model_ids = get_required_model_ids(cfg)
     total = len(model_ids)
     downloaded: list[str] = []
@@ -109,17 +111,18 @@ def download_required_models(
         if ModelDownloader.is_downloaded(model_id):
             already_present.append(model_id.value)
         else:
+            category, label = MODEL_LABELS.get(model_id, ("Model", model_id.value))
             if report_progress:
                 job_manager.update(
                     job,
                     progress=int(((index - 1) / max(total, 1)) * 95),
-                    message=f"Downloading {model_id.value}",
+                    message=msg("download.downloading", ui_lang, name=label),
                 )
             ModelDownloader.get(model_id)
             downloaded.append(model_id.value)
 
     if report_progress:
-        job_manager.update(job, progress=95, message="Checking downloaded models")
+        job_manager.update(job, progress=95, message=msg("download.verifying", ui_lang))
 
     return {
         "downloaded": downloaded,

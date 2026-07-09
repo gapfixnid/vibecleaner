@@ -6,6 +6,7 @@ from typing import Any
 
 from ..core.errors import PageNotFoundError
 from ..core.models.image import ImageData
+from ..infrastructure.job_messages import msg_from_context
 from .page_analysis import (
     bubbles_from_analysis,
     merge_overlapping_bubbles,
@@ -82,7 +83,7 @@ class PageDetectionStage:
         job_manager.ensure_not_cancelled(job)
         if not local_bubbles:
             if show_progress:
-                job_manager.update(job, progress=15, message="Detecting and reading text")
+                job_manager.update(job, progress=15, message=msg_from_context("page_translation.detecting", context))
             context.artifacts["blocks"] = self.detection_service.detect_and_ocr(
                 image,
                 lang=config.source_language,
@@ -115,7 +116,7 @@ class PageOcrStage:
 
         if not local_bubbles:
             if show_progress:
-                job_manager.update(job, progress=30, message="Analyzing page layout")
+                job_manager.update(job, progress=30, message=msg_from_context("page_translation.analyzing", context))
             local_bubbles = bubbles_from_analysis(
                 image,
                 context.artifacts["blocks"],
@@ -155,7 +156,7 @@ class PageTranslationStage:
 
         if untranslated:
             if show_progress:
-                job_manager.update(job, progress=45, message="Translating text")
+                job_manager.update(job, progress=45, message=msg_from_context("page_translation.translating", context))
             temp_blocks = [
                 SimpleNamespace(text_bbox=bubble.source_xyxy(), text=bubble.text, translation="")
                 for bubble in untranslated
@@ -187,7 +188,7 @@ class PageInpaintingStage:
 
         if inpainted_image is None:
             if show_progress:
-                job_manager.update(job, progress=60, message="Cleaning backgrounds")
+                job_manager.update(job, progress=60, message=msg_from_context("page_translation.cleaning", context))
             boxes = inpaint_boxes(local_bubbles, use_textbox_only=config.inpaint_use_textbox_only)
             inpainted_image = self.inpainting_service.clean_background(
                 image,

@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from ...core.models import Rect, TextBubble
 from ...infrastructure.image.loading import ensure_page_image, invalidate_page_caches, load_cv_image
+from ...infrastructure.job_messages import msg
 from ...core.state.review import derive_bubble_status, refresh_bubble_status, refresh_page_status
 from ...core.version import APP_NAME
 from .page_crud import resolve_page, resolve_page_index
@@ -347,7 +348,7 @@ def _translate_single_bubble_job(state, job: dict, page_id: str, bubble_id: int,
         bubble_snapshot = bubble.clone()
 
     job_manager.ensure_not_cancelled(job)
-    job_manager.update(job, progress=30, message="Translating selected bubble")
+    job_manager.update(job, progress=30, message=msg("bubble.translate", config.ui_language))
     tb_block = SimpleNamespace(
         text_bbox=np.array(bubble_snapshot.source_xyxy()).astype(np.int32),
         text=bubble_snapshot.text,

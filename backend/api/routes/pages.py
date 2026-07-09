@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from ..dependencies import get_container
 from ...core.container import AppContainer
+from ...infrastructure.job_messages import msg
 from ..use_cases.bubbles import (
     BubbleUpdateSchema,
     get_bubbles_response,
@@ -127,12 +128,12 @@ def translate_single_bubble(page_id: str, bubble_id: int, container: AppContaine
 @router.post("/api/pages/{page_id}/bubbles/{bubble_id}/inpaint")
 def inpaint_single_bubble(page_id: str, bubble_id: int, container: AppContainer = Depends(get_container)):
     return start_inpaint_bubble(
-        container.project_state, page_id, bubble_id, container.inpainting_service, container.job_manager
+        container.project_state, page_id, bubble_id, container.inpainting_service, container.job_manager, container.config
     )
 
 @router.post("/api/pages/{page_id}/inpaint")
 def run_inpaint(page_id: str, container: AppContainer = Depends(get_container)):
-    return start_inpaint_page(container.project_state, page_id, container.inpainting_service, container.job_manager)
+    return start_inpaint_page(container.project_state, page_id, container.inpainting_service, container.job_manager, container.config)
 
 @router.post("/api/pages/{page_id}/translate-all")
 def run_translate_all(page_id: str, container: AppContainer = Depends(get_container)):
@@ -177,6 +178,7 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
     total = len(page_ids)
     completed = 0
     completed_page_indices = []
+    ui_lang = container.config.ui_language
 
     for page_id in page_ids:
         page_idx = None
@@ -186,7 +188,7 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
             container.job_manager.update(
                 job,
                 progress=int((completed / total) * 100),
-                message=f"Translating page {completed + 1}/{total}...",
+                message=msg("batch_translation.translating_page", ui_lang, current=completed + 1, total=total),
             )
             job["result"] = {"completed_pages": list(completed_page_indices), "total_pages": total}
             run_page_translation(
@@ -212,7 +214,7 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
             completed_page_indices.append(page_idx)
             container.job_manager.ensure_not_cancelled(job)
 
-    container.job_manager.update(job, progress=100, message="Batch translation complete")
+    container.job_manager.update(job, progress=100, message=msg("batch_translation.complete", ui_lang))
     return {"translated_pages": completed, "total_pages": total, "completed_pages": completed_page_indices}
 
 
