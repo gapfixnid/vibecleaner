@@ -15,7 +15,7 @@ interface UseProjectActionsDeps {
   saveProject: () => Promise<boolean>;
   newProject: () => Promise<boolean>;
   loadProject: () => Promise<number[] | null>;
-  openFiles: () => Promise<{ beforeCount: number; afterCount: number; addedCount: number } | undefined>;
+  openFiles: (paths?: string[]) => Promise<{ beforeCount: number; afterCount: number; addedCount: number } | undefined>;
   pages: PageInfo[];
   selectedPageIds: number[];
   runTask: RunTask;
@@ -96,8 +96,10 @@ export function useProjectActions({
     });
   }, [guardUnsaved, loadProject, resetPageVersions, setSelectedPageIds, setSelectedBubbleId]);
 
-  const handleImportImages = useCallback(async () => {
-    const result = await openFiles();
+  const handleImportImages = useCallback(async (paths?: string[]) => {
+    // Guard: this is also used directly as a click handler, where the first
+    // argument would be a MouseEvent rather than a paths array.
+    const result = await openFiles(Array.isArray(paths) ? paths : undefined);
     if (!result) return;
     const { beforeCount, afterCount, addedCount } = result;
     if (beforeCount === 0 && addedCount > 0) {

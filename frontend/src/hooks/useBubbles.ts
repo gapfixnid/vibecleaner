@@ -15,6 +15,8 @@ interface UseBubblesDeps {
   markDirty: () => void;
   /** Called when translated count may have changed so sidebar dots refresh. */
   onPageTranslationChanged?: () => void;
+  /** Called after a bubble was deleted, with a callback that restores it (undo toast). */
+  onBubbleDeleted?: (undo: () => void) => void;
   t?: (key: string) => string;
 }
 
@@ -45,7 +47,7 @@ function translationStatusChanged(oldB: BubbleInfo | undefined, newB: BubbleInfo
 }
 
 /** Owns bubble list state, selection, and all bubble-level operations. */
-export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, showError, markDirty, onPageTranslationChanged, t = (key) => key }: UseBubblesDeps) {
+export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, showError, markDirty, onPageTranslationChanged, onBubbleDeleted, t = (key) => key }: UseBubblesDeps) {
   const [bubbles, setBubbles] = useState<BubbleInfo[]>([]);
   const [selectedBubbleId, setSelectedBubbleId] = useState<number | null>(null);
   const bubbleRequestSeq = useRef(0);
@@ -221,8 +223,21 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
       await fetchBubblesForPage(idx);
       // Deleting a bubble changes translated_count
       onPageTranslationChanged?.();
+      // Offer undo: restoring re-sends the pre-delete list (full-list sync).
+      onBubbleDeleted?.(() => {
+        void (async () => {
+          try {
+            await syncBubblesToBackend(prev);
+            await fetchBubblesForPage(idx);
+            onPageTranslationChanged?.();
+          } catch (e) {
+            console.error("Failed to restore deleted bubble", e);
+            showError(t("bubbles.saveFailedTitle"), t("bubbles.saveFailedMessage"));
+          }
+        })();
+      });
     },
-    [currentIndexRef, getPageId, syncBubblesToBackend, fetchBubblesForPage, showError, onPageTranslationChanged, t]
+    [currentIndexRef, getPageId, syncBubblesToBackend, fetchBubblesForPage, showError, onPageTranslationChanged, onBubbleDeleted, t]
   );
 
   return {

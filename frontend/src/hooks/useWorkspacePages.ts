@@ -19,6 +19,8 @@ interface UseWorkspacePagesDeps {
     destructive?: boolean
   ) => void;
   markDirty: () => void;
+  /** Passed through to useBubbles for the delete-undo toast. */
+  onBubbleDeleted?: (undo: () => void) => void;
   t?: (key: string) => string;
 }
 
@@ -28,6 +30,7 @@ export function useWorkspacePages({
   showError,
   showConfirm,
   markDirty,
+  onBubbleDeleted,
   t = (key) => key,
 }: UseWorkspacePagesDeps) {
   const selectionRef = useRef<number[]>([]);
@@ -45,6 +48,7 @@ export function useWorkspacePages({
     showError,
     markDirty,
     onPageTranslationChanged: () => onTranslationChangedRef.current?.(),
+    onBubbleDeleted,
     t,
   });
 

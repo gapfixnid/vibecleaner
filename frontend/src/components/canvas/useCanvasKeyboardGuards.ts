@@ -1,5 +1,6 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import type { BubbleInfo } from "../../types";
+import { isTextInputFocused } from "../../lib/keyboard";
 
 interface DraggingBubbleState {
   id: number;
@@ -20,6 +21,10 @@ interface UseCanvasKeyboardGuardsDeps {
   bubbles: BubbleInfo[];
   onPreviewBubbles: (updated: BubbleInfo[]) => void;
   onDeleteBubble: (id: number) => void;
+  /** Ctrl+= / Ctrl+- zoom step. */
+  zoomBy?: (factor: number) => void;
+  /** Ctrl+0 fit to window. */
+  fitToWindow?: () => void;
 }
 
 export function useCanvasKeyboardGuards({
@@ -30,6 +35,8 @@ export function useCanvasKeyboardGuards({
   bubbles,
   onPreviewBubbles,
   onDeleteBubble,
+  zoomBy,
+  fitToWindow,
 }: UseCanvasKeyboardGuardsDeps) {
   useEffect(() => {
     const blockRightClickDuringDrag = (event: MouseEvent) => {
@@ -73,16 +80,22 @@ export function useCanvasKeyboardGuards({
         return;
       }
       if (event.code === "Delete") {
-        if (selectedBubbleId !== null) {
-          const activeTag = document.activeElement?.tagName.toLowerCase();
-          const isEditing =
-            activeTag === "input" ||
-            activeTag === "textarea" ||
-            activeTag === "select" ||
-            (document.activeElement as HTMLElement | null)?.isContentEditable;
-          if (!isEditing) {
-            onDeleteBubble(selectedBubbleId);
-          }
+        if (selectedBubbleId !== null && !isTextInputFocused()) {
+          onDeleteBubble(selectedBubbleId);
+        }
+        return;
+      }
+      // Zoom shortcuts: Ctrl+0 fit, Ctrl+= in, Ctrl+- out.
+      if ((event.ctrlKey || event.metaKey) && !isTextInputFocused()) {
+        if (event.key === "0") {
+          event.preventDefault();
+          fitToWindow?.();
+        } else if (event.key === "=" || event.key === "+") {
+          event.preventDefault();
+          zoomBy?.(1.25);
+        } else if (event.key === "-") {
+          event.preventDefault();
+          zoomBy?.(1 / 1.25);
         }
       }
     };
@@ -107,5 +120,7 @@ export function useCanvasKeyboardGuards({
     onDeleteBubble,
     bubbles,
     onPreviewBubbles,
+    zoomBy,
+    fitToWindow,
   ]);
 }

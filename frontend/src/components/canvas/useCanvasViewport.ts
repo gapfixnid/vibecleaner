@@ -24,6 +24,23 @@ interface UseCanvasViewportOptions {
   hasUserAdjustedRef: MutableRefObject<boolean>;
 }
 
+export const MIN_SCALE = 0.15;
+export const MAX_SCALE = 5;
+const FIT_MARGIN = 60;
+
+/** Scale + centered pan that fits the image inside the container (never upscales). */
+function computeFit(containerW: number, containerH: number, imgW: number, imgH: number) {
+  if (!containerW || !containerH || !imgW || !imgH) return null;
+  const scale = Math.min((containerW - FIT_MARGIN) / imgW, (containerH - FIT_MARGIN) / imgH, 1);
+  return {
+    scale,
+    pan: {
+      x: (containerW - imgW * scale) / 2,
+      y: (containerH - imgH * scale) / 2,
+    },
+  };
+}
+
 export function useCanvasViewport({
   containerRef,
   imageRef,
@@ -62,15 +79,10 @@ export function useCanvasViewport({
       setImageDimensions({ w: imgWidth, h: imgHeight });
       if (hasUserAdjustedRef.current) return;
 
-      const scaleX = (containerWidth - 60) / imgWidth;
-      const scaleY = (containerHeight - 60) / imgHeight;
-      const initialScale = Math.min(scaleX, scaleY, 1);
-
-      setScale(initialScale);
-      setPan({
-        x: (containerWidth - imgWidth * initialScale) / 2,
-        y: (containerHeight - imgHeight * initialScale) / 2,
-      });
+      const fit = computeFit(containerWidth, containerHeight, imgWidth, imgHeight);
+      if (!fit) return;
+      setScale(fit.scale);
+      setPan(fit.pan);
     });
 
     observer.observe(containerRef.current);
@@ -89,15 +101,10 @@ export function useCanvasViewport({
     if (imgWidth === 0 || imgHeight === 0 || containerWidth === 0 || containerHeight === 0) return;
 
     if (scale === 1 && !hasUserAdjustedRef.current) {
-      const scaleX = (containerWidth - 60) / imgWidth;
-      const scaleY = (containerHeight - 60) / imgHeight;
-      const initialScale = Math.min(scaleX, scaleY, 1);
-
-      setScale(initialScale);
-      setPan({
-        x: (containerWidth - imgWidth * initialScale) / 2,
-        y: (containerHeight - imgHeight * initialScale) / 2,
-      });
+      const fit = computeFit(containerWidth, containerHeight, imgWidth, imgHeight);
+      if (!fit) return;
+      setScale(fit.scale);
+      setPan(fit.pan);
       setImageDimensions({ w: imgWidth, h: imgHeight });
     }
   }, [
@@ -119,7 +126,8 @@ export function useCanvasViewport({
         e.preventDefault();
         hasUserAdjustedRef.current = true;
         const zoomFactor = 1.1;
-        const nextScale = e.deltaY < 0 ? Math.min(scale * zoomFactor, 5) : Math.max(scale / zoomFactor, 0.15);
+        const nextScale =
+          e.deltaY < 0 ? Math.min(scale * zoomFactor, MAX_SCALE) : Math.max(scale / zoomFactor, MIN_SCALE);
 
         if (containerRef.current) {
           const rect = containerRef.current.getBoundingClientRect();
@@ -172,6 +180,39 @@ export function useCanvasViewport({
     return true;
   }, [isPanning]);
 
+  /** Zoom to an absolute scale, anchored at the viewport center. */
+  const zoomTo = useCallback(
+    (nextScale: number) => {
+      const container = containerRef.current;
+      if (!container) return;
+      const clamped = Math.min(Math.max(nextScale, MIN_SCALE), MAX_SCALE);
+      hasUserAdjustedRef.current = true;
+      const cx = container.clientWidth / 2;
+      const cy = container.clientHeight / 2;
+      const imgX = (cx - pan.x) / scale;
+      const imgY = (cy - pan.y) / scale;
+      setScale(clamped);
+      setPan({ x: cx - imgX * clamped, y: cy - imgY * clamped });
+    },
+    [containerRef, hasUserAdjustedRef, pan.x, pan.y, scale, setPan, setScale],
+  );
+
+  const zoomBy = useCallback((factor: number) => zoomTo(scale * factor), [zoomTo, scale]);
+
+  /** Re-fit the image and resume auto-fit on future container resizes. */
+  const fitToWindow = useCallback(() => {
+    const container = containerRef.current;
+    const img = imageRef.current;
+    if (!container || !img) return;
+    const imgWidth = imageWidth || img.naturalWidth;
+    const imgHeight = imageHeight || img.naturalHeight;
+    const fit = computeFit(container.clientWidth, container.clientHeight, imgWidth, imgHeight);
+    if (!fit) return;
+    hasUserAdjustedRef.current = false;
+    setScale(fit.scale);
+    setPan(fit.pan);
+  }, [containerRef, hasUserAdjustedRef, imageHeight, imageRef, imageWidth, setPan, setScale]);
+
   return {
     handleWheel,
     isPanning,
@@ -180,5 +221,8 @@ export function useCanvasViewport({
     startCanvasPan,
     updateCanvasPan,
     finishCanvasPan,
+    zoomBy,
+    zoomTo,
+    fitToWindow,
   };
 }

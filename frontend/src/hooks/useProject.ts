@@ -39,18 +39,22 @@ export function useProject({
   // Used so "Save Project" writes back to the same file without re-prompting.
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
 
-  const handleOpenFiles = useCallback(async (): Promise<OpenFilesResult | undefined> => {
+  /** Import images. Opens a file dialog unless explicit paths are given
+   *  (e.g. OS drag-and-drop). */
+  const handleOpenFiles = useCallback(async (presetPaths?: string[]): Promise<OpenFilesResult | undefined> => {
     let result: OpenFilesResult | undefined;
     await runTask(
       t("project.loadingSelectedImages"),
       async () => {
-        const files = await desktop.selectMultipleFiles({
-          title: t("project.selectMangaImagesTitle"),
-          filters: [
-            [t("project.mangaImagesFilter"), ["png", "jpg", "jpeg", "webp", "bmp"]],
-            [t("project.allFilesFilter"), ["*"]],
-          ],
-        });
+        const files =
+          presetPaths ??
+          (await desktop.selectMultipleFiles({
+            title: t("project.selectMangaImagesTitle"),
+            filters: [
+              [t("project.mangaImagesFilter"), ["png", "jpg", "jpeg", "webp", "bmp"]],
+              [t("project.allFilesFilter"), ["*"]],
+            ],
+          }));
         if (!files || files.length === 0) return; // Cancelled
         const beforeData = await api.getPages();
         const beforeCount = beforeData.pages.length;

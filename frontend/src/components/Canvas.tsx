@@ -2,6 +2,7 @@
 import React, { useRef, useState } from "react";
 import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
+import { CanvasZoomControls } from "./canvas/CanvasZoomControls";
 import { CanvasMultiSelectEmpty } from "./canvas/CanvasMultiSelectEmpty";
 import { CanvasImageStage } from "./canvas/CanvasImageStage";
 import { useCanvasKeyboardGuards } from "./canvas/useCanvasKeyboardGuards";
@@ -93,6 +94,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     startCanvasPan,
     updateCanvasPan,
     finishCanvasPan,
+    zoomBy,
+    zoomTo,
+    fitToWindow,
   } = useCanvasViewport({
     containerRef,
     imageRef,
@@ -133,6 +137,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     bubbles,
     onPreviewBubbles,
     onDeleteBubble,
+    zoomBy,
+    fitToWindow,
   });
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -187,6 +193,18 @@ export const Canvas: React.FC<CanvasProps> = ({
           onImageLoad={handleImageLoad}
           onImageError={handleImageError}
           onStartBubbleDrag={startBubbleDrag}
+        />
+      )}
+
+      {/* Floating zoom cluster */}
+      {displayImageUrl && !isMultiPageSelection && (
+        <CanvasZoomControls
+          scale={scale}
+          onZoomIn={() => zoomBy(1.25)}
+          onZoomOut={() => zoomBy(1 / 1.25)}
+          onZoomReset={() => zoomTo(1)}
+          onZoomFit={fitToWindow}
+          t={t}
         />
       )}
 
