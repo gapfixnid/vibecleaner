@@ -4,7 +4,7 @@ import logging
 
 import cv2
 import numpy as np
-from infrastructure import image as imk
+from ....infrastructure import image as imk
 
 logger = logging.getLogger(__name__)
 
@@ -113,4 +113,3 @@ def crop_quad(img: np.ndarray, quad: np.ndarray) -> np.ndarray:
 	if h > 0 and w > 0 and (h / float(w)) >= 1.5:
 		crop = np.rot90(crop)
 	return crop
-

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
-from infrastructure import image as imk
+from ....infrastructure import image as imk
 
 @dataclass(slots=True)
 class _MaskStats:
@@ -644,5 +644,4 @@ def _split_mask_by_tall_vertical_columns(mask: np.ndarray) -> list[np.ndarray]:
         sub_mask[:, cx1:cx2] = mask[:, cx1:cx2]
         sub_masks.append(sub_mask)
     return sub_masks
-
 

@@ -1,24 +1,15 @@
-import sys
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-from core.models import Rect
+from backend.core.models import Rect
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from core.models import TextBubble
-from engines.rendering.service import RenderService
-
+from backend.core.models import TextBubble
+from backend.engines.rendering.service import RenderService
 
 def _rect_from_qrectf(rect) -> Rect:
     """The service hands the renderer Qt geometry; record it as a core Rect."""
     return Rect(rect.x(), rect.y(), rect.width(), rect.height())
-
 
 class FakeRenderer:
     def __init__(self):
@@ -57,7 +48,6 @@ class FakeRenderer:
 
     def make_ellipse_mask(self, width, height, inset=0):
         return np.ones((height, width), dtype=np.uint8)
-
 
 class RenderServiceTests(unittest.TestCase):
     def test_render_service_passes_explicit_font_size_options_to_renderer(self):
@@ -104,7 +94,6 @@ class RenderServiceTests(unittest.TestCase):
         service.get_layout_for_bubble("translated", bubble, image=None, font_family=None)
 
         self.assertIsNone(renderer.font_family)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,20 +1,14 @@
 # download_models.py
-import os
 import sys
 import logging
 import argparse
 
-# Ensure current directory and backend directory are in search path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(current_dir)
-sys.path.append(os.path.join(current_dir, "backend"))
-
-from infrastructure.logging import configure_logging
-from infrastructure.downloads import ModelDownloader, ModelID
-from infrastructure.storage import get_settings_file_path
-from core.config import AppConfig
-from infrastructure.downloads.requirements import get_required_model_ids
-from core.version import APP_NAME
+from backend.infrastructure.logging import configure_logging
+from backend.infrastructure.downloads import ModelDownloader, ModelID
+from backend.infrastructure.storage import get_settings_file_path
+from backend.core.config import AppConfig
+from backend.infrastructure.downloads.requirements import get_required_model_ids
+from backend.core.version import APP_NAME
 
 configure_logging()
 logger = logging.getLogger(__name__)

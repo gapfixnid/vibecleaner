@@ -1,22 +1,14 @@
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from core.config import AppConfig
-from engines.ocr.ppocr import engine as ppocr_module
-from engines.ocr.ppocr.engine import PPOCRv5Engine
-from engines.ocr.ppocr.preprocessing import apply_adaptive_binarization
-from engines.ocr.local import LocalOCR
-from engines.common.textblock import TextBlock
-
+from backend.core.config import AppConfig
+from backend.engines.ocr.ppocr import engine as ppocr_module
+from backend.engines.ocr.ppocr.engine import PPOCRv5Engine
+from backend.engines.ocr.ppocr.preprocessing import apply_adaptive_binarization
+from backend.engines.ocr.local import LocalOCR
+from backend.engines.common.textblock import TextBlock
 
 class FakeMangaEngine:
     calls = []
@@ -30,7 +22,6 @@ class FakeMangaEngine:
             block.text = "manga"
         return blocks
 
-
 class FakePPOCREngine:
     calls = []
 
@@ -42,7 +33,6 @@ class FakePPOCREngine:
         for block in blocks:
             block.text = f"ppocr:{self.lang}"
         return blocks
-
 
 class OcrPipelineOptionsTests(unittest.TestCase):
     def test_local_ocr_uses_explicit_engine_without_global_config(self):
@@ -155,7 +145,6 @@ class OcrPipelineOptionsTests(unittest.TestCase):
             engine.process_image(np.zeros((100, 100, 3), dtype=np.uint8), [block])
 
         self.assertEqual(to_blocks.call_args.args[1], [(10, 20, 40, 80)])
-
 
 if __name__ == "__main__":
     unittest.main()

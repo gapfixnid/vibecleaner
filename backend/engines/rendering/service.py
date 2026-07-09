@@ -4,10 +4,10 @@ import numpy as np
 from PySide6.QtCore import QRectF
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
-from core.config import config_value
-from core.models import Rect, TextBubble
+from ...core.config import config_value
+from ...core.models import Rect, TextBubble
 from .renderer import TextRenderer, TextLayoutResult
-from infrastructure.image.masks import build_bubble_clip_mask
+from ...infrastructure.image.masks import build_bubble_clip_mask
 
 logger = logging.getLogger(__name__)
 

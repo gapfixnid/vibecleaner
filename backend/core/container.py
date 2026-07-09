@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from core.config import AppConfig, AppConfigSnapshot
-from core.state.project_state import ProjectState
-from pipeline.planner import PipelinePlanner
-from pipeline.registry import StageRegistry
-from pipeline.runner import PipelineRunner
+from .config import AppConfig, AppConfigSnapshot
+from .state.project_state import ProjectState
+from ..pipeline.planner import PipelinePlanner
+from ..pipeline.registry import StageRegistry
+from ..pipeline.runner import PipelineRunner
 
 if TYPE_CHECKING:
     # Type-only imports: the composition root may know every concrete type,

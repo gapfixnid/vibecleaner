@@ -4,17 +4,17 @@ import logging
 from types import SimpleNamespace
 from typing import Any
 
-from core.errors import PageNotFoundError
-from core.models.image import ImageData
-from pipeline.page_analysis import (
+from ..core.errors import PageNotFoundError
+from ..core.models.image import ImageData
+from .page_analysis import (
     bubbles_from_analysis,
     merge_overlapping_bubbles,
     bubble_clip_boxes,
     inpaint_boxes,
 )
-from pipeline.context import PipelineContext
-from pipeline.registry import StageRegistry
-from pipeline.runner import PipelineRunner
+from .context import PipelineContext
+from .registry import StageRegistry
+from .runner import PipelineRunner
 
 logger = logging.getLogger(__name__)
 

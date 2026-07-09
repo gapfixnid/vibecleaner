@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.models.image import ImageData
-from core.ports.inpainting import InpaintOptions, InpaintRegion, InpaintResult
+from ...core.models.image import ImageData
+from ...core.ports.inpainting import InpaintOptions, InpaintRegion, InpaintResult
 
 
 class InpaintingEngineAdapter:

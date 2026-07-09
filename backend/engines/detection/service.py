@@ -7,9 +7,9 @@ import threading
 import time
 import numpy as np
 from typing import List, Optional, Any, Dict
-from core.config import config_value
+from ...core.config import config_value
 from .wrapper import RTDETRv2Detector
-from engines.ocr.local import LocalOCR
+from ..ocr.local import LocalOCR
 
 logger = logging.getLogger(__name__)
 

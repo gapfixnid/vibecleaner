@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from core.models.page import MangaPage
+from ..models.page import MangaPage
 
 
 class ProjectRepository(Protocol):

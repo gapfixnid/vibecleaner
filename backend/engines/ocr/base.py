@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 import numpy as np
 import base64
-from infrastructure import image as imk
+from ...infrastructure import image as imk
 
-from engines.common.textblock import TextBlock
+from ..common.textblock import TextBlock
 
 
 class OCREngine(ABC):

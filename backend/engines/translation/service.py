@@ -6,8 +6,8 @@ import hashlib
 import shutil
 import numpy as np
 from typing import List, Optional, Any, Dict, cast
-from infrastructure.storage import get_app_data_dir
-from core.config import OLLAMA_API_URL
+from ...infrastructure.storage import get_app_data_dir
+from ...core.config import OLLAMA_API_URL
 from .providers import (
     OllamaTranslator,
     OpenAICompatibleTranslator,

@@ -5,7 +5,7 @@ from typing import Dict, Optional
 
 import numpy as np
 
-from core.models.geometry import Rect
+from .geometry import Rect
 
 
 @dataclass

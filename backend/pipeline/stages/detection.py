@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from core.ports.detection import TextDetector
-from pipeline.context import PipelineContext
-from pipeline.strategies.engine_selection import EngineSelectionStrategy
-from pipeline.validation.inputs import require_page_image
+from ...core.ports.detection import TextDetector
+from ..context import PipelineContext
+from ..strategies.engine_selection import EngineSelectionStrategy
+from ..validation.inputs import require_page_image
 
 
 class DetectionStage:

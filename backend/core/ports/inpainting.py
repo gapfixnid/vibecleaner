@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from core.models.geometry import Box
-from core.models.image import ImageData
+from ..models.geometry import Box
+from ..models.image import ImageData
 
 
 @dataclass(frozen=True)

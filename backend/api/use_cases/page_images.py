@@ -5,14 +5,14 @@ import os
 from fastapi import HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
-from core.version import APP_NAME
-from infrastructure.image.encoding import (
+from ...core.version import APP_NAME
+from ...infrastructure.image.encoding import (
     encode_jpeg_bytes,
     encode_png_bytes,
     encode_preview_jpeg_bytes,
     encode_thumbnail_bytes,
 )
-from infrastructure.image.loading import ensure_original_thumbnail, load_cv_image
+from ...infrastructure.image.loading import ensure_original_thumbnail, load_cv_image
 from .page_crud import resolve_page, resolve_page_index
 
 import logging

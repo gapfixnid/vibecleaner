@@ -1,5 +1,5 @@
-from infrastructure.downloads.files import download_url_to_file
-from infrastructure.downloads.models import (
+from .files import download_url_to_file
+from .models import (
     ModelDownloader,
     ModelID,
     ModelSpec,

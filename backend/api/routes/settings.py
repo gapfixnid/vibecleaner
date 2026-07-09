@@ -4,11 +4,11 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from api.dependencies import get_container
-from core.version import APP_NAME
-from core.container import AppContainer
-from core.config import OLLAMA_API_URL
-from infrastructure.downloads.requirements import download_required_models, get_model_status
+from ..dependencies import get_container
+from ...core.version import APP_NAME
+from ...core.container import AppContainer
+from ...core.config import OLLAMA_API_URL
+from ...infrastructure.downloads.requirements import download_required_models, get_model_status
 
 router = APIRouter()
 logger = logging.getLogger(APP_NAME)

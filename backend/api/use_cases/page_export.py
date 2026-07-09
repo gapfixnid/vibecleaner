@@ -5,8 +5,8 @@ from typing import Optional
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
-from core.models import MangaPage
-from infrastructure.image.loading import ensure_page_image
+from ...core.models import MangaPage
+from ...infrastructure.image.loading import ensure_page_image
 
 from .page_crud import resolve_page
 

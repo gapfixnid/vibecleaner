@@ -1,6 +1,6 @@
 from .base import DetectionEngine
 from .rtdetr_v2_onnx import RTDetrV2ONNXDetection
-from infrastructure.runtime.device import resolve_device, torch_available
+from ...infrastructure.runtime.device import resolve_device, torch_available
 from .backend import DEFAULT_DETECTION_BACKEND, resolve_detection_backend
 
 

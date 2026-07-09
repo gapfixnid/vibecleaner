@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.ports.translation import TranslationInput, TranslationOptions, TranslationResult
+from ...core.ports.translation import TranslationInput, TranslationOptions, TranslationResult
 
 
 class TranslationEngineAdapter:

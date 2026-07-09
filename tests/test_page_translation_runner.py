@@ -1,23 +1,15 @@
-import sys
-from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-from core.models import Rect
+from backend.core.models import Rect
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from core.models import MangaPage, TextBubble
-from core.state.project_state import ProjectState
-from core.config import AppConfig
-from pipeline.page_translation import run_page_translation
-from pipeline.planner import PipelinePlanner
-from pipeline.page_translation_stages import build_page_translation_runner
-from infrastructure.jobs import JobManager
-
+from backend.core.models import MangaPage, TextBubble
+from backend.core.state.project_state import ProjectState
+from backend.core.config import AppConfig
+from backend.pipeline.page_translation import run_page_translation
+from backend.pipeline.planner import PipelinePlanner
+from backend.pipeline.page_translation_stages import build_page_translation_runner
+from backend.infrastructure.jobs import JobManager
 
 class FakeInpaintingService:
     def __init__(self):
@@ -29,7 +21,6 @@ class FakeInpaintingService:
         cleaned[:, :] = 255
         return cleaned
 
-
 class FakeTranslationService:
     def __init__(self):
         self.calls = []
@@ -38,7 +29,6 @@ class FakeTranslationService:
         self.calls.append({"texts": [block.text for block in blocks], "src_lang": src_lang, "tgt_lang": tgt_lang})
         for block in blocks:
             block.translation = f"translated:{block.text}"
-
 
 def test_page_translation_runner_uses_canonical_stages_and_updates_page_state():
     state = ProjectState()

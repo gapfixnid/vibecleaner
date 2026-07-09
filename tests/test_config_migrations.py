@@ -1,16 +1,9 @@
 import json
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from core.config import AppConfig
-
+from backend.core.config import AppConfig
 
 class ConfigMigrationTests(unittest.TestCase):
     def test_removed_high_precision_profiles_migrate_to_balanced_profiles(self):
@@ -47,7 +40,6 @@ class ConfigMigrationTests(unittest.TestCase):
             cfg.load()
 
         self.assertTrue(cfg.setup_completed)
-
 
 if __name__ == "__main__":
     unittest.main()

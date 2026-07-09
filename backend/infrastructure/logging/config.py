@@ -6,7 +6,7 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-from infrastructure.storage.paths import get_user_data_dir
+from ..storage.paths import get_user_data_dir
 
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 DEFAULT_LOG_LEVEL = logging.INFO

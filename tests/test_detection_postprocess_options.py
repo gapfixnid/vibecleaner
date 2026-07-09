@@ -1,17 +1,8 @@
-import sys
-from pathlib import Path
-
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from core.config import AppConfigSnapshot
-from engines.detection.pipeline import DetectionPipeline
-from pipeline.strategies.engine_selection import EngineSelectionStrategy
-
+from backend.core.config import AppConfigSnapshot
+from backend.engines.detection.pipeline import DetectionPipeline
+from backend.pipeline.strategies.engine_selection import EngineSelectionStrategy
 
 def test_strategy_maps_detection_postprocess_options():
     settings = AppConfigSnapshot(
@@ -27,7 +18,6 @@ def test_strategy_maps_detection_postprocess_options():
     assert options.line_merge_sensitivity == 1.7
     assert options.smart_direction is False
     assert options.text_direction_override == "vertical"
-
 
 def test_detection_pipeline_accepts_explicit_bubbles_only_option():
     pipeline = DetectionPipeline(settings=None)

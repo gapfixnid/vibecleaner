@@ -1,7 +1,7 @@
 from __future__ import annotations
 import math
 import numpy as np
-from infrastructure import image as imk
+from ....infrastructure import image as imk
 
 from .geometry import _line_axis_box, _clamp_box, _is_polygon_line
 from .clustering import _cluster_components_by_y, _component_boxes, _components_to_box

@@ -3,10 +3,10 @@ from __future__ import annotations
 import inspect
 from typing import Any
 
-from core.models.geometry import Box
-from core.models.image import ImageData
-from core.models.text import TextRegion
-from core.ports.detection import DetectionOptions, DetectionResult
+from ...core.models.geometry import Box
+from ...core.models.image import ImageData
+from ...core.models.text import TextRegion
+from ...core.ports.detection import DetectionOptions, DetectionResult
 
 
 class DetectionEngineAdapter:

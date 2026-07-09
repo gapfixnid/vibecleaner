@@ -1,4 +1,4 @@
-from infrastructure.storage.paths import (
+from .paths import (
     get_app_data_dir,
     get_default_project_autosave_dir,
     get_settings_file_path,

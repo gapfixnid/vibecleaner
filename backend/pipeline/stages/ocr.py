@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from core.ports.ocr import OcrEngine
-from pipeline.context import PipelineContext
-from pipeline.strategies.engine_selection import EngineSelectionStrategy
-from pipeline.validation.results import PipelineValidationError, ValidationIssue
+from ...core.ports.ocr import OcrEngine
+from ..context import PipelineContext
+from ..strategies.engine_selection import EngineSelectionStrategy
+from ..validation.results import PipelineValidationError, ValidationIssue
 
 
 class OcrStage:

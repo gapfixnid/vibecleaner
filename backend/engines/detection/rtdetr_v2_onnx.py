@@ -3,11 +3,11 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 
-from infrastructure.runtime.device import get_providers
-from infrastructure.downloads import ModelDownloader, ModelID, models_base_dir
-from infrastructure.runtime.onnx import make_session
-from engines.common.textblock import TextBlock
-from engines.detection.utils.slicer import ImageSlicer
+from ...infrastructure.runtime.device import get_providers
+from ...infrastructure.downloads import ModelDownloader, ModelID, models_base_dir
+from ...infrastructure.runtime.onnx import make_session
+from ..common.textblock import TextBlock
+from .utils.slicer import ImageSlicer
 from .base import DetectionEngine
 
 

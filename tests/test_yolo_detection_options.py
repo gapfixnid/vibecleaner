@@ -1,17 +1,9 @@
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-import engines.detection.yolo_onnx as yolo_module
-from engines.detection.yolo_onnx import YoloONNXDetection
-
+import backend.engines.detection.yolo_onnx as yolo_module
+from backend.engines.detection.yolo_onnx import YoloONNXDetection
 
 class FakeSession:
     def get_inputs(self):
@@ -19,7 +11,6 @@ class FakeSession:
 
     def run(self, *_args, **_kwargs):
         return [np.zeros((1, 6, 0), dtype=np.float32)]
-
 
 def test_yolo_initialize_uses_explicit_model_name_without_global_config():
     created_paths = []
@@ -49,7 +40,6 @@ def test_yolo_initialize_uses_explicit_model_name_without_global_config():
     assert detector.current_loaded_model == "custom-yolo.onnx"
     assert detector.confidence_threshold == 0.66
     assert detector.tiling_enabled is False
-
 
 def test_yolo_detect_uses_explicit_confidence_and_tiling_options():
     detector = YoloONNXDetection()

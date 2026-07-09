@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pipeline.context import PipelineContext
-from pipeline.validation.results import PipelineValidationError, ValidationIssue
+from ..context import PipelineContext
+from .results import PipelineValidationError, ValidationIssue
 
 
 def require_page_image(context: PipelineContext, stage: str) -> None:

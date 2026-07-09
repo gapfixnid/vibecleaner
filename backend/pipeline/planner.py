@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pipeline.plan import PipelinePlan
+from .plan import PipelinePlan
 
 
 class PipelinePlanner:

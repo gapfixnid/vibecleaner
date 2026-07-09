@@ -1,21 +1,12 @@
 import unittest
-import sys
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from api.routes import settings as settings_route
-from core.config import AppConfig
-
+from backend.api.routes import settings as settings_route
+from backend.core.config import AppConfig
 
 def make_translation_service():
     return SimpleNamespace(system_prompt="", reload=lambda: None)
-
 
 class SettingsUiLanguageTest(unittest.TestCase):
     def test_get_settings_includes_ui_language(self):
@@ -100,7 +91,6 @@ class SettingsUiLanguageTest(unittest.TestCase):
         self.assertEqual(cfg.adaptive_binarization_strength, 2.75)
         self.assertEqual(response["ocr_engine"], "manga_ocr")
         self.assertEqual(response["inpaint_engine"], "opencv")
-
 
 if __name__ == "__main__":
     unittest.main()

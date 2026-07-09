@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 
-from core.models import Rect, TextBubble, BubbleLayoutInput
+from ..core.models import Rect, TextBubble, BubbleLayoutInput
 
 
 def inpaint_boxes(bubbles, *, use_textbox_only: bool = True) -> list:

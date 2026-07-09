@@ -1,17 +1,8 @@
 import unittest
-import sys
-from pathlib import Path
+from backend.core.models import Rect
 
-from core.models import Rect
-
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from core.models import MangaPage, TextBubble
-from core.state.review import derive_bubble_status, derive_page_status, refresh_page_status
-
+from backend.core.models import MangaPage, TextBubble
+from backend.core.state.review import derive_bubble_status, derive_page_status, refresh_page_status
 
 class ReviewStateTests(unittest.TestCase):
     def test_bubble_review_state_survives_project_roundtrip(self):
@@ -77,7 +68,6 @@ class ReviewStateTests(unittest.TestCase):
         self.assertEqual(restored.bubbles[0].status, "needs_review")
         self.assertEqual(restored.bubbles[0].problems, ["manual check"])
         self.assertTrue(restored.bubbles[0].edited)
-
 
 if __name__ == "__main__":
     unittest.main()

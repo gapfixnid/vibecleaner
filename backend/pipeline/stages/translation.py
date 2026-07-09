@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from core.ports.translation import TranslationInput, Translator
-from pipeline.context import PipelineContext
-from pipeline.strategies.engine_selection import EngineSelectionStrategy
-from pipeline.validation.results import PipelineValidationError, ValidationIssue
+from ...core.ports.translation import TranslationInput, Translator
+from ..context import PipelineContext
+from ..strategies.engine_selection import EngineSelectionStrategy
+from ..validation.results import PipelineValidationError, ValidationIssue
 
 
 class TranslationStage:

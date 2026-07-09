@@ -1,7 +1,5 @@
 import argparse
-import asyncio
 import logging
-import os
 import sys
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
@@ -11,23 +9,19 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-# Add backend directory to sys.path to ensure local imports resolve.
-backend_dir = os.path.dirname(os.path.abspath(__file__))
-if backend_dir not in sys.path:
-    sys.path.insert(0, backend_dir)
 
 # Text layout uses QFontMetricsF in request handlers, so the backend process
 # needs an offscreen QApplication before routes start serving bubble data.
-import infrastructure.runtime.qt  # noqa: F401
+from .infrastructure.runtime import qt  # noqa: F401
 
-from core.version import APP_NAME, __version__ as APP_VERSION
-from core.container import build_container
-from core.errors import PageImageLoadError, PageNotFoundError
-from infrastructure.logging import configure_logging
-from api.routes.jobs import router as jobs_router
-from api.routes.pages import router as pages_router
-from api.routes.project import router as project_router
-from api.routes.settings import router as settings_router
+from .core.version import APP_NAME, __version__ as APP_VERSION
+from .core.container import build_container
+from .core.errors import PageImageLoadError, PageNotFoundError
+from .infrastructure.logging import configure_logging
+from .api.routes.jobs import router as jobs_router
+from .api.routes.pages import router as pages_router
+from .api.routes.project import router as project_router
+from .api.routes.settings import router as settings_router
 
 
 configure_logging()

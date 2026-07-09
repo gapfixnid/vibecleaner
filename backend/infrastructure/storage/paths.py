@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import platform
 
-from core.version import APP_NAME
+from ...core.version import APP_NAME
 
 
 def get_user_data_dir(app_name: str = APP_NAME) -> str:

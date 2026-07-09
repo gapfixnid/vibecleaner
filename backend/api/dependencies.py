@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import Request
 
-from core.container import AppContainer
+from ..core.container import AppContainer
 
 
 def get_container(request: Request) -> AppContainer:

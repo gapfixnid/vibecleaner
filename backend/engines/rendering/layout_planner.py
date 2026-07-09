@@ -19,7 +19,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from core.models import AnchorPoint, BubbleLayoutInput, Insets, LayoutPlanDto
+from ...core.models import AnchorPoint, BubbleLayoutInput, Insets, LayoutPlanDto
 
 logger = logging.getLogger(__name__)
 

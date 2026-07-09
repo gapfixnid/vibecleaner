@@ -6,13 +6,13 @@ import sys
 import logging
 import hashlib
 import numpy as np
-from infrastructure import image as imk
+from ...infrastructure import image as imk
 from typing import List, Optional
 from urllib.parse import urlparse
 from PIL import Image, ImageOps, PngImagePlugin
-from core.version import APP_NAME
+from ...core.version import APP_NAME
 
-from infrastructure.downloads import (
+from ...infrastructure.downloads import (
     download_url_to_file,
     models_base_dir,
     notify_download_event,

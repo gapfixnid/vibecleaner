@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Any, List, Optional
 
-from core.config import config_value
+from ...core.config import config_value
 from .hybrid import HybridInpainter
 
 

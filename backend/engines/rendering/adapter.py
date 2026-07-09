@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.models.image import ImageData
-from core.models.page import Bubble
-from core.ports.rendering import RenderOptions, RenderResult
+from ...core.models.image import ImageData
+from ...core.models.page import Bubble
+from ...core.ports.rendering import RenderOptions, RenderResult
 
 
 class RenderingEngineAdapter:

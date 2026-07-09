@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.models.image import ImageData
-from pipeline.context import PipelineContext
+from ..core.models.image import ImageData
+from .context import PipelineContext
 
 
 def run_page_translation(

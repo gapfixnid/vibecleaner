@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Protocol
 
-from core.models.jobs import JobStatus
+from ..models.jobs import JobStatus
 
 
 class JobManagerPort(Protocol):

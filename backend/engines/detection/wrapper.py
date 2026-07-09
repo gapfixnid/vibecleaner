@@ -4,7 +4,7 @@ import logging
 import cv2
 import numpy as np
 from .factory import DetectionEngineFactory
-from engines.common.textblock import TextBlock
+from ..common.textblock import TextBlock
 
 logger = logging.getLogger(__name__)
 

@@ -1,17 +1,8 @@
-import sys
 import unittest
-from pathlib import Path
-
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from pipeline.analysis import bubbles as bubble_module
-from pipeline.analysis.bubbles import BubbleAnalysisService
-
+from backend.pipeline.analysis import bubbles as bubble_module
+from backend.pipeline.analysis.bubbles import BubbleAnalysisService
 
 class BubbleAnalysisServiceTests(unittest.TestCase):
     def test_layout_box_uses_distance_transform_and_stays_inside_bubble(self):
@@ -57,7 +48,6 @@ class BubbleAnalysisServiceTests(unittest.TestCase):
 
         self.assertEqual(reading_order, "LTR")
         self.assertEqual([bubble.text for bubble in sorted_bubbles], ["left", "right"])
-
 
 if __name__ == "__main__":
     unittest.main()

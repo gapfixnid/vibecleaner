@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from core.models.image import ImageData
-from core.models.text import TextRegion
-from core.ports.ocr import OcrOptions, OcrResult
-from engines.common.textblock import TextBlock
+from ...core.models.image import ImageData
+from ...core.models.text import TextRegion
+from ...core.ports.ocr import OcrOptions, OcrResult
+from ..common.textblock import TextBlock
 
 
 class OcrEngineAdapter:

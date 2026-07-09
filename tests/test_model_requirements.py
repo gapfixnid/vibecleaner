@@ -1,19 +1,11 @@
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from core.config import AppConfig
-from infrastructure.downloads import ModelID
-from infrastructure.downloads.requirements import get_required_model_ids, get_model_status
-from api.routes import settings as settings_route
+from backend.core.config import AppConfig
+from backend.infrastructure.downloads import ModelID
+from backend.infrastructure.downloads.requirements import get_required_model_ids, get_model_status
+from backend.api.routes import settings as settings_route
 from download_models import get_model_ids
-
 
 class ModelRequirementsTests(unittest.TestCase):
     def test_balanced_japanese_uses_fp32_detection_manga_ocr_and_lama(self):
@@ -125,7 +117,6 @@ class ModelRequirementsTests(unittest.TestCase):
             [item["id"] for item in status["required"]],
             [ModelID.RTDETR_V2_ONNX.value, ModelID.MANGA_OCR_MOBILE_ONNX.value],
         )
-
 
 if __name__ == "__main__":
     unittest.main()

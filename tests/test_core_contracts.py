@@ -1,7 +1,7 @@
-from core.models.geometry import Box
-from core.models.image import ImageData
-from core.state.project_state import ProjectState
-from core.state.repository import InMemoryProjectRepository
+from backend.core.models.geometry import Box
+from backend.core.models.image import ImageData
+from backend.core.state.project_state import ProjectState
+from backend.core.state.repository import InMemoryProjectRepository
 
 
 def test_box_clamps_to_image_bounds():

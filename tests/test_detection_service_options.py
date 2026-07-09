@@ -1,22 +1,13 @@
-import sys
-from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from engines.detection.service import DetectionService
-
+from backend.engines.detection.service import DetectionService
 
 class FakeBlock:
     def __init__(self):
         self.xyxy = [1, 2, 11, 12]
         self.text = ""
-
 
 class FakeDetector:
     def __init__(self):
@@ -47,7 +38,6 @@ class FakeDetector:
         )
         return [FakeBlock()]
 
-
 class FakeOcr:
     def __init__(self):
         self.lang = None
@@ -56,7 +46,6 @@ class FakeOcr:
         for block in blocks:
             block.text = f"{engine}:text"
         return blocks
-
 
 def test_detection_service_passes_explicit_detection_options_from_config():
     detector = FakeDetector()

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from core.ports.rendering import Renderer
-from pipeline.context import PipelineContext
-from pipeline.strategies.engine_selection import EngineSelectionStrategy
-from pipeline.validation.results import PipelineValidationError, ValidationIssue
+from ...core.ports.rendering import Renderer
+from ..context import PipelineContext
+from ..strategies.engine_selection import EngineSelectionStrategy
+from ..validation.results import PipelineValidationError, ValidationIssue
 
 
 class RenderingStage:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Tuple, Optional
 import numpy as np
-from infrastructure import image as imk
+from ....infrastructure import image as imk
 import pyclipper
 from shapely.geometry import Polygon
 
@@ -213,4 +213,3 @@ class CTCLabelDecoder:
 			texts.append(text)
 			confs.append(conf)
 		return texts, confs
-

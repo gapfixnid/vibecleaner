@@ -1,6 +1,5 @@
 import os
 import shutil
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,14 +7,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from core.models import MangaPage
-from infrastructure.image.loading import ensure_original_thumbnail, ensure_page_image
-
+from backend.core.models import MangaPage
+from backend.infrastructure.image.loading import ensure_original_thumbnail, ensure_page_image
 
 class UnicodeImagePathTests(unittest.TestCase):
     def _write_unicode_png(self) -> Path:
@@ -48,7 +41,6 @@ class UnicodeImagePathTests(unittest.TestCase):
 
         self.assertGreater(len(thumbnail), 0)
         self.assertEqual(thumbnail[:8], b"\x89PNG\r\n\x1a\n")
-
 
 if __name__ == "__main__":
     unittest.main()

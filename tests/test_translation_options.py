@@ -1,18 +1,10 @@
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from engines.translation import providers as translation_wrapper
-from core.config import AppConfig
-from engines.common.textblock import TextBlock
-from engines.translation.service import TranslationService
-
+from backend.engines.translation import providers as translation_wrapper
+from backend.core.config import AppConfig
+from backend.engines.common.textblock import TextBlock
+from backend.engines.translation.service import TranslationService
 
 class TranslationOptionsTests(unittest.TestCase):
     def test_openai_compatible_payload_uses_configurable_llm_options(self):
@@ -66,7 +58,6 @@ class TranslationOptionsTests(unittest.TestCase):
 
         self.assertEqual(translator.max_retries, 4)
         self.assertEqual(translator.retry_backoff_seconds, 5)
-
 
 if __name__ == "__main__":
     unittest.main()

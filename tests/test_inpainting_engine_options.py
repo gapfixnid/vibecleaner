@@ -1,17 +1,9 @@
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-from engines.inpainting.hybrid import HybridInpainter
-
+from backend.engines.inpainting.hybrid import HybridInpainter
 
 class InpaintingEngineOptionsTests(unittest.TestCase):
     def test_inpainter_uses_explicit_options_without_global_config(self):
@@ -71,7 +63,6 @@ class InpaintingEngineOptionsTests(unittest.TestCase):
         aot_cls.assert_not_called()
         self.assertEqual(lama_cls.call_count, 1)
         np.testing.assert_array_equal(result[2:22, 2:22], output_crop)
-
 
 if __name__ == "__main__":
     unittest.main()

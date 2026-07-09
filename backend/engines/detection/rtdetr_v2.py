@@ -4,11 +4,11 @@ import numpy as np
 from PIL import Image
 
 from .base import DetectionEngine
-from engines.common.textblock import TextBlock
-from engines.detection.utils.slicer import ImageSlicer
-from infrastructure.runtime.device import tensors_to_device
-from infrastructure.downloads import models_base_dir
-from infrastructure.runtime.torch_autocast import TorchAutocastMixin
+from ..common.textblock import TextBlock
+from .utils.slicer import ImageSlicer
+from ...infrastructure.runtime.device import tensors_to_device
+from ...infrastructure.downloads import models_base_dir
+from ...infrastructure.runtime.torch_autocast import TorchAutocastMixin
 
 logger = logging.getLogger(__name__)
 

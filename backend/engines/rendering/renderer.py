@@ -7,7 +7,7 @@ from PySide6.QtGui import QFont, QFontMetricsF
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QRectF, Qt
 from .typesetting import dp_wrap_text, fit_font_size
-from infrastructure.fonts import resolver as font_resolver
+from ...infrastructure.fonts import resolver as font_resolver
 import logging
 
 logger = logging.getLogger(__name__)

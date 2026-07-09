@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
-from api.routes.pages import run_translate_all
-from main import create_app
-from pipeline.plan import PipelinePlan
+from backend.api.routes.pages import run_translate_all
+from backend.main import create_app
+from backend.pipeline.plan import PipelinePlan
 
 
 def test_app_exposes_container_and_settings_route():

@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from core.models.image import ImageData
-from core.models.page import MangaPage
-from pipeline.provenance import ProvenanceTrace
+from ..core.models.image import ImageData
+from ..core.models.page import MangaPage
+from .provenance import ProvenanceTrace
 
 
 @dataclass

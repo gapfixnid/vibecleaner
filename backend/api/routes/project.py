@@ -6,12 +6,12 @@ import cv2
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Form
 from PIL import Image
-from api.dependencies import get_container
-from core.models import MangaPage
-from core.version import APP_NAME
-from core.container import AppContainer
-from infrastructure.image.encoding import encode_preview_jpeg_bytes
-from infrastructure.image.loading import load_cv_image, warm_original_thumbnail
+from ..dependencies import get_container
+from ...core.models import MangaPage
+from ...core.version import APP_NAME
+from ...core.container import AppContainer
+from ...infrastructure.image.encoding import encode_preview_jpeg_bytes
+from ...infrastructure.image.loading import load_cv_image, warm_original_thumbnail
 
 router = APIRouter()
 logger = logging.getLogger(APP_NAME)

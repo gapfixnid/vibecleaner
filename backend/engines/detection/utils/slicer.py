@@ -1,7 +1,7 @@
 import math
 import numpy as np
 from typing import Callable, Any
-from engines.common.geometry import calculate_iou
+from ...common.geometry import calculate_iou
 
 
 class ImageSlicer:

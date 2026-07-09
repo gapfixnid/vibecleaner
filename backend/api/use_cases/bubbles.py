@@ -4,10 +4,10 @@ from typing import List
 import numpy as np
 from fastapi import HTTPException
 from pydantic import BaseModel
-from core.models import Rect, TextBubble
-from infrastructure.image.loading import ensure_page_image, invalidate_page_caches, load_cv_image
-from core.state.review import derive_bubble_status, refresh_bubble_status, refresh_page_status
-from core.version import APP_NAME
+from ...core.models import Rect, TextBubble
+from ...infrastructure.image.loading import ensure_page_image, invalidate_page_caches, load_cv_image
+from ...core.state.review import derive_bubble_status, refresh_bubble_status, refresh_page_status
+from ...core.version import APP_NAME
 from .page_crud import resolve_page, resolve_page_index
 
 import logging

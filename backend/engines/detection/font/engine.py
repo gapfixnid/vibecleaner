@@ -3,12 +3,12 @@ import os
 import logging
 import numpy as np
 from PIL import Image
-from infrastructure import image as imk
+from ....infrastructure import image as imk
 from . import config
-from infrastructure.runtime.device import resolve_device, get_providers
-from infrastructure.downloads import ModelDownloader, ModelID
-from infrastructure.runtime.onnx import make_session
-from infrastructure.runtime.torch_autocast import TorchAutocastMixin
+from ....infrastructure.runtime.device import resolve_device, get_providers
+from ....infrastructure.downloads import ModelDownloader, ModelID
+from ....infrastructure.runtime.onnx import make_session
+from ....infrastructure.runtime.torch_autocast import TorchAutocastMixin
 
 logger = logging.getLogger(__name__)
 

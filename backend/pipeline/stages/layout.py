@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from core.models.page import Bubble
-from pipeline.context import PipelineContext
-from pipeline.validation.results import PipelineValidationError, ValidationIssue
+from ...core.models.page import Bubble
+from ..context import PipelineContext
+from ..validation.results import PipelineValidationError, ValidationIssue
 
 
 class LayoutStage:

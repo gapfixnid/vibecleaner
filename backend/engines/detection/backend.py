@@ -1,4 +1,4 @@
-from infrastructure.runtime.device import torch_available
+from ...infrastructure.runtime.device import torch_available
 
 
 DEFAULT_DETECTION_BACKEND = "onnx"

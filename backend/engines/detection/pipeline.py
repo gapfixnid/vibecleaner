@@ -3,13 +3,13 @@ from typing import Optional
 import logging
 import numpy as np
 
-from engines.detection.backend import resolve_detection_backend
-from engines.detection.font.engine import extract_foreground_color
-from engines.detection.heuristic_lines import annotate_blocks_with_heuristic_lines
-from engines.detection.utils.content import filter_and_fix_bboxes
-from engines.common.geometry import does_rectangle_fit, do_rectangles_overlap, merge_overlapping_boxes
-from infrastructure.runtime.device import resolve_device
-from engines.common.textblock import TextBlock
+from .backend import resolve_detection_backend
+from .font.engine import extract_foreground_color
+from .heuristic_lines import annotate_blocks_with_heuristic_lines
+from .utils.content import filter_and_fix_bboxes
+from ..common.geometry import does_rectangle_fit, do_rectangles_overlap, merge_overlapping_boxes
+from ...infrastructure.runtime.device import resolve_device
+from ..common.textblock import TextBlock
 
 logger = logging.getLogger(__name__)
 

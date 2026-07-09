@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from typing import Optional
 
-from engines.common.textblock import TextBlock
+from ..common.textblock import TextBlock
 from .backend import resolve_detection_backend
 from .pipeline import DetectionPipeline
 

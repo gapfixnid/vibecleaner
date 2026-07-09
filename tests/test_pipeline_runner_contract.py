@@ -1,10 +1,10 @@
-from core.models.image import ImageData
-from core.models.page import MangaPage
-from pipeline.context import PipelineContext
-from pipeline.plan import PipelinePlan
-from pipeline.registry import StageRegistry
-from pipeline.runner import PipelineRunner
-from pipeline.validation.results import PipelineValidationError, ValidationIssue
+from backend.core.models.image import ImageData
+from backend.core.models.page import MangaPage
+from backend.pipeline.context import PipelineContext
+from backend.pipeline.plan import PipelinePlan
+from backend.pipeline.registry import StageRegistry
+from backend.pipeline.runner import PipelineRunner
+from backend.pipeline.validation.results import PipelineValidationError, ValidationIssue
 
 
 class RecordingStage:

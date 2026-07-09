@@ -3,10 +3,10 @@ import logging
 import cv2
 import numpy as np
 
-from core.errors import PageImageLoadError
-from core.models import MangaPage
-from core.version import APP_NAME
-from infrastructure.image.encoding import encode_thumbnail_bytes
+from ...core.errors import PageImageLoadError
+from ...core.models import MangaPage
+from ...core.version import APP_NAME
+from .encoding import encode_thumbnail_bytes
 
 
 logger = logging.getLogger(APP_NAME)

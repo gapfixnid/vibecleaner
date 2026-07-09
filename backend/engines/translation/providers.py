@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 import requests
 
-from engines.common.textblock import TextBlock
+from ..common.textblock import TextBlock
 
 from .base import BaseTranslator
 from .helpers import (

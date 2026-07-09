@@ -1,17 +1,17 @@
-from core.models.geometry import Box
-from core.models.image import ImageData
-from core.models.page import Bubble
-from core.models.text import TextRegion
-from core.ports.detection import DetectionOptions
-from core.ports.inpainting import InpaintOptions, InpaintRegion
-from core.ports.ocr import OcrOptions
-from core.ports.rendering import RenderOptions
-from core.ports.translation import TranslationInput, TranslationOptions
-from engines.detection.adapter import DetectionEngineAdapter
-from engines.inpainting.adapter import InpaintingEngineAdapter
-from engines.ocr.adapter import OcrEngineAdapter
-from engines.rendering.adapter import RenderingEngineAdapter
-from engines.translation.adapter import TranslationEngineAdapter
+from backend.core.models.geometry import Box
+from backend.core.models.image import ImageData
+from backend.core.models.page import Bubble
+from backend.core.models.text import TextRegion
+from backend.core.ports.detection import DetectionOptions
+from backend.core.ports.inpainting import InpaintOptions, InpaintRegion
+from backend.core.ports.ocr import OcrOptions
+from backend.core.ports.rendering import RenderOptions
+from backend.core.ports.translation import TranslationInput, TranslationOptions
+from backend.engines.detection.adapter import DetectionEngineAdapter
+from backend.engines.inpainting.adapter import InpaintingEngineAdapter
+from backend.engines.ocr.adapter import OcrEngineAdapter
+from backend.engines.rendering.adapter import RenderingEngineAdapter
+from backend.engines.translation.adapter import TranslationEngineAdapter
 
 
 class FakeLegacyBlock:

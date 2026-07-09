@@ -1,9 +1,9 @@
 from fastapi import HTTPException
 
-from pipeline.page_analysis import bubble_clip_boxes, inpaint_boxes
-from infrastructure.image.encoding import encode_preview_jpeg_bytes
-from infrastructure.image.loading import ensure_page_image, invalidate_page_caches
-from core.state.review import refresh_page_status
+from ...pipeline.page_analysis import bubble_clip_boxes, inpaint_boxes
+from ...infrastructure.image.encoding import encode_preview_jpeg_bytes
+from ...infrastructure.image.loading import ensure_page_image, invalidate_page_caches
+from ...core.state.review import refresh_page_status
 
 from .page_crud import resolve_page, resolve_page_index
 

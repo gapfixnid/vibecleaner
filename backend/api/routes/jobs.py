@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.dependencies import get_container
-from core.container import AppContainer
+from ..dependencies import get_container
+from ...core.container import AppContainer
 
 router = APIRouter()
 

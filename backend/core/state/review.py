@@ -1,4 +1,4 @@
-from core.models import MangaPage, TextBubble
+from ..models import MangaPage, TextBubble
 
 
 def derive_bubble_status(bubble: TextBubble) -> str:

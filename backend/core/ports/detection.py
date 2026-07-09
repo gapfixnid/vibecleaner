@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from core.models.image import ImageData
-from core.models.text import TextRegion
+from ..models.image import ImageData
+from ..models.text import TextRegion
 
 
 @dataclass(frozen=True)

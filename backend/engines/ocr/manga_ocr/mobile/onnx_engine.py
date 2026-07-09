@@ -6,10 +6,10 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 
-from engines.ocr.base import OCREngine
-from engines.ocr.ppocr.preprocessing import apply_adaptive_binarization
-from infrastructure.downloads import ModelDownloader, ModelID
-from engines.common.textblock import TextBlock, adjust_text_line_coordinates
+from ...base import OCREngine
+from ...ppocr.preprocessing import apply_adaptive_binarization
+from .....infrastructure.downloads import ModelDownloader, ModelID
+from ....common.textblock import TextBlock, adjust_text_line_coordinates
 
 
 logger = logging.getLogger(__name__)

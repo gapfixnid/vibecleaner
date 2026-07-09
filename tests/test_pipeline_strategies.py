@@ -1,5 +1,5 @@
-from core.config import AppConfigSnapshot
-from pipeline.strategies.engine_selection import EngineSelectionStrategy
+from backend.core.config import AppConfigSnapshot
+from backend.pipeline.strategies.engine_selection import EngineSelectionStrategy
 
 
 def test_detection_options_are_resolved_from_snapshot():

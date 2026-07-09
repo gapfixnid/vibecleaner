@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from pipeline.context import PipelineContext
-from pipeline.plan import PipelinePlan
-from pipeline.registry import StageRegistry
-from pipeline.validation.results import PipelineValidationError, ValidationIssue
+from .context import PipelineContext
+from .plan import PipelinePlan
+from .registry import StageRegistry
+from .validation.results import PipelineValidationError, ValidationIssue
 
 
 @dataclass

@@ -1,14 +1,14 @@
 import numpy as np
 import logging
-from infrastructure.runtime.device import get_providers
+from ...infrastructure.runtime.device import get_providers
 
 from .helpers import (
     norm_img,
     load_jit_model,
 )
-from infrastructure.downloads import ModelDownloader, ModelID
-from infrastructure.runtime.onnx import make_session
-from infrastructure.runtime.torch_autocast import TorchAutocastMixin
+from ...infrastructure.downloads import ModelDownloader, ModelID
+from ...infrastructure.runtime.onnx import make_session
+from ...infrastructure.runtime.torch_autocast import TorchAutocastMixin
 from .base import InpaintModel
 from .schema import Config
 

@@ -1,9 +1,9 @@
 import numpy as np
-from infrastructure import image as imk
+from ...infrastructure import image as imk
 import onnxruntime as ort
 from PIL import Image
 import logging
-from infrastructure.runtime.device import get_providers
+from ...infrastructure.runtime.device import get_providers
 
 from .base import InpaintModel
 from .schema import Config
@@ -11,9 +11,9 @@ from .schema import Config
 from .helpers import (
     load_jit_model,
 )
-from infrastructure.downloads import ModelDownloader, ModelID
-from infrastructure.runtime.onnx import make_session
-from infrastructure.runtime.torch_autocast import TorchAutocastMixin
+from ...infrastructure.downloads import ModelDownloader, ModelID
+from ...infrastructure.runtime.onnx import make_session
+from ...infrastructure.runtime.torch_autocast import TorchAutocastMixin
 
 logger = logging.getLogger(__name__)
 
@@ -135,5 +135,3 @@ def resize_keep_aspect(img, target_size):
     new_size = (round(img.shape[1] * scale), round(img.shape[0] * scale))  
     return imk.resize(img, new_size, mode=Image.Resampling.BILINEAR)
     
-
-

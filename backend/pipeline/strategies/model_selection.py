@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from core.config import AppConfigSnapshot
+from ...core.config import AppConfigSnapshot
 
 
 class ModelSelectionStrategy:

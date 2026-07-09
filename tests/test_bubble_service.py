@@ -1,20 +1,12 @@
-import sys
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-from core.models import Rect
+from backend.core.models import Rect
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-import api.use_cases.bubbles as bubble_service
-from core.models import MangaPage, TextBubble
-from core.state.project_state import ProjectState
-
+import backend.api.use_cases.bubbles as bubble_service
+from backend.core.models import MangaPage, TextBubble
+from backend.core.state.project_state import ProjectState
 
 class FakeRenderService:
     def __init__(self, layout):
@@ -22,7 +14,6 @@ class FakeRenderService:
 
     def get_layout_for_bubble(self, *args, **kwargs):
         return self.layout
-
 
 class BubbleServiceTests(unittest.TestCase):
     def setUp(self):
@@ -117,7 +108,6 @@ class BubbleServiceTests(unittest.TestCase):
         self.assertEqual(bubble["status"], "layout_overflow")
         self.assertIn("layout overflow", bubble["problems"])
         self.assertTrue(bubble["layout_overflow"])
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,7 +6,7 @@ import cv2
 from PIL import Image, ImageDraw, ImageFont
 from PySide6.QtGui import QFontMetricsF
 from typing import Optional, Any, Callable
-from core.models import MangaPage
+from ...core.models import MangaPage
 from .service import RenderService
 
 logger = logging.getLogger(__name__)

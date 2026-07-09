@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from core.config import AppConfigSnapshot
-from core.ports.detection import DetectionOptions
-from core.ports.inpainting import InpaintOptions
-from core.ports.ocr import OcrOptions
-from core.ports.rendering import RenderOptions
-from core.ports.translation import TranslationOptions
+from ...core.config import AppConfigSnapshot
+from ...core.ports.detection import DetectionOptions
+from ...core.ports.inpainting import InpaintOptions
+from ...core.ports.ocr import OcrOptions
+from ...core.ports.rendering import RenderOptions
+from ...core.ports.translation import TranslationOptions
 
 
 class EngineSelectionStrategy:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from pipeline.context import PipelineContext
+from .context import PipelineContext
 
 
 class Stage(Protocol):

@@ -2,17 +2,17 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Form
 from pydantic import BaseModel
 
-from api.dependencies import get_container
-from core.container import AppContainer
-from api.use_cases.bubbles import (
+from ..dependencies import get_container
+from ...core.container import AppContainer
+from ..use_cases.bubbles import (
     BubbleUpdateSchema,
     get_bubbles_response,
     re_ocr_bubble_response,
     start_translate_bubble,
     update_bubbles_response,
 )
-from api.use_cases.page_images import get_page_image_response
-from api.use_cases.page_crud import (
+from ..use_cases.page_images import get_page_image_response
+from ..use_cases.page_crud import (
     delete_page_batch_response,
     delete_page_response,
     duplicate_page_batch_response,
@@ -24,10 +24,10 @@ from api.use_cases.page_crud import (
     resolve_page_index as _resolve_page_index,
     select_page_response,
 )
-from api.use_cases.page_export import export_page_response
-from api.use_cases.page_inpaint import start_inpaint_bubble, start_inpaint_page
-from core.errors import PageNotFoundError
-from pipeline.page_translation import run_page_translation
+from ..use_cases.page_export import export_page_response
+from ..use_cases.page_inpaint import start_inpaint_bubble, start_inpaint_page
+from ...core.errors import PageNotFoundError
+from ...pipeline.page_translation import run_page_translation
 router = APIRouter()
 
 

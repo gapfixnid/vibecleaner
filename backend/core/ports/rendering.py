@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from core.models.image import ImageData
-from core.models.page import Bubble
+from ..models.image import ImageData
+from ..models.page import Bubble
 
 
 @dataclass(frozen=True)

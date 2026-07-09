@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from core.config import AppConfig
-from infrastructure.downloads import ModelDownloader, ModelID
+from ...core.config import AppConfig
+from . import ModelDownloader, ModelID
 
 
 MODEL_LABELS: dict[ModelID, tuple[str, str]] = {

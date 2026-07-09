@@ -1,21 +1,13 @@
-import sys
-from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-from core.models import Rect
+from backend.core.models import Rect
 
-ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-
-import pipeline.page_analysis as page_analysis
-from core.models import TextBubble
-from core.config import AppConfig
-from pipeline.analysis.bubbles import BubbleAnalysisResult, BubbleData
-from core.models import Insets
-
+import backend.pipeline.page_analysis as page_analysis
+from backend.core.models import TextBubble
+from backend.core.config import AppConfig
+from backend.pipeline.analysis.bubbles import BubbleAnalysisResult, BubbleData
+from backend.core.models import Insets
 
 def test_bubbles_from_analysis_preserves_detected_font_color():
     config = AppConfig()
@@ -53,7 +45,6 @@ def test_bubbles_from_analysis_preserves_detected_font_color():
 
     assert len(bubbles) == 1
     assert bubbles[0].color == "#0c2238"
-
 
 def test_bubbles_from_analysis_preserves_layout_plan_metadata():
     config = AppConfig()
@@ -111,7 +102,6 @@ def test_bubbles_from_analysis_preserves_layout_plan_metadata():
     assert bubble.layout_margin == {"top": 5, "right": 6, "bottom": 7, "left": 8}
     assert bubble.layout_confidence == 0.73
     assert bubble.layout_reasoning == "writing_mode=vertical; alignment=right"
-
 
 def test_merge_overlapping_bubbles_preserves_cjk_lines_without_spaces():
     first = TextBubble(

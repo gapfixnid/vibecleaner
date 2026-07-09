@@ -5,12 +5,12 @@ import numpy as np
 import onnxruntime as ort
 
 from ..base import OCREngine
-from engines.common.textblock import TextBlock
-from engines.common.textblock import lists_to_blk_list
-from engines.common.language_utils import is_no_space_lang
-from infrastructure.runtime.device import get_providers
-from infrastructure.downloads import ModelDownloader, ModelID
-from infrastructure.runtime.onnx import make_session
+from ...common.textblock import TextBlock
+from ...common.textblock import lists_to_blk_list
+from ...common.language_utils import is_no_space_lang
+from ....infrastructure.runtime.device import get_providers
+from ....infrastructure.downloads import ModelDownloader, ModelID
+from ....infrastructure.runtime.onnx import make_session
 from .preprocessing import apply_adaptive_binarization, det_preprocess, crop_quad, rec_resize_norm
 from .postprocessing import DBPostProcessor, CTCLabelDecoder
 
@@ -263,4 +263,3 @@ def _rec_target_width(img: np.ndarray, img_shape=(3, 48, 320)) -> int:
 	h, w = img.shape[:2]
 	ratio = w / float(max(1, h))
 	return max(W, int(np.ceil(H * ratio)))
-

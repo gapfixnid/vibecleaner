@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from core.models.page import MangaPage
-from core.state.project_state import ProjectState
+from ..models.page import MangaPage
+from .project_state import ProjectState
 
 
 class InMemoryProjectRepository:

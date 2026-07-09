@@ -4,9 +4,9 @@ from typing import List
 from fastapi import HTTPException
 from PIL import Image
 
-from core.models import MangaPage
-from infrastructure.image.loading import ensure_page_image
-from core.state.review import derive_page_status
+from ...core.models import MangaPage
+from ...infrastructure.image.loading import ensure_page_image
+from ...core.state.review import derive_page_status
 
 
 def get_page_by_id(state, page_id: str) -> MangaPage:

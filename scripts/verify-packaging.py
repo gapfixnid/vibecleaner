@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import sys
 from pathlib import Path
 
 
@@ -26,15 +24,6 @@ FORBIDDEN_RUNTIME_REQUIREMENTS = {
     "pytorch-lightning",
     "pytorch_lightning",
 }
-
-
-def _add_backend_to_path() -> None:
-    backend = str(BACKEND_ROOT)
-    repo = str(REPO_ROOT)
-    for path in (repo, backend):
-        if path not in sys.path:
-            sys.path.insert(0, path)
-
 
 def _load_tauri_config() -> dict:
     with TAURI_CONFIG.open("r", encoding="utf-8") as f:
@@ -79,15 +68,13 @@ def _check_runtime_requirements(errors: list[str]) -> None:
 
 
 def _model_ids(profile: str):
-    _add_backend_to_path()
     from download_models import get_model_ids
 
     return get_model_ids(profile)
 
 
 def _check_model_registry(profile: str, errors: list[str]) -> None:
-    _add_backend_to_path()
-    from infrastructure.downloads import ModelDownloader
+    from backend.infrastructure.downloads import ModelDownloader
 
     for model_id in _model_ids(profile):
         spec = ModelDownloader.registry.get(model_id)
@@ -108,8 +95,7 @@ def _check_model_registry(profile: str, errors: list[str]) -> None:
 
 
 def _check_model_files(profile: str, errors: list[str]) -> None:
-    _add_backend_to_path()
-    from infrastructure.downloads import ModelDownloader
+    from backend.infrastructure.downloads import ModelDownloader
 
     for model_id in _model_ids(profile):
         if not ModelDownloader.is_downloaded(model_id):

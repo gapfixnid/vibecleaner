@@ -1,5 +1,5 @@
 import os
-from infrastructure import image as imk
+from ...infrastructure import image as imk
 from PIL import Image
 import numpy as np
 import logging
@@ -10,10 +10,10 @@ from .helpers import (
     resize_max_size,
     norm_img,
 )
-from infrastructure.downloads import ModelDownloader, ModelID
-from infrastructure.runtime.device import get_providers
-from infrastructure.runtime.onnx import make_session
-from infrastructure.runtime.torch_autocast import TorchAutocastMixin
+from ...infrastructure.downloads import ModelDownloader, ModelID
+from ...infrastructure.runtime.device import get_providers
+from ...infrastructure.runtime.onnx import make_session
+from ...infrastructure.runtime.torch_autocast import TorchAutocastMixin
 from .base import InpaintModel
 from .schema import Config
 
