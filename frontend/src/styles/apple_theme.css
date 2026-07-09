@@ -103,7 +103,7 @@ body {
   align-items: center;
   gap: var(--space-3);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: all var(--transition-base);
 }
 
 .apple-button:hover {
@@ -125,13 +125,13 @@ body {
 }
 
 .apple-button.danger {
-  background-color: rgba(255, 59, 48, 0.15);
-  border-color: rgba(255, 59, 48, 0.3);
+  background-color: var(--danger-bg-subtle);
+  border-color: var(--danger-border-subtle);
   color: var(--system-red);
 }
 
 .apple-button.danger:hover {
-  background-color: rgba(255, 59, 48, 0.25);
+  background-color: var(--danger-bg-subtle-hover);
 }
 
 .apple-button:disabled {
@@ -156,7 +156,7 @@ body {
 
 .apple-input:focus {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+  box-shadow: var(--focus-ring-shadow);
   background-color: var(--bg-input-focus);
 }
 
@@ -175,7 +175,7 @@ body {
 
 .number-stepper:focus-within {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+  box-shadow: var(--focus-ring-shadow);
 }
 
 .number-stepper-input {
@@ -237,6 +237,24 @@ body {
 .number-stepper-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+/* Shared skeleton shimmer (sidebar first-boot rows, thumbnail placeholders).
+   Reduced-motion users get a static fill via the global kill-switch above. */
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--fill-3) 25%,
+    var(--fill-1) 50%,
+    var(--fill-3) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
 /* Scrollbar customization to match macOS overlays */

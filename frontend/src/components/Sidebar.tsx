@@ -126,6 +126,8 @@ interface SidebarProps {
   backendUrl: string;
   /** Image version per page — bumps when the underlying image changes. */
   pageVersions: Record<number, number>;
+  /** True while the backend is booting — shows skeleton rows instead of the empty state. */
+  isLoading?: boolean;
   t?: (key: string) => string;
 }
 
@@ -146,6 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSaveImages,
   backendUrl,
   pageVersions,
+  isLoading,
   t = (key) => key,
 }) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -465,6 +468,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             document.body
           )}
         </>
+      ) : isLoading ? (
+        <div className="sidebar-boot-skeleton" aria-hidden="true">
+          {Array.from({ length: 5 }, (_, i) => (
+            <div className="skeleton-row" key={i}>
+              <div className="skeleton-thumb skeleton-shimmer" />
+              <div className="skeleton-lines">
+                <div className="skeleton-line skeleton-shimmer" />
+                <div className="skeleton-line short skeleton-shimmer" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="empty-pages sidebar-empty-only" role="status">
           <p className="empty-pages-title">{t("sidebar.noImagesLoaded")}</p>
@@ -583,7 +598,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         .search-input:focus {
           border-color: var(--border-focus);
           background-color: var(--bg-input-focus);
-          box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16);
+          box-shadow: var(--focus-ring-shadow);
         }
 
         .sidebar-scroll-area {
@@ -823,7 +838,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           border-radius: 6px;
           background: transparent;
           cursor: pointer;
-          transition: all 0.15s cubic-bezier(0.25, 0.8, 0.25, 1);
+          transition: all 0.15s var(--ease-standard);
           position: absolute;
         }
 
@@ -874,7 +889,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
         .page-thumbnail.placeholder {
           width: 100%;
           height: 100%;
-          background: linear-gradient(135deg, var(--fill-3), var(--fill-1));
+          background: linear-gradient(
+            90deg,
+            var(--fill-3) 25%,
+            var(--fill-1) 50%,
+            var(--fill-3) 75%
+          );
+          background-size: 200% 100%;
+          animation: skeleton-shimmer 1.4s ease-in-out infinite;
+        }
+
+        .sidebar-boot-skeleton {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          padding: 12px 10px;
+        }
+
+        .skeleton-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 6px 8px;
+        }
+
+        .skeleton-thumb {
+          width: 44px;
+          height: 52px;
+          border-radius: 4px;
+          flex-shrink: 0;
+        }
+
+        .skeleton-lines {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
+
+        .skeleton-line {
+          height: 9px;
+          border-radius: var(--radius-sm);
+          width: 85%;
+        }
+
+        .skeleton-line.short {
+          width: 45%;
         }
 
         .page-number-badge {

@@ -970,7 +970,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           flex-direction: row;
           box-shadow: var(--shadow-lg);
           overflow: hidden;
-          animation: scaleUp 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
+          animation: scaleUp 0.18s var(--ease-standard);
         }
 
         @keyframes scaleUp {
@@ -1044,9 +1044,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }
 
         .btn-icon-wrapper.general { background-color: #8e8e93; }
-        .btn-icon-wrapper.translation { background-color: #007aff; }
-        .btn-icon-wrapper.detection { background-color: #34c759; }
-        .btn-icon-wrapper.inpainting { background-color: #ff9500; }
+        .btn-icon-wrapper.translation { background-color: var(--system-blue); }
+        .btn-icon-wrapper.detection { background-color: var(--system-green); }
+        .btn-icon-wrapper.inpainting { background-color: var(--system-orange); }
 
         /* Main settings content pane */
         .preferences-main {
@@ -1384,7 +1384,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         .apple-select-pref:focus {
           border-color: var(--border-focus);
-          box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+          box-shadow: var(--focus-ring-shadow);
         }
 
         /* Ensure the native option popup is readable in both themes
@@ -1446,8 +1446,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           display: flex;
           align-items: center;
           gap: 10px;
-          background: rgba(10, 132, 255, 0.08);
-          border: 1px solid rgba(10, 132, 255, 0.2);
+          background: var(--accent-bg-subtle);
+          border: 1px solid var(--accent-border-subtle);
           border-radius: 6px;
           padding: 8px 12px;
           margin: 4px 0;

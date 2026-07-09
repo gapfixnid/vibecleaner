@@ -294,18 +294,18 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(12, 14, 18, 0.58);
+          background: var(--scrim);
           padding: 24px;
         }
         .setup-panel {
           width: min(860px, 100%);
           max-height: min(760px, calc(100vh - 48px));
           overflow: auto;
-          background: var(--panel-bg, #fff);
-          color: var(--text-primary, #111827);
-          border: 1px solid var(--border-color, rgba(0,0,0,0.12));
+          background: var(--bg-panel);
+          color: var(--text-primary);
+          border: 1px solid var(--border-color);
           border-radius: 8px;
-          box-shadow: 0 24px 80px rgba(0,0,0,0.28);
+          box-shadow: var(--shadow-lg);
           padding: 24px;
         }
         .setup-header h1 {
@@ -316,7 +316,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         }
         .setup-header p {
           margin: 0;
-          color: var(--text-secondary, #5b6472);
+          color: var(--text-secondary);
           font-size: 13px;
         }
         .setup-grid {
@@ -327,10 +327,10 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         }
         .setup-section,
         .setup-model-list {
-          border: 1px solid var(--border-color, rgba(0,0,0,0.12));
+          border: 1px solid var(--border-color);
           border-radius: 8px;
           padding: 16px;
-          background: var(--surface-bg, rgba(255,255,255,0.6));
+          background: var(--fill-4);
         }
         .setup-model-list {
           margin-top: 16px;
@@ -339,7 +339,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           font-size: 11px;
           font-weight: 700;
           text-transform: uppercase;
-          color: var(--text-secondary, #5b6472);
+          color: var(--text-secondary);
           margin-bottom: 12px;
         }
         .setup-row {
@@ -365,7 +365,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           font-size: 12px;
         }
         .setup-model-item + .setup-model-item {
-          border-top: 1px solid var(--border-color, rgba(0,0,0,0.1));
+          border-top: 1px solid var(--separator);
         }
         .setup-model-item strong,
         .setup-model-item span {
@@ -376,23 +376,23 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           font-weight: 650;
         }
         .setup-model-item div span {
-          color: var(--text-secondary, #5b6472);
+          color: var(--text-secondary);
           margin-top: 2px;
         }
         .setup-model-dot {
           width: 8px;
           height: 8px;
           border-radius: 50%;
-          background: #b8c0cc;
+          background: var(--text-quaternary);
         }
         .setup-model-dot.ready {
-          background: #2f9e44;
+          background: var(--system-green);
         }
         .setup-empty,
         .setup-progress,
         .setup-error {
           font-size: 13px;
-          color: var(--text-secondary, #5b6472);
+          color: var(--text-secondary);
         }
         .setup-progress {
           display: flex;
@@ -406,7 +406,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           max-width: 220px;
           height: 5px;
           border-radius: 999px;
-          background: var(--fill-2, rgba(0,0,0,0.08));
+          background: var(--fill-2);
           overflow: hidden;
         }
         .setup-progress-fill {
@@ -415,7 +415,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           left: 0;
           height: 100%;
           border-radius: 999px;
-          background: var(--system-blue, #2563eb);
+          background: var(--system-blue);
           transition: width 0.35s ease;
         }
         .setup-progress-pct {
@@ -424,7 +424,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         }
         .setup-error {
           margin-top: 16px;
-          color: #d9480f;
+          color: var(--system-red);
         }
         .setup-spin {
           animation: setup-spin 0.9s linear infinite;
@@ -439,7 +439,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         .setup-secondary {
           height: 34px;
           border-radius: 7px;
-          border: 1px solid var(--border-color, rgba(0,0,0,0.14));
+          border: 1px solid var(--border-color);
           padding: 0 14px;
           display: inline-flex;
           align-items: center;
@@ -450,12 +450,12 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         }
         .setup-primary {
           color: #fff;
-          background: var(--accent-color, #2563eb);
-          border-color: var(--accent-color, #2563eb);
+          background: var(--system-blue);
+          border-color: var(--system-blue);
         }
         .setup-secondary {
           background: transparent;
-          color: var(--text-primary, #111827);
+          color: var(--text-primary);
         }
         .setup-primary:disabled,
         .setup-secondary:disabled {

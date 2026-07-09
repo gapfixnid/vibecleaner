@@ -14,6 +14,21 @@
 
   --glass-blur: blur(20px);
 
+  /* Motion (single source for transition timing) */
+  --ease-standard: cubic-bezier(0.25, 0.8, 0.25, 1);
+  --transition-fast: 0.12s ease;
+  --transition-base: 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Canvas page paper — intentionally white in both themes (manga pages). */
+  --page-paper: #ffffff;
+
+  /* Accent tints derived from the theme accents (resolve per-theme at use site). */
+  --accent-tint: color-mix(in srgb, var(--system-blue), white 35%);
+  --accent-tint-strong: color-mix(in srgb, var(--system-blue), white 65%);
+  --danger-tint: color-mix(in srgb, var(--system-red), white 30%);
+  --danger-tint-strong: color-mix(in srgb, var(--system-red), white 65%);
+
   /* Radius scale */
   --radius-lg: 12px;
   --radius-md: 8px;
@@ -98,6 +113,17 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.4);
+
+  /* Focus ring + accent glows */
+  --focus-ring-shadow: 0 0 0 3px rgba(10, 132, 255, 0.25);
+  --accent-bg-subtle: rgba(10, 132, 255, 0.08);
+  --accent-border-subtle: rgba(10, 132, 255, 0.2);
+  --accent-glow: 0 2px 8px rgba(10, 132, 255, 0.4), 0 1px 2px rgba(10, 132, 255, 0.3);
+  --accent-glow-strong: 0 4px 12px rgba(10, 132, 255, 0.5), 0 1px 3px rgba(10, 132, 255, 0.4);
+  --danger-glow: 0 2px 8px rgba(255, 69, 58, 0.4), 0 1px 2px rgba(255, 69, 58, 0.3);
+  --danger-bg-subtle: rgba(255, 69, 58, 0.15);
+  --danger-bg-subtle-hover: rgba(255, 69, 58, 0.25);
+  --danger-border-subtle: rgba(255, 69, 58, 0.3);
 }
 
 /* ----------------------------------------------------------------------------
@@ -160,4 +186,15 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.15);
+
+  /* Focus ring + accent glows */
+  --focus-ring-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+  --accent-bg-subtle: rgba(0, 122, 255, 0.08);
+  --accent-border-subtle: rgba(0, 122, 255, 0.2);
+  --accent-glow: 0 2px 8px rgba(0, 122, 255, 0.35), 0 1px 2px rgba(0, 122, 255, 0.25);
+  --accent-glow-strong: 0 4px 12px rgba(0, 122, 255, 0.45), 0 1px 3px rgba(0, 122, 255, 0.35);
+  --danger-glow: 0 2px 8px rgba(255, 59, 48, 0.35), 0 1px 2px rgba(255, 59, 48, 0.25);
+  --danger-bg-subtle: rgba(255, 59, 48, 0.15);
+  --danger-bg-subtle-hover: rgba(255, 59, 48, 0.25);
+  --danger-border-subtle: rgba(255, 59, 48, 0.3);
 }

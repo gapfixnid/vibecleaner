@@ -136,7 +136,7 @@ function App() {
     t,
   });
 
-  const { backendError, isRetryingBackend, handleRetryBackend } = useBackendBootstrap({
+  const { backendError, isRetryingBackend, isBootstrapping, handleRetryBackend } = useBackendBootstrap({
     setSettings,
     loadPagesFromServer,
   });
@@ -218,6 +218,7 @@ function App() {
           onTranslatePages={handleContextTranslate}
           onSaveImages={handleContextSaveImages}
           backendUrl={currentBackendUrl}
+          isLoading={isBootstrapping}
           t={t}
         />
 

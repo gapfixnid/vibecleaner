@@ -224,7 +224,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         .canvas-image-wrapper {
           box-shadow: var(--shadow-lg);
-          background: #ffffff;
+          background: var(--page-paper);
           position: relative;
         }
 
@@ -280,7 +280,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           display: flex;
           align-items: center;
           gap: 6px;
-          transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.1s ease;
+          transition: background var(--transition-slow), color var(--transition-slow), box-shadow var(--transition-slow), transform 0.1s ease;
           white-space: nowrap;
         }
 
@@ -307,17 +307,16 @@ export const Canvas: React.FC<CanvasProps> = ({
           background: linear-gradient(
             90deg,
             var(--system-blue) 0%,
-            #5ab3ff 40%,
-            #a8d8ff 50%,
-            #5ab3ff 60%,
+            var(--accent-tint) 40%,
+            var(--accent-tint-strong) 50%,
+            var(--accent-tint) 60%,
             var(--system-blue) 100%
           );
           background-size: 200% 100%;
           background-position: 100% 0;
           color: white;
           box-shadow:
-            0 2px 8px rgba(10, 132, 255, 0.4),
-            0 1px 2px rgba(10, 132, 255, 0.3),
+            var(--accent-glow),
             inset 0 1px 0 rgba(255, 255, 255, 0.15);
           animation: shimmer-bg 3s ease-in-out infinite;
         }
@@ -348,15 +347,14 @@ export const Canvas: React.FC<CanvasProps> = ({
           background: linear-gradient(
             90deg,
             var(--system-blue-hover) 0%,
-            #7ac4ff 40%,
-            #b8e4ff 50%,
-            #7ac4ff 60%,
+            var(--accent-tint) 40%,
+            var(--accent-tint-strong) 50%,
+            var(--accent-tint) 60%,
             var(--system-blue-hover) 100%
           );
           background-size: 200% 100%;
           box-shadow:
-            0 4px 12px rgba(10, 132, 255, 0.5),
-            0 1px 3px rgba(10, 132, 255, 0.4),
+            var(--accent-glow-strong),
             inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
@@ -364,17 +362,16 @@ export const Canvas: React.FC<CanvasProps> = ({
           background: linear-gradient(
             90deg,
             var(--system-red) 0%,
-            #ff6b6b 40%,
-            #ffb3b3 50%,
-            #ff6b6b 60%,
+            var(--danger-tint) 40%,
+            var(--danger-tint-strong) 50%,
+            var(--danger-tint) 60%,
             var(--system-red) 100%
           );
           background-size: 200% 100%;
           background-position: 100% 0;
           color: white;
           box-shadow:
-            0 2px 8px rgba(255, 59, 48, 0.4),
-            0 1px 2px rgba(255, 59, 48, 0.3),
+            var(--danger-glow),
             inset 0 1px 0 rgba(255, 255, 255, 0.15);
           animation: shimmer-bg 3s ease-in-out infinite;
         }
@@ -384,9 +381,9 @@ export const Canvas: React.FC<CanvasProps> = ({
           background: linear-gradient(
             90deg,
             var(--system-red) 0%,
-            #ff7979 40%,
-            #ffc2c2 50%,
-            #ff7979 60%,
+            var(--danger-tint) 40%,
+            var(--danger-tint-strong) 50%,
+            var(--danger-tint) 60%,
             var(--system-red) 100%
           );
           background-size: 200% 100%;

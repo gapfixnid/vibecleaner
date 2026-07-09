@@ -289,7 +289,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           background: var(--system-blue);
           border-color: transparent;
           color: white;
-          box-shadow: 0 5px 14px rgba(0, 122, 255, 0.22);
+          box-shadow: var(--accent-glow);
         }
 
         .toolbar-action.primary:hover {

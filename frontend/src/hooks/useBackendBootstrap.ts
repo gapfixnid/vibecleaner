@@ -11,6 +11,8 @@ interface UseBackendBootstrapDeps {
 export function useBackendBootstrap({ setSettings, loadPagesFromServer }: UseBackendBootstrapDeps) {
   const [backendError, setBackendError] = useState<string | null>(null);
   const [isRetryingBackend, setIsRetryingBackend] = useState(false);
+  /** True until the backend is reachable (or declared failed) — drives boot skeletons. */
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   const loadSettingsFromServer = useCallback(async () => {
     try {
@@ -53,11 +55,13 @@ export function useBackendBootstrap({ setSettings, loadPagesFromServer }: UseBac
         }
         if (!reachable) {
           setBackendError("백엔드 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+          setIsBootstrapping(false);
           return;
         }
         loadSettingsFromServer();
-        loadPagesFromServer();
+        await loadPagesFromServer();
       }
+      setIsBootstrapping(false);
     };
     initTauri();
   }, [loadPagesFromServer, loadSettingsFromServer]);
@@ -84,6 +88,7 @@ export function useBackendBootstrap({ setSettings, loadPagesFromServer }: UseBac
   return {
     backendError,
     isRetryingBackend,
+    isBootstrapping,
     handleRetryBackend,
   };
 }
