@@ -22,6 +22,7 @@ import { usePageExport } from "./hooks/usePageExport";
 import { useBackendBootstrap } from "./hooks/useBackendBootstrap";
 import { useWindowCloseGuard } from "./hooks/useWindowCloseGuard";
 import { useAppChrome } from "./hooks/useAppChrome";
+import { useFileDropImport } from "./hooks/useFileDropImport";
 import { useProjectActions } from "./hooks/useProjectActions";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useWorkspacePages } from "./hooks/useWorkspacePages";
@@ -60,12 +61,21 @@ function App() {
   } = useProcessingTask(showError, t, notifyCancelled);
 
   // --- Domain hooks ---
+  const onBubbleDeleted = useCallback(
+    (undo: () => void) =>
+      showToast("info", t("toast.bubbleDeleted"), {
+        actionLabel: t("toast.undo"),
+        onAction: undo,
+      }),
+    [showToast, t]
+  );
   const workspacePages = useWorkspacePages({
     runTask,
     waitForJob,
     showError,
     showConfirm,
     markDirty,
+    onBubbleDeleted,
     t,
   });
   const {
@@ -141,8 +151,6 @@ function App() {
     loadPagesFromServer,
   });
 
-  useAppChrome({ openSettings: () => setIsSettingsOpen(true) });
-
   const {
     guardUnsaved,
     handleNewProject,
@@ -172,6 +180,37 @@ function App() {
   });
 
   useWindowCloseGuard(isDirty, guardUnsaved);
+
+  const handlePageStep = useCallback(
+    (delta: number) => {
+      const next = currentIndexRef.current + delta;
+      if (next >= 0 && next < pages.length) {
+        pagesApi.handleSelectPage(next);
+      }
+    },
+    [currentIndexRef, pages.length, pagesApi]
+  );
+
+  useAppChrome({
+    openSettings: () => setIsSettingsOpen(true),
+    onSaveProject: projectApi.handleSaveProject,
+    onOpenProject: handleOpenProject,
+    onNewProject: handleNewProject,
+    onTranslate: handleTranslate,
+    onPageStep: handlePageStep,
+  });
+
+  const { isDragOver } = useFileDropImport({
+    enabled: !backendError && settings.setup_completed !== false,
+    onDropImages: (imagePaths, skippedCount) => {
+      if (skippedCount > 0) {
+        showToast("info", t("dnd.skippedFiles").replace("{count}", String(skippedCount)));
+      }
+      if (imagePaths.length > 0) {
+        handleImportImages(imagePaths);
+      }
+    },
+  });
 
   const handleContextTranslate = useCallback(
     (idx: number) => {
@@ -287,9 +326,15 @@ function App() {
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
+      {isDragOver && (
+        <div className="drop-veil" aria-hidden="true">
+          <div className="drop-veil-box">{t("dnd.dropToImport")}</div>
+        </div>
+      )}
+
       <CustomDialog options={dialog} onClose={closeDialog} t={t} />
 
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} t={t} />
 
       {backendError && (
         <BackendErrorScreen
@@ -305,6 +350,28 @@ function App() {
           flex: 1;
           height: calc(100vh - var(--toolbar-height) - var(--statusbar-height));
           overflow: hidden;
+        }
+
+        .drop-veil {
+          position: fixed;
+          inset: 0;
+          z-index: 6000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--scrim);
+          pointer-events: none;
+        }
+
+        .drop-veil-box {
+          padding: 18px 28px;
+          border: 2px dashed var(--system-blue);
+          border-radius: var(--radius-xl);
+          background: var(--bg-panel);
+          color: var(--text-primary);
+          font-size: 14px;
+          font-weight: 600;
+          box-shadow: var(--shadow-lg);
         }
       `}</style>
     </div>

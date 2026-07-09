@@ -122,6 +122,29 @@ export type TranslationKey =
   | "statusbar.pageIndicator"
   | "statusbar.unsaved"
   | "setup.downloadingModels"
+  | "canvas.zoomIn"
+  | "canvas.zoomOut"
+  | "canvas.zoomFit"
+  | "canvas.zoomActual"
+  | "dnd.dropToImport"
+  | "dnd.skippedFiles"
+  | "toast.bubbleDeleted"
+  | "toast.undo"
+  | "backend.startFailedTitle"
+  | "backend.startFailedDesc"
+  | "backend.unreachable"
+  | "backend.restartFailed"
+  | "backend.retry"
+  | "backend.retrying"
+  | "settings.modelsLoadFailed"
+  | "settings.providerGoogle"
+  | "settings.providerOllama"
+  | "settings.providerCompatible"
+  | "toolbar.closeWindow"
+  | "toolbar.minimizeWindow"
+  | "toolbar.maximizeWindow"
+  | "about.title"
+  | "about.version"
   | "export.cleaningBeforeExport"
   | "export.pageImageTitle"
   | "export.pngImageFilter"
@@ -368,6 +391,29 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "statusbar.pageIndicator": "Page {n} of {total}",
     "statusbar.unsaved": "Unsaved changes",
     "setup.downloadingModels": "Downloading models...",
+    "canvas.zoomIn": "Zoom in",
+    "canvas.zoomOut": "Zoom out",
+    "canvas.zoomFit": "Fit to window",
+    "canvas.zoomActual": "Actual size (100%)",
+    "dnd.dropToImport": "Drop images to import",
+    "dnd.skippedFiles": "{count} unsupported file(s) skipped",
+    "toast.bubbleDeleted": "Bubble deleted",
+    "toast.undo": "Undo",
+    "backend.startFailedTitle": "Failed to start the backend server",
+    "backend.startFailedDesc": "Cannot connect to the AI processing engine (local server). The installation may be damaged or an executable may be missing.",
+    "backend.unreachable": "Cannot reach the backend server. Please try again shortly.",
+    "backend.restartFailed": "Failed to invoke the backend restart command.",
+    "backend.retry": "Retry",
+    "backend.retrying": "Retrying...",
+    "settings.modelsLoadFailed": "Failed to load the model list.",
+    "settings.providerGoogle": "Google Translate (Free Web · Default)",
+    "settings.providerOllama": "Ollama (Local LLM)",
+    "settings.providerCompatible": "OpenAI Compatible (Local/Custom)",
+    "toolbar.closeWindow": "Close window",
+    "toolbar.minimizeWindow": "Minimize window",
+    "toolbar.maximizeWindow": "Maximize window",
+    "about.title": "About {appName}",
+    "about.version": "Version {version}",
     "export.cleaningBeforeExport": "Cleaning page before export...",
     "export.pageImageTitle": "Export Page Image",
     "export.pngImageFilter": "PNG Image",
@@ -613,6 +659,29 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "statusbar.pageIndicator": "{total}페이지 중 {n}페이지",
     "statusbar.unsaved": "저장되지 않은 변경 사항",
     "setup.downloadingModels": "모델 다운로드 중...",
+    "canvas.zoomIn": "확대",
+    "canvas.zoomOut": "축소",
+    "canvas.zoomFit": "창에 맞추기",
+    "canvas.zoomActual": "실제 크기 (100%)",
+    "dnd.dropToImport": "이미지를 놓아 가져오기",
+    "dnd.skippedFiles": "지원되지 않는 파일 {count}개를 건너뛰었습니다",
+    "toast.bubbleDeleted": "말풍선이 삭제되었습니다",
+    "toast.undo": "실행 취소",
+    "backend.startFailedTitle": "백엔드 서버를 시작하지 못했습니다",
+    "backend.startFailedDesc": "AI 처리 엔진(로컬 서버)에 연결할 수 없습니다. 설치가 손상되었거나 실행 파일이 누락되었을 수 있습니다.",
+    "backend.unreachable": "백엔드 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    "backend.restartFailed": "백엔드 재시작 명령을 호출하지 못했습니다.",
+    "backend.retry": "다시 시도",
+    "backend.retrying": "다시 시도 중...",
+    "settings.modelsLoadFailed": "모델 목록을 불러오지 못했습니다.",
+    "settings.providerGoogle": "Google 번역 (무료 웹 · 기본값)",
+    "settings.providerOllama": "Ollama (로컬 LLM)",
+    "settings.providerCompatible": "OpenAI 호환 (로컬/커스텀)",
+    "toolbar.closeWindow": "창 닫기",
+    "toolbar.minimizeWindow": "창 최소화",
+    "toolbar.maximizeWindow": "창 최대화",
+    "about.title": "{appName} 정보",
+    "about.version": "버전 {version}",
     "export.cleaningBeforeExport": "내보내기 전 페이지 정리 중...",
     "export.pageImageTitle": "페이지 이미지 내보내기",
     "export.pngImageFilter": "PNG 이미지",
@@ -767,11 +836,14 @@ export function createTranslator(value: unknown) {
   const cached = translatorCache.get(language);
   if (cached) return cached;
 
-  const translator = (key: string): string => {
-    if (isTranslationKey(key)) {
-      return translations[language][key] ?? translations.en[key];
+  const translator = (key: string, params?: Record<string, string | number>): string => {
+    let text = isTranslationKey(key) ? translations[language][key] ?? translations.en[key] : key;
+    if (params) {
+      for (const [name, paramValue] of Object.entries(params)) {
+        text = text.replaceAll(`{${name}}`, String(paramValue));
+      }
     }
-    return key;
+    return text;
   };
   translatorCache.set(language, translator);
   return translator;

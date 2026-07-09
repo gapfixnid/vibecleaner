@@ -8,8 +8,16 @@ interface UseBackendBootstrapDeps {
   loadPagesFromServer: () => Promise<void>;
 }
 
+/** Machine-readable backend failure; BackendErrorScreen maps codes to
+ *  translated copy (the backend's ui_language is unavailable here). */
+export interface BackendErrorInfo {
+  code: "start_failed" | "unreachable" | "restart_failed";
+  /** Raw error detail from the backend/Tauri layer, if any. */
+  detail: string | null;
+}
+
 export function useBackendBootstrap({ setSettings, loadPagesFromServer }: UseBackendBootstrapDeps) {
-  const [backendError, setBackendError] = useState<string | null>(null);
+  const [backendError, setBackendError] = useState<BackendErrorInfo | null>(null);
   const [isRetryingBackend, setIsRetryingBackend] = useState(false);
   /** True until the backend is reachable (or declared failed) — drives boot skeletons. */
   const [isBootstrapping, setIsBootstrapping] = useState(true);
@@ -34,7 +42,7 @@ export function useBackendBootstrap({ setSettings, loadPagesFromServer }: UseBac
           const status = await desktop.getBackendStatus();
           if (!status.running) {
             backendOk = false;
-            setBackendError(status.error || "백엔드 서버를 시작하지 못했습니다.");
+            setBackendError({ code: "start_failed", detail: status.error || null });
           }
         } catch (e) {
           console.log("getBackendStatus unavailable; assuming backend managed externally", e);
@@ -54,7 +62,7 @@ export function useBackendBootstrap({ setSettings, loadPagesFromServer }: UseBac
           }
         }
         if (!reachable) {
-          setBackendError("백엔드 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+          setBackendError({ code: "unreachable", detail: null });
           setIsBootstrapping(false);
           return;
         }
@@ -75,11 +83,11 @@ export function useBackendBootstrap({ setSettings, loadPagesFromServer }: UseBac
         loadSettingsFromServer();
         await loadPagesFromServer();
       } else {
-        setBackendError(status.error || "백엔드 서버를 시작하지 못했습니다.");
+        setBackendError({ code: "start_failed", detail: status.error || null });
       }
     } catch (e) {
       console.error("retry_backend invocation failed", e);
-      setBackendError("백엔드 재시작 명령을 호출하지 못했습니다.");
+      setBackendError({ code: "restart_failed", detail: e instanceof Error ? e.message : null });
     } finally {
       setIsRetryingBackend(false);
     }

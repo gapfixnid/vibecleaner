@@ -151,7 +151,7 @@ export function InspectorStyleSection({
       <div className="form-row border-top-row">
         <label className="form-label">{t("inspector.category")}</label>
         <div className="form-control-right text-right">
-          <span className="text-class-badge">{selectedBubble.text_class || "unknown"}</span>
+          <span className="text-class-badge">{selectedBubble.text_class || t("inspector.unknown")}</span>
         </div>
       </div>
     </div>

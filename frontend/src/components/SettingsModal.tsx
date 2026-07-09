@@ -84,7 +84,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (e) {
       console.warn("Failed to fetch provider models", e);
       setProviderModels([]);
-      setModelsError("모델 목록을 불러오지 못했습니다.");
+      setModelsError(t("settings.modelsLoadFailed"));
     } finally {
       setIsLoadingModels(false);
     }
@@ -470,14 +470,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           value={localSettings.translation_provider}
                           onChange={(v) => handleAutoSave("translation_provider", v)}
                           options={[
-                            { value: "google", label: "Google Translate (Free Web · Default)" },
+                            { value: "google", label: t("settings.providerGoogle") },
                             { value: "deepl", label: "DeepL Translation API" },
                             { value: "openai", label: "OpenAI (ChatGPT API)" },
                             { value: "claude", label: "Anthropic Claude API" },
                             { value: "papago", label: "Naver Papago API" },
                             { value: "baidu", label: "Baidu Fanyi API" },
-                            { value: "ollama", label: "Ollama (Local LLM)" },
-                            { value: "openai_compatible", label: "OpenAI Compatible (Local/Custom)" },
+                            { value: "ollama", label: t("settings.providerOllama") },
+                            { value: "openai_compatible", label: t("settings.providerCompatible") },
                           ]}
                         />
                       </div>

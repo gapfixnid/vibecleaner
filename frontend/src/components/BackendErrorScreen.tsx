@@ -1,9 +1,11 @@
 // frontend/src/components/BackendErrorScreen.tsx
-import React from "react";
+import React, { useMemo } from "react";
 import { ServerCrash, RotateCcw } from "lucide-react";
+import { createTranslator, getStoredUiLanguage } from "../i18n";
+import type { BackendErrorInfo } from "../hooks/useBackendBootstrap";
 
 interface BackendErrorScreenProps {
-  error: string;
+  error: BackendErrorInfo;
   isRetrying: boolean;
   onRetry: () => void;
 }
@@ -13,20 +15,29 @@ interface BackendErrorScreenProps {
  * Rendered with the app's own design language (not a native dialog) so the
  * visual identity is preserved. Webview-level failures that prevent React from
  * rendering at all are handled by a last-resort native message in the Rust layer.
+ *
+ * The backend (and thus `settings.ui_language`) is unavailable here, so the
+ * translator falls back to the language remembered in localStorage.
  */
 export const BackendErrorScreen: React.FC<BackendErrorScreenProps> = ({ error, isRetrying, onRetry }) => {
+  const t = useMemo(() => createTranslator(getStoredUiLanguage()), []);
+  const description =
+    error.code === "unreachable"
+      ? t("backend.unreachable")
+      : error.code === "restart_failed"
+        ? t("backend.restartFailed")
+        : t("backend.startFailedDesc");
+
   return (
     <div className="backend-error-overlay">
       <div className="backend-error-card">
         <ServerCrash size={40} className="backend-error-icon" />
-        <h2 className="backend-error-title">백엔드 서버를 시작하지 못했습니다</h2>
-        <p className="backend-error-desc">
-          AI 처리 엔진(로컬 서버)에 연결할 수 없습니다. 설치가 손상되었거나 실행 파일이 누락되었을 수 있습니다.
-        </p>
-        <pre className="backend-error-detail">{error}</pre>
+        <h2 className="backend-error-title">{t("backend.startFailedTitle")}</h2>
+        <p className="backend-error-desc">{description}</p>
+        {error.detail && <pre className="backend-error-detail">{error.detail}</pre>}
         <button className="backend-error-retry" onClick={onRetry} disabled={isRetrying}>
           <RotateCcw size={15} className={isRetrying ? "spinning" : ""} />
-          <span>{isRetrying ? "다시 시도 중..." : "다시 시도"}</span>
+          <span>{isRetrying ? t("backend.retrying") : t("backend.retry")}</span>
         </button>
       </div>
 
@@ -109,7 +120,7 @@ export const BackendErrorScreen: React.FC<BackendErrorScreenProps> = ({ error, i
           font-size: 13px;
           font-weight: 500;
           cursor: pointer;
-          transition: background 0.2s ease;
+          transition: background var(--transition-base);
         }
 
         .backend-error-retry:hover:not(:disabled) {

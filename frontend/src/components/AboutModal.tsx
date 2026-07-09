@@ -7,9 +7,10 @@ import { APP_NAME, APP_VERSION } from "../appMeta";
 interface AboutModalProps {
   isOpen: boolean;
   onClose: () => void;
+  t?: (key: string, params?: Record<string, string | number>) => string;
 }
 
-export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
+export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, t = (key) => key }) => {
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,16 +34,16 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
         className="about-box"
         role="dialog"
         aria-modal="true"
-        aria-label={`About ${APP_NAME}`}
+        aria-label={t("about.title", { appName: APP_NAME })}
         tabIndex={-1}
         ref={boxRef}
         onClick={(e) => e.stopPropagation()}
       >
-        <img className="about-icon" src="/favicon.svg" alt={`${APP_NAME} icon`} width={72} height={72} />
+        <img className="about-icon" src="/favicon.svg" alt="" width={72} height={72} />
         <div className="about-name">{APP_NAME}</div>
-        <div className="about-version">Version {APP_VERSION}</div>
+        <div className="about-version">{t("about.version", { version: APP_VERSION })}</div>
         <button className="apple-button primary about-ok" onClick={onClose}>
-          OK
+          {t("dialog.ok")}
         </button>
       </div>
 

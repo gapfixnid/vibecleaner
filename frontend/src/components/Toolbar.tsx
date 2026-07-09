@@ -52,9 +52,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     <header className="toolbar-container">
       <div className="toolbar-left">
         <div className="window-controls">
-          <button type="button" className="win-btn close" onClick={() => desktop.closeWindow()} aria-label="Close window" />
-          <button type="button" className="win-btn minimize" onClick={() => desktop.minimizeWindow()} aria-label="Minimize window" />
-          <button type="button" className="win-btn maximize" onClick={() => desktop.toggleMaximizeWindow()} aria-label="Maximize window" />
+          <button type="button" className="win-btn close" onClick={() => desktop.closeWindow()} aria-label={t("toolbar.closeWindow")} />
+          <button type="button" className="win-btn minimize" onClick={() => desktop.minimizeWindow()} aria-label={t("toolbar.minimizeWindow")} />
+          <button type="button" className="win-btn maximize" onClick={() => desktop.toggleMaximizeWindow()} aria-label={t("toolbar.maximizeWindow")} />
         </div>
 
         <div className="app-logo" data-tauri-drag-region>
