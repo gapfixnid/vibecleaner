@@ -117,6 +117,11 @@ export type TranslationKey =
   | "task.translatingPage"
   | "task.translatingPages"
   | "task.failed"
+  | "task.cancelled"
+  | "statusbar.ready"
+  | "statusbar.pageIndicator"
+  | "statusbar.unsaved"
+  | "setup.downloadingModels"
   | "export.cleaningBeforeExport"
   | "export.pageImageTitle"
   | "export.pngImageFilter"
@@ -358,6 +363,11 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "task.translatingPage": "Translating page...",
     "task.translatingPages": "Translating {count} pages...",
     "task.failed": "Task Failed",
+    "task.cancelled": "Task cancelled",
+    "statusbar.ready": "Ready",
+    "statusbar.pageIndicator": "Page {n} of {total}",
+    "statusbar.unsaved": "Unsaved changes",
+    "setup.downloadingModels": "Downloading models...",
     "export.cleaningBeforeExport": "Cleaning page before export...",
     "export.pageImageTitle": "Export Page Image",
     "export.pngImageFilter": "PNG Image",
@@ -598,6 +608,11 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "task.translatingPage": "페이지 번역 중...",
     "task.translatingPages": "{count}개 페이지 번역 중...",
     "task.failed": "작업 실패",
+    "task.cancelled": "작업이 취소되었습니다",
+    "statusbar.ready": "준비됨",
+    "statusbar.pageIndicator": "{total}페이지 중 {n}페이지",
+    "statusbar.unsaved": "저장되지 않은 변경 사항",
+    "setup.downloadingModels": "모델 다운로드 중...",
     "export.cleaningBeforeExport": "내보내기 전 페이지 정리 중...",
     "export.pageImageTitle": "페이지 이미지 내보내기",
     "export.pngImageFilter": "PNG 이미지",

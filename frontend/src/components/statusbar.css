@@ -1,0 +1,112 @@
+/* Bottom status bar: ambient info when idle, job progress while working. */
+
+.status-bar {
+  height: var(--statusbar-height);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 12px;
+  background: var(--bg-toolbar);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-top: 1px solid var(--separator);
+  font-family: var(--font-family);
+  font-size: 11px;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.status-bar-left,
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.status-bar-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 420px;
+}
+
+.status-bar-track {
+  position: relative;
+  width: 140px;
+  height: 4px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: var(--fill-2);
+  box-shadow: var(--inset-track-shadow);
+  overflow: hidden;
+}
+
+.status-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--system-blue);
+  transition: width 0.35s ease;
+}
+
+/* Indeterminate: a sweeping segment. */
+.status-bar-track.indeterminate .status-bar-fill {
+  width: 40%;
+  animation: status-bar-sweep 1.2s ease-in-out infinite;
+}
+
+@keyframes status-bar-sweep {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+
+.status-bar-percent {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+
+.status-bar-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  flex-shrink: 0;
+  background: var(--fill-2);
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.status-bar-cancel:hover {
+  background: var(--system-red);
+  color: #fff;
+}
+
+.status-bar-unsaved {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+}
+
+.status-bar-unsaved-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--system-orange);
+}
+
+.status-bar-pages {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

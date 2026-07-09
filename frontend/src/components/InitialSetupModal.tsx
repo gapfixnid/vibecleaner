@@ -3,15 +3,16 @@ import { CheckCircle2, Download, Loader2 } from "lucide-react";
 import { AppleSelect } from "./AppleSelect";
 import * as api from "../services/api";
 import { createTranslator } from "../i18n";
-import type { JobStatus, ModelStatus, Settings } from "../types";
+import type { WaitForJob } from "../hooks/useProcessingTask";
+import type { ModelStatus, Settings } from "../types";
 
 interface InitialSetupModalProps {
   isOpen: boolean;
   settings: Settings;
   onComplete: (settings: Settings) => void;
+  /** Shared job poller (timeout + unmount guard) from useProcessingTask. */
+  waitForJob: WaitForJob;
 }
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface PreviewModel {
   id: string;
@@ -65,25 +66,17 @@ function getPreviewModels(settings: Settings, status: ModelStatus | null): Previ
   return items;
 }
 
-async function waitForJob(jobId: string): Promise<JobStatus> {
-  for (;;) {
-    const job = await api.getJob(jobId);
-    if (["succeeded", "failed", "cancelled"].includes(job.status)) {
-      return job;
-    }
-    await wait(700);
-  }
-}
-
 export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   isOpen,
   settings,
   onComplete,
+  waitForJob,
 }) => {
   const [localSettings, setLocalSettings] = useState<Settings>({ ...settings });
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [isWorking, setIsWorking] = useState(false);
   const [progressText, setProgressText] = useState("");
+  const [progressPct, setProgressPct] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const uiT = useMemo(() => createTranslator(localSettings.ui_language), [localSettings.ui_language]);
 
@@ -92,6 +85,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     setLocalSettings({ ...settings });
     setError(null);
     setProgressText("");
+    setProgressPct(null);
     api.getModelStatus().then(setModelStatus).catch(() => setModelStatus(null));
   }, [isOpen, settings]);
 
@@ -129,21 +123,26 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       if (!beforeDownload.all_ready) {
         setProgressText(uiT("setup.downloading"));
         const job = await api.downloadRequiredModels();
-        const done = await waitForJob(job.job_id);
-        if (done.status !== "succeeded") {
-          throw new Error(done.error || done.message || "Download failed");
-        }
+        // Shared poller throws on failure/cancel; progress drives the bar below.
+        await waitForJob(job, uiT("setup.downloadingModels"), {
+          onProgress: (latest) => {
+            setProgressPct(typeof latest.progress === "number" ? latest.progress : null);
+            setProgressText(latest.message || uiT("setup.downloading"));
+          },
+        });
       }
 
       const saved = await api.updateSettings({ ...localSettings, setup_completed: true });
       const afterDownload = await api.getModelStatus();
       setModelStatus(afterDownload);
+      setProgressPct(null);
       setProgressText(uiT("setup.ready"));
       onComplete(saved);
     } catch (e) {
       console.error("Initial setup download failed", e);
       setError(uiT("setup.downloadFailed"));
       setProgressText("");
+      setProgressPct(null);
     } finally {
       setIsWorking(false);
     }
@@ -261,6 +260,17 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           <div className="setup-progress">
             <Loader2 size={14} className={isWorking ? "setup-spin" : ""} />
             <span>{progressText}</span>
+            {isWorking && progressPct !== null && (
+              <>
+                <span className="setup-progress-track" aria-hidden="true">
+                  <span
+                    className="setup-progress-fill"
+                    style={{ width: `${Math.max(2, Math.min(100, progressPct))}%` }}
+                  />
+                </span>
+                <span className="setup-progress-pct">{Math.round(progressPct)}%</span>
+              </>
+            )}
           </div>
         )}
         {error && <div className="setup-error">{error}</div>}
@@ -389,6 +399,28 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           align-items: center;
           gap: 8px;
           margin-top: 16px;
+        }
+        .setup-progress-track {
+          position: relative;
+          flex: 1;
+          max-width: 220px;
+          height: 5px;
+          border-radius: 999px;
+          background: var(--fill-2, rgba(0,0,0,0.08));
+          overflow: hidden;
+        }
+        .setup-progress-fill {
+          position: absolute;
+          top: 0;
+          left: 0;
+          height: 100%;
+          border-radius: 999px;
+          background: var(--system-blue, #2563eb);
+          transition: width 0.35s ease;
+        }
+        .setup-progress-pct {
+          font-variant-numeric: tabular-nums;
+          font-size: 12px;
         }
         .setup-error {
           margin-top: 16px;

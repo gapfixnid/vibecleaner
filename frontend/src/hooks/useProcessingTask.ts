@@ -15,9 +15,8 @@ export interface RunTaskOptions {
   keepBusyOnSuccess?: boolean;
   /**
    * Skip toggling `isProcessing`. The task still gets error handling and
-   * keepBusyOnSuccess logic, but the status bar won't show "Working...".
-   * Use for lightweight ops (import, save, open project) that shouldn't
-   * look like heavy processing.
+   * keepBusyOnSuccess logic. Use for lightweight ops (import, save, open
+   * project) that shouldn't look like heavy processing.
    */
   skipBusy?: boolean;
 }
@@ -45,6 +44,18 @@ export type WaitForJob = (
   options?: WaitForJobOptions,
 ) => Promise<unknown>;
 
+/** Live info about the job currently being polled — drives the StatusBar
+ *  progress readout and the Translate→Cancel button morph. */
+export interface ActiveJobInfo {
+  jobId: string;
+  /** Caller-supplied label (always shown; backend message may refine it). */
+  label: string;
+  /** Latest backend `job.message`, unless the caller opted out. */
+  message: string | null;
+  /** 0-100, or null for indeterminate. */
+  progress: number | null;
+}
+
 /** Safety cap so a stuck/dead backend job can't poll forever. */
 const MAX_WAIT_MS = 10 * 60 * 1000;
 const POLL_INTERVAL_MS = 500;
@@ -57,17 +68,27 @@ const CANCELLED = "__job_cancelled__";
  * - `runTask`: a wrapper that toggles busy state and surfaces failures through
  *   a single error dialog (fixes inconsistent error handling).
  * - `waitForJob`: polls a backend job to completion with a timeout, an unmount
- *   guard, and cancellation support.
+ *   guard, and cancellation support. Publishes `activeJob` (label/message/
+ *   progress) for the StatusBar while polling.
+ * - `cancelCurrentJob`: requests cancellation of the job being polled.
  */
-export function useProcessingTask(showError: ShowError, t: (key: string) => string = (key) => key) {
+export function useProcessingTask(
+  showError: ShowError,
+  t: (key: string) => string = (key) => key,
+  /** Called once when a user-requested cancellation completes (e.g. show a toast). */
+  notifyCancelled?: () => void
+) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isWaitingForImageReload, setIsWaitingForImageReload] = useState(false);
+  const [activeJob, setActiveJob] = useState<ActiveJobInfo | null>(null);
 
   const isMountedRef = useRef(true);
   const currentJobIdRef = useRef<string | null>(null);
   const cancelRequestedRef = useRef(false);
   /** Exposed so callers can branch after runTask returns. Reset after each runTask. */
   const wasCancelledRef = useRef(false);
+  const notifyCancelledRef = useRef(notifyCancelled);
+  notifyCancelledRef.current = notifyCancelled;
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -76,13 +97,32 @@ export function useProcessingTask(showError: ShowError, t: (key: string) => stri
     };
   }, []);
 
+  const cancelCurrentJob = useCallback(() => {
+    cancelRequestedRef.current = true;
+    const jobId = currentJobIdRef.current;
+    if (jobId) {
+      // Best effort: the poll loop exits via cancelRequestedRef regardless.
+      api.cancelJob(jobId).catch(() => {});
+    }
+  }, []);
+
   const waitForJob = useCallback(
-    async (startedJob: JobStatus, _fallbackStatus: string, _options?: WaitForJobOptions): Promise<unknown> => {
+    async (startedJob: JobStatus, fallbackStatus: string, options?: WaitForJobOptions): Promise<unknown> => {
       if (!startedJob?.job_id) {
         return startedJob;
       }
       currentJobIdRef.current = startedJob.job_id;
       cancelRequestedRef.current = false;
+      const publish = (job: JobStatus) => {
+        if (!isMountedRef.current) return;
+        setActiveJob({
+          jobId: job.job_id,
+          label: fallbackStatus,
+          message: options?.ignoreBackendMessage ? null : job.message || null,
+          progress: typeof job.progress === "number" ? job.progress : null,
+        });
+      };
+      publish(startedJob);
       const deadline = Date.now() + MAX_WAIT_MS;
       try {
         let job = startedJob;
@@ -107,10 +147,14 @@ export function useProcessingTask(showError: ShowError, t: (key: string) => stri
           }
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
           job = await api.getJob(job.job_id);
-          _options?.onProgress?.(job);
+          publish(job);
+          options?.onProgress?.(job);
         }
       } finally {
         currentJobIdRef.current = null;
+        if (isMountedRef.current) {
+          setActiveJob(null);
+        }
       }
     },
     []
@@ -133,6 +177,10 @@ export function useProcessingTask(showError: ShowError, t: (key: string) => stri
         if (err?.message === CANCELLED) {
           wasCancelledRef.current = true;
           if (busy) setIsProcessing(false);
+          // Only notify for explicit user cancellations, not unmount aborts.
+          if (cancelRequestedRef.current && isMountedRef.current) {
+            notifyCancelledRef.current?.();
+          }
           return undefined;
         }
         showError(options?.errorTitle || t("task.failed"), err?.response?.data?.detail || err?.message || String(e));
@@ -158,6 +206,8 @@ export function useProcessingTask(showError: ShowError, t: (key: string) => stri
     setIsProcessing,
     isWaitingForImageReload,
     setIsWaitingForImageReload,
+    activeJob,
+    cancelCurrentJob,
     waitForJob,
     runTask,
     finishImageReload,

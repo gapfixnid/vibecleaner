@@ -121,6 +121,10 @@ export const getJob = async (jobId: string): Promise<JobStatus> => {
   return api.getJob(jobId) as Promise<JobStatus>;
 };
 
+export const cancelJob = async (jobId: string): Promise<JobStatus> => {
+  return api.cancelJob(jobId) as Promise<JobStatus>;
+};
+
 export const exportPage = async (pageId: string, formData: FormData): Promise<ExportResult> => {
   const savePath = formData.get("save_path") as string;
   if (!savePath) {

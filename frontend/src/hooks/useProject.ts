@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import * as api from "../services/api";
 import * as desktop from "../services/desktop";
 import type { RunTask } from "./useProcessingTask";
-import type { AlertType } from "./useDialog";
+import type { ShowToast } from "./useToasts";
 import { APP_NAME } from "../appMeta";
 
 export interface OpenFilesResult {
@@ -13,7 +13,8 @@ export interface OpenFilesResult {
 
 interface UseProjectDeps {
   runTask: RunTask;
-  showAlert: (type: AlertType, title: string, message: string) => void;
+  /** Non-blocking success feedback (errors still go through runTask's dialog). */
+  showToast: ShowToast;
   loadPagesFromServer: (selectIndex?: number) => Promise<void>;
   /** Mark the project as having unsaved changes. */
   markDirty: () => void;
@@ -27,7 +28,7 @@ interface UseProjectDeps {
 /** Owns file open / project new / load / save flows and the current project path. */
 export function useProject({
   runTask,
-  showAlert,
+  showToast,
   loadPagesFromServer,
   markDirty,
   markClean,
@@ -142,12 +143,12 @@ export function useProject({
         setCurrentProjectPath(file);
         markClean();
         saved = true;
-        showAlert("success", t("project.success"), t("project.projectSaved"));
+        showToast("success", t("project.projectSaved"));
       },
       { errorTitle: t("project.failedToSaveProject"), skipBusy: true }
     );
     return saved;
-  }, [runTask, showAlert, currentProjectPath, markClean, getSelectedIndices, t]);
+  }, [runTask, showToast, currentProjectPath, markClean, getSelectedIndices, t]);
 
   return {
     currentProjectPath,

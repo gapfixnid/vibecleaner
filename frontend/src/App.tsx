@@ -9,8 +9,11 @@ import { InitialSetupModal } from "./components/InitialSetupModal";
 import { CustomDialog } from "./components/CustomDialog";
 import { AboutModal } from "./components/AboutModal";
 import { BackendErrorScreen } from "./components/BackendErrorScreen";
+import { StatusBar } from "./components/StatusBar";
+import { ToastStack } from "./components/Toast";
 import "./styles/apple_theme.css";
 import { useDialog } from "./hooks/useDialog";
+import { useToasts } from "./hooks/useToasts";
 import { useProcessingTask } from "./hooks/useProcessingTask";
 import { useProject } from "./hooks/useProject";
 import { useTheme } from "./hooks/useTheme";
@@ -39,14 +42,22 @@ function App() {
   const { settings, setSettings, handleSaveSettings } = useAppSettings();
   const t = useMemo(() => createTranslator(settings.ui_language), [settings.ui_language]);
 
+  const { toasts, showToast, dismissToast } = useToasts();
+  const notifyCancelled = useCallback(
+    () => showToast("info", t("task.cancelled")),
+    [showToast, t]
+  );
+
   const {
     isProcessing,
     isWaitingForImageReload,
     setIsWaitingForImageReload,
+    activeJob,
+    cancelCurrentJob,
     waitForJob,
     runTask,
     finishImageReload,
-  } = useProcessingTask(showError, t);
+  } = useProcessingTask(showError, t, notifyCancelled);
 
   // --- Domain hooks ---
   const workspacePages = useWorkspacePages({
@@ -74,7 +85,7 @@ function App() {
   } = workspacePages;
   const projectApi = useProject({
     runTask,
-    showAlert,
+    showToast,
     loadPagesFromServer: pagesApi.loadPagesFromServer,
     markDirty,
     markClean,
@@ -121,7 +132,7 @@ function App() {
     syncBubblesToBackend,
     bumpPageVersion: pagesApi.bumpPageVersion,
     loadPagesFromServer,
-    showAlert,
+    showToast,
     t,
   });
 
@@ -223,6 +234,8 @@ function App() {
           onUpdateBubbles={bubblesApi.handleUpdateBubbles}
           onTranslate={handleTranslate}
           isProcessing={isProcessing}
+          isJobActive={activeJob !== null}
+          onCancelJob={cancelCurrentJob}
           onDeleteBubble={bubblesApi.handleDeleteBubble}
           onImageLoaded={finishImageReload}
           isMultiPageSelection={isMultiPageSelection}
@@ -243,6 +256,15 @@ function App() {
         />
       </div>
 
+      <StatusBar
+        activeJob={activeJob}
+        onCancel={cancelCurrentJob}
+        pageCount={pages.length}
+        currentIndex={currentIndex}
+        isDirty={isDirty}
+        t={t}
+      />
+
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -259,7 +281,10 @@ function App() {
         isOpen={!backendError && settings.setup_completed === false}
         settings={settings}
         onComplete={setSettings}
+        waitForJob={waitForJob}
       />
+
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
       <CustomDialog options={dialog} onClose={closeDialog} t={t} />
 
@@ -277,7 +302,7 @@ function App() {
         .main-workspace {
           display: flex;
           flex: 1;
-          height: calc(100vh - var(--toolbar-height));
+          height: calc(100vh - var(--toolbar-height) - var(--statusbar-height));
           overflow: hidden;
         }
       `}</style>

@@ -3,6 +3,7 @@ import * as api from "../services/api";
 import * as desktop from "../services/desktop";
 import type { BubbleInfo, PageInfo } from "../types";
 import type { RunTask, WaitForJob } from "./useProcessingTask";
+import type { ShowToast } from "./useToasts";
 
 interface UsePageExportDeps {
   pages: PageInfo[];
@@ -11,7 +12,8 @@ interface UsePageExportDeps {
   syncBubblesToBackend: (bubblesList?: BubbleInfo[], opts?: { silent?: boolean }) => Promise<void>;
   bumpPageVersion: (idx: number) => void;
   loadPagesFromServer: (selectIndex?: number, options?: { skipPageActivation?: boolean }) => Promise<void>;
-  showAlert: (type: "success" | "error" | "warning" | "info", title: string, message: string) => void;
+  /** Non-blocking success feedback (errors still go through runTask's dialog). */
+  showToast: ShowToast;
   t?: (key: string) => string;
 }
 
@@ -29,7 +31,7 @@ export function usePageExport({
   syncBubblesToBackend,
   bumpPageVersion,
   loadPagesFromServer,
-  showAlert,
+  showToast,
   t = (key) => key,
 }: UsePageExportDeps) {
   const exportPageToPath = useCallback(
@@ -75,7 +77,9 @@ export function usePageExport({
             await syncBubblesToBackend(undefined, { silent: true });
             const data = await exportPageToPath(idx, file);
             if (data.status === "cancelled") return;
-            showAlert("success", t("export.successTitle"), t("export.successSingleMessage").replace("{path}", data.saved_path || ""));
+            showToast("success", t("export.successTitle"), {
+              message: t("export.successSingleMessage").replace("{path}", data.saved_path || ""),
+            });
           },
           { errorTitle: t("export.failedTitle") }
         );
@@ -99,12 +103,14 @@ export function usePageExport({
             usedNames.add(name.toLowerCase());
             await exportPageToPath(idx, `${dir}/${name}`);
           }
-          showAlert("success", t("export.successTitle"), t("export.successMultiMessage").replace("{count}", String(targets.length)).replace("{path}", dir));
+          showToast("success", t("export.successTitle"), {
+            message: t("export.successMultiMessage").replace("{count}", String(targets.length)).replace("{path}", dir),
+          });
         },
         { errorTitle: t("export.failedTitle") }
       );
     },
-    [pages, runTask, syncBubblesToBackend, exportPageToPath, showAlert, t]
+    [pages, runTask, syncBubblesToBackend, exportPageToPath, showToast, t]
   );
 
   return {

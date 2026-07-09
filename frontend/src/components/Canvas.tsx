@@ -22,6 +22,9 @@ interface CanvasProps {
   onUpdateBubbles: (updated: BubbleInfo[]) => void;
   onTranslate: () => void;
   isProcessing: boolean;
+  /** True while a backend job is being polled (shows the Cancel morph). */
+  isJobActive?: boolean;
+  onCancelJob?: () => void;
   onDeleteBubble: (id: number) => void;
   onImageLoaded?: () => void;
   isMultiPageSelection?: boolean;
@@ -44,6 +47,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   onUpdateBubbles,
   onTranslate,
   isProcessing,
+  isJobActive,
+  onCancelJob,
   onDeleteBubble,
   onImageLoaded,
   isMultiPageSelection,
@@ -191,9 +196,11 @@ export const Canvas: React.FC<CanvasProps> = ({
           <div className="actions-capsule">
             <CanvasTranslateButton
               isProcessing={isProcessing}
+              isJobActive={isJobActive}
               isMultiPageSelection={isMultiPageSelection}
               selectedPageCount={selectedPageCount}
               onTranslate={onTranslate}
+              onCancel={onCancelJob}
               t={t}
             />
           </div>
