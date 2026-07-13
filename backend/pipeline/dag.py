@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from time import sleep
 
@@ -18,6 +19,7 @@ class DagStage:
     depends_on: tuple[str, ...] = ()
     resource: ResourceClass = ResourceClass.CPU
     max_retries: int = 0
+    parallel_safe: bool = False
 
 
 @dataclass(frozen=True)
@@ -52,7 +54,7 @@ class DagPipelinePlan:
 
 
 class DagPipelineExecutor:
-    """Deterministic v2 DAG executor; parallel scheduling is a later optimization."""
+    """Resource-aware DAG executor with opt-in parallel stage batches."""
 
     def __init__(self, registry: StageRegistry, resource_manager: ResourceManager | None = None, checkpoint_store: Any | None = None, retry_backoff_seconds: float = 0.25) -> None:
         self.registry = registry
@@ -74,11 +76,20 @@ class DagPipelineExecutor:
             ready = [stage for stage in pending if set(stage.depends_on) <= completed]
             if not ready:
                 raise ValueError("DAG could not make progress")
+            executable = []
             for spec in ready:
                 if self._can_resume(spec, resume_manifest, context):
                     completed.add(spec.name)
                     pending.remove(spec)
                     continue
+                executable.append(spec)
+            if len(executable) > 1 and all(spec.parallel_safe for spec in executable):
+                failure = self._run_parallel_batch(context, executable, completed, pending)
+                if failure is not None:
+                    return failure
+                self._save_checkpoint(context, completed)
+                continue
+            for spec in executable:
                 stage = self.registry.get(spec.name)
                 entry, started_at = context.provenance.start_stage(
                     spec.name, input_summary={"artifact_count": len(context.artifacts)}
@@ -109,6 +120,51 @@ class DagPipelineExecutor:
                 pending.remove(spec)
                 self._save_checkpoint(context, completed)
         return PipelineResult(context=context, succeeded=True)
+
+    def _run_parallel_batch(
+        self,
+        context: PipelineContext,
+        specs: list[DagStage],
+        completed: set[str],
+        pending: list[DagStage],
+    ) -> PipelineResult | None:
+        records = {}
+        with ThreadPoolExecutor(max_workers=len(specs), thread_name_prefix="pipeline-stage") as pool:
+            for spec in specs:
+                stage = self.registry.get(spec.name)
+                entry, started_at = context.provenance.start_stage(
+                    spec.name, input_summary={"artifact_count": len(context.artifacts)}
+                )
+                records[pool.submit(self._run_with_retry, stage, spec, context)] = (
+                    spec, entry, started_at
+                )
+            issues: list[ValidationIssue] = []
+            for future, (spec, entry, started_at) in records.items():
+                try:
+                    result_context = future.result()
+                    if result_context is not context:
+                        raise RuntimeError("Parallel stages must mutate and return their input context")
+                except PipelineValidationError as exc:
+                    stage_issues = exc.issues
+                    issues.extend(stage_issues)
+                except Exception as exc:
+                    stage_issues = [ValidationIssue(
+                        code="stage_failed", severity="error", message=str(exc), stage=spec.name
+                    )]
+                    issues.extend(stage_issues)
+                else:
+                    stage_issues = []
+                    completed.add(spec.name)
+                    pending.remove(spec)
+                context.provenance.finish_stage(
+                    entry,
+                    started_at,
+                    output_summary={"artifact_count": len(context.artifacts)},
+                    errors=[issue.message for issue in stage_issues],
+                )
+        if issues:
+            return PipelineResult(context=context, succeeded=False, issues=issues)
+        return None
 
     def _run_with_retry(self, stage: Any, spec: DagStage, context: PipelineContext) -> PipelineContext:
         attempts = max(0, spec.max_retries) + 1

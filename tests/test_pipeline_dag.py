@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import threading
 
 import pytest
 
@@ -6,6 +7,7 @@ from backend.pipeline.dag import DagPipelineExecutor, DagPipelinePlan, DagStage
 from backend.pipeline.checkpoint import CheckpointManifest, JsonCheckpointStore
 from backend.pipeline.registry import StageRegistry
 from backend.pipeline.provenance import ProvenanceTrace
+from backend.pipeline.resources import ResourceClass
 
 
 class Stage:
@@ -85,3 +87,25 @@ def test_dag_retries_transient_stage_failure():
     )
     assert result.succeeded
     assert stage.attempts == 2
+
+
+def test_dag_runs_parallel_safe_independent_stages_concurrently():
+    barrier = threading.Barrier(2, timeout=1)
+
+    class ConcurrentStage(Stage):
+        def run(self, context):
+            barrier.wait()
+            context.artifacts[self.name] = True
+            return context
+
+    registry = StageRegistry()
+    registry.register(ConcurrentStage("translate", "translate"))
+    registry.register(ConcurrentStage("inpaint", "inpaint"))
+    context = SimpleNamespace(artifacts={}, provenance=ProvenanceTrace(), page_id="page-1")
+    plan = DagPipelinePlan((
+        DagStage("translate", resource=ResourceClass.NETWORK, parallel_safe=True),
+        DagStage("inpaint", resource=ResourceClass.GPU, parallel_safe=True),
+    ))
+    result = DagPipelineExecutor(registry).run(context, plan)
+    assert result.succeeded
+    assert context.artifacts == {"translate": True, "inpaint": True}
