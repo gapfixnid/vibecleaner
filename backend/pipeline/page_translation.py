@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from ..core.models.image import ImageData
+from ..infrastructure.storage.paths import get_app_data_dir
+from .benchmark import JsonlBenchmarkSink
 from .context import PipelineContext
 from .dag import DagPipelineExecutor
 from .rollout import PipelineExecutionCoordinator, PipelineRollout
@@ -34,11 +37,18 @@ def run_page_translation(
     )
     plan = planner.translate_page_plan()
     rollout = PipelineRollout.from_settings(config)
+    benchmark_sink = None
+    if rollout.shadow:
+        benchmark_path = getattr(config, "pipeline_benchmark_path", None)
+        if not benchmark_path:
+            benchmark_path = os.path.join(get_app_data_dir(), "pipeline_shadow_benchmark.jsonl")
+        benchmark_sink = JsonlBenchmarkSink(benchmark_path)
     coordinator = PipelineExecutionCoordinator(
         v1_runner=lambda item: runner.run(item, plan),
         v2_runner=lambda item: DagPipelineExecutor(runner.registry).run(
             item, planner.translate_page_dag_plan()
         ),
+        benchmark_sink=benchmark_sink,
     )
     result = coordinator.run(context, rollout)
     runner.last_result = result
