@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Callable
 
+from .benchmark import ShadowBenchmarkRecord
+
 
 class PipelineVariant(StrEnum):
     V1 = "v1"
@@ -64,11 +66,13 @@ class PipelineExecutionCoordinator:
         *,
         v1_runner: Callable[[Any], Any],
         v2_runner: Callable[[Any], Any] | None = None,
+        benchmark_sink: Any | None = None,
     ) -> None:
         self._runners = {PipelineVariant.V1: v1_runner}
         if v2_runner is not None:
             self._runners[PipelineVariant.V2] = v2_runner
         self.last_comparison: PipelineComparison | None = None
+        self.benchmark_sink = benchmark_sink
 
     def run(self, context: Any, rollout: PipelineRollout) -> Any:
         primary_variant = rollout.primary
@@ -84,7 +88,26 @@ class PipelineExecutionCoordinator:
             self.last_comparison = self._compare(
                 primary_variant, primary_result, shadow_variant, shadow_result
             )
+            self._record_benchmark(context, self.last_comparison)
         return primary_result
+
+    def _record_benchmark(self, context: Any, comparison: PipelineComparison) -> None:
+        if self.benchmark_sink is None:
+            return
+        provenance = getattr(context, "provenance", None)
+        self.benchmark_sink.record(
+            ShadowBenchmarkRecord(
+                run_id=str(getattr(provenance, "run_id", "unknown")),
+                page_id=str(getattr(context, "page_id", "unknown")),
+                primary=comparison.primary.value,
+                shadow=comparison.shadow.value,
+                equivalent=comparison.equivalent,
+                primary_succeeded=comparison.primary_succeeded,
+                shadow_succeeded=comparison.shadow_succeeded,
+                matching_artifact_keys=comparison.matching_artifact_keys,
+                metadata=comparison.metadata,
+            )
+        )
 
     def _run_shadow(self, context: Any, variant: PipelineVariant) -> Any:
         return self._runners[variant](deepcopy(context))
