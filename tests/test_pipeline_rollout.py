@@ -88,3 +88,16 @@ def test_shadow_comparison_records_duration_and_text_quality():
     assert comparison.metadata["bubble_count_match"] is True
     assert comparison.metadata["ocr_text_match_ratio"] == 1.0
     assert comparison.metadata["translation_match_ratio"] == 1.0
+
+
+def test_shadow_order_alternates_by_page_id_without_changing_primary_result():
+    calls = []
+    context = SimpleNamespace(artifacts={}, page_id="a")
+    coordinator = PipelineExecutionCoordinator(
+        v1_runner=lambda item: calls.append("v1") or Result(artifacts=item.artifacts),
+        v2_runner=lambda item: calls.append("v2") or Result(artifacts=item.artifacts),
+    )
+    result = coordinator.run(context, PipelineRollout(enabled=True, shadow=True))
+    assert calls == ["v1", "v2"]
+    assert result.succeeded
+    assert coordinator.last_comparison.metadata["execution_order"] == "shadow_first"
