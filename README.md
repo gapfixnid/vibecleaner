@@ -53,6 +53,8 @@ The v0.2 evolution guardrails are documented in
 `docs/adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md`. Persisted
 project, settings, artifact, checkpoint, and cache compatibility follows
 `docs/schema-versioning-policy.md`.
+Provider manifest, registration, and catalog rules are documented in
+`docs/provider-extension-contract.md`.
 
 ## Translation Pipeline
 

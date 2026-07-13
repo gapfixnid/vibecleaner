@@ -1,0 +1,160 @@
+"""Stable provider metadata shared by the composition root and API catalog."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from typing import Any, Literal
+
+
+ProviderStage = Literal["detection", "ocr", "translation", "inpainting", "rendering"]
+ResourceClass = Literal["cpu", "gpu", "io", "network"]
+ConfigValueType = Literal["string", "integer", "number", "boolean", "enum", "secret"]
+
+VALID_STAGES = frozenset({"detection", "ocr", "translation", "inpainting", "rendering"})
+VALID_RESOURCES = frozenset({"cpu", "gpu", "io", "network"})
+VALID_CONFIG_TYPES = frozenset({"string", "integer", "number", "boolean", "enum", "secret"})
+_PROVIDER_ID = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
+
+
+@dataclass(frozen=True)
+class ConfigFieldSpec:
+    key: str
+    value_type: ConfigValueType
+    label: str
+    required: bool = False
+    default: Any = None
+    choices: tuple[str, ...] = ()
+    advanced: bool = True
+
+    def __post_init__(self) -> None:
+        if not self.key or not self.key.replace("_", "").isalnum():
+            raise ValueError(f"Invalid provider config key: {self.key!r}")
+        if self.value_type not in VALID_CONFIG_TYPES:
+            raise ValueError(f"Unsupported provider config type: {self.value_type!r}")
+        object.__setattr__(self, "choices", tuple(self.choices))
+        if self.value_type == "enum" and not self.choices:
+            raise ValueError(f"Enum provider config field {self.key!r} requires choices")
+        if self.value_type == "enum" and self.default is not None and self.default not in self.choices:
+            raise ValueError(f"Enum provider config field {self.key!r} default must be one of its choices")
+        if self.value_type != "enum" and self.choices:
+            raise ValueError(f"Only enum provider config fields may declare choices: {self.key!r}")
+        if self.value_type == "secret" and self.default not in (None, ""):
+            raise ValueError(f"Secret provider config field {self.key!r} cannot expose a default")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "key": self.key,
+            "value_type": self.value_type,
+            "label": self.label,
+            "required": self.required,
+            "default": None if self.value_type == "secret" else self.default,
+            "choices": list(self.choices),
+            "advanced": self.advanced,
+        }
+
+
+@dataclass(frozen=True)
+class ProviderCapabilities:
+    languages: frozenset[str] = field(default_factory=frozenset)
+    devices: frozenset[str] = field(default_factory=lambda: frozenset({"cpu"}))
+    execution_modes: frozenset[str] = field(default_factory=frozenset)
+    features: frozenset[str] = field(default_factory=frozenset)
+    supports_batch: bool = False
+
+    def __post_init__(self) -> None:
+        for name in ("languages", "devices", "execution_modes", "features"):
+            values = frozenset(str(value) for value in getattr(self, name))
+            if any(not value for value in values):
+                raise ValueError(f"Provider capability {name} contains an empty value")
+            object.__setattr__(self, name, values)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "languages": sorted(self.languages),
+            "devices": sorted(self.devices),
+            "execution_modes": sorted(self.execution_modes),
+            "features": sorted(self.features),
+            "supports_batch": self.supports_batch,
+        }
+
+
+@dataclass(frozen=True)
+class ProviderManifest:
+    provider_id: str
+    display_name: str
+    stage: ProviderStage
+    api_version: str
+    implementation_version: str
+    capabilities: ProviderCapabilities
+    resource_classes: frozenset[ResourceClass]
+    max_concurrency: int = 1
+    config_schema: tuple[ConfigFieldSpec, ...] = ()
+    legacy_adapter: bool = False
+
+    def __post_init__(self) -> None:
+        if not _PROVIDER_ID.fullmatch(self.provider_id):
+            raise ValueError(f"Invalid provider_id: {self.provider_id!r}")
+        if not self.display_name.strip():
+            raise ValueError("Provider display_name is required")
+        if self.stage not in VALID_STAGES:
+            raise ValueError(f"Unsupported provider stage: {self.stage!r}")
+        if not self.api_version or not self.implementation_version:
+            raise ValueError("Provider API and implementation versions are required")
+        resources = frozenset(self.resource_classes)
+        if not resources or not resources.issubset(VALID_RESOURCES):
+            raise ValueError(f"Invalid provider resource classes: {sorted(resources)!r}")
+        object.__setattr__(self, "resource_classes", resources)
+        object.__setattr__(self, "config_schema", tuple(self.config_schema))
+        if self.max_concurrency < 1:
+            raise ValueError("Provider max_concurrency must be positive")
+        keys = [field.key for field in self.config_schema]
+        if len(keys) != len(set(keys)):
+            raise ValueError(f"Provider {self.provider_id!r} has duplicate config keys")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "provider_id": self.provider_id,
+            "display_name": self.display_name,
+            "stage": self.stage,
+            "api_version": self.api_version,
+            "implementation_version": self.implementation_version,
+            "capabilities": self.capabilities.to_dict(),
+            "resource_classes": sorted(self.resource_classes),
+            "max_concurrency": self.max_concurrency,
+            "config_schema": [field.to_dict() for field in self.config_schema],
+            "legacy_adapter": self.legacy_adapter,
+        }
+
+
+@dataclass(frozen=True)
+class ProviderRequirements:
+    stage: ProviderStage
+    languages: frozenset[str] = field(default_factory=frozenset)
+    devices: frozenset[str] = field(default_factory=frozenset)
+    execution_modes: frozenset[str] = field(default_factory=frozenset)
+    features: frozenset[str] = field(default_factory=frozenset)
+    resource_classes: frozenset[ResourceClass] = field(default_factory=frozenset)
+    requires_batch: bool = False
+
+    def __post_init__(self) -> None:
+        if self.stage not in VALID_STAGES:
+            raise ValueError(f"Unsupported provider stage: {self.stage!r}")
+        for name in ("languages", "devices", "execution_modes", "features"):
+            object.__setattr__(self, name, frozenset(str(value) for value in getattr(self, name)))
+        resources = frozenset(self.resource_classes)
+        if not resources.issubset(VALID_RESOURCES):
+            raise ValueError(f"Invalid required resource classes: {sorted(resources)!r}")
+        object.__setattr__(self, "resource_classes", resources)
+
+    def matches(self, manifest: ProviderManifest) -> bool:
+        capabilities = manifest.capabilities
+        return (
+            manifest.stage == self.stage
+            and self.languages.issubset(capabilities.languages)
+            and self.devices.issubset(capabilities.devices)
+            and self.execution_modes.issubset(capabilities.execution_modes)
+            and self.features.issubset(capabilities.features)
+            and self.resource_classes.issubset(manifest.resource_classes)
+            and (not self.requires_batch or capabilities.supports_batch)
+        )

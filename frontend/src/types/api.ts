@@ -1,5 +1,6 @@
 import type { ProjectDto, PageDto, SettingsDto } from "./project";
 import type { BubbleDto, BubblePatchDto } from "./bubble";
+import type { ProviderCatalogDto } from "./provider";
 
 export interface ActionResultDto {
   status?: string;
@@ -124,6 +125,7 @@ export interface vibeCleanerApi {
   exportPageToPath(pageId: string, savePath: string): Promise<ExportPageResultDto>;
   exportPages(options: ExportOptionsDto): Promise<ExportResultDto>;
   getSettings(): Promise<SettingsDto>;
+  getProviderCatalog(): Promise<ProviderCatalogDto>;
   updateSettings(settings: SettingsDto): Promise<SettingsDto>;
   getModelStatus(): Promise<ModelStatusDto>;
   downloadRequiredModels(): Promise<JobStatusDto>;

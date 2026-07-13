@@ -5,6 +5,7 @@ export * from "./types/bubble";
 export * from "./types/project";
 export * from "./types/problem";
 export * from "./types/pipeline";
+export * from "./types/provider";
 export * from "./types/api";
 export * from "./types/domain";
 

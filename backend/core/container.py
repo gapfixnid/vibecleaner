@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .config import AppConfig, AppConfigSnapshot
+from .providers import ProviderRegistry
 from .state.project_state import ProjectState
 from ..pipeline.planner import PipelinePlanner
 from ..pipeline.registry import StageRegistry
@@ -37,6 +38,7 @@ class AppContainer:
     stage_registry: StageRegistry
     pipeline_runner: PipelineRunner
     pipeline_planner: PipelinePlanner
+    provider_registry: ProviderRegistry
 
 
 def build_container(config: AppConfig | None = None) -> AppContainer:
@@ -55,6 +57,7 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
     from ..engines.rendering.service import RenderService
     from .state.review import refresh_page_status
     from ..engines.translation.service import TranslationService
+    from ..engines.provider_catalog import register_builtin_providers
 
     runtime_config = config or AppConfig(settings_path=get_settings_file_path())
     if config is None:
@@ -65,6 +68,14 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
     inpainting_service = InpaintingService(config=runtime_config)
     render_service = RenderService(config=runtime_config)
     export_service = ExportService(render_service)
+    provider_registry = ProviderRegistry()
+    register_builtin_providers(
+        provider_registry,
+        detection_service=detection_service,
+        translation_service=translation_service,
+        inpainting_service=inpainting_service,
+        render_service=render_service,
+    )
 
     settings = AppConfigSnapshot.from_object(runtime_config)
     pipeline_runner = build_page_translation_runner(
@@ -95,4 +106,5 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
         stage_registry=pipeline_runner.registry,
         pipeline_runner=pipeline_runner,
         pipeline_planner=PipelinePlanner(),
+        provider_registry=provider_registry,
     )

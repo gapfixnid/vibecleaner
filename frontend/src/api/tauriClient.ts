@@ -13,6 +13,7 @@ import type {
   TranslationModelsDto,
   vibeCleanerApi,
 } from "../types/api";
+import type { ProviderCatalogDto } from "../types/provider";
 import type { ProjectDto, PageDto, SettingsDto } from "../types/project";
 import type { BubbleDto, BubblePatchDto } from "../types/bubble";
 
@@ -141,6 +142,10 @@ export const tauriClient: vibeCleanerApi = {
 
   async getSettings(): Promise<SettingsDto> {
     return callTauri<SettingsDto>("get_settings");
+  },
+
+  async getProviderCatalog(): Promise<ProviderCatalogDto> {
+    return callTauri<ProviderCatalogDto>("get_provider_catalog");
   },
 
   async updateSettings(settings: SettingsDto): Promise<SettingsDto> {

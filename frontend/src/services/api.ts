@@ -11,6 +11,7 @@ import type {
   TranslationModelsResponse,
   ModelStatus,
   LoadProjectResult,
+  ProviderCatalogDto,
 } from "../types";
 import { toBubbleInfo, toBubbleUpdateDto, toPagesResponse } from "./mappers";
 
@@ -25,6 +26,10 @@ export const getBackendUrl = () => BACKEND_URL;
 export const getSettings = async (): Promise<Settings> => {
   const settings = await api.getSettings();
   return settings as Settings;
+};
+
+export const getProviderCatalog = async (): Promise<ProviderCatalogDto> => {
+  return api.getProviderCatalog();
 };
 
 export const updateSettings = async (settings: Settings): Promise<Settings> => {

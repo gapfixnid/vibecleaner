@@ -29,6 +29,7 @@ from backend.core.container import build_container
 from backend.core.errors import PageImageLoadError, PageNotFoundError
 from backend.infrastructure.logging import configure_logging
 from backend.api.routes.jobs import router as jobs_router
+from backend.api.routes.catalog import router as catalog_router
 from backend.api.routes.pages import router as pages_router
 from backend.api.routes.project import router as project_router
 from backend.api.routes.settings import router as settings_router
@@ -90,6 +91,7 @@ async def reject_untrusted_browser_origins(request: Request, call_next):
 
 
 def include_routes(app: FastAPI) -> None:
+    app.include_router(catalog_router)
     app.include_router(settings_router)
     app.include_router(project_router)
     app.include_router(pages_router)

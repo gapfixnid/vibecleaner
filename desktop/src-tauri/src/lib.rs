@@ -979,6 +979,13 @@ async fn get_settings(port_state: tauri::State<'_, PortState>) -> Result<serde_j
 }
 
 #[tauri::command]
+async fn get_provider_catalog(
+    port_state: tauri::State<'_, PortState>,
+) -> Result<serde_json::Value, String> {
+    forward_get(port_state.0, "/api/providers/catalog").await
+}
+
+#[tauri::command]
 async fn update_settings(
     port_state: tauri::State<'_, PortState>,
     settings: serde_json::Value,
@@ -1083,6 +1090,7 @@ pub fn run() {
             export_page_to_path,
             export_pages,
             get_settings,
+            get_provider_catalog,
             update_settings,
             get_model_status,
             download_required_models,
