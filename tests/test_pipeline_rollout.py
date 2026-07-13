@@ -55,3 +55,19 @@ def test_shadow_comparison_can_be_recorded(tmp_path):
     )
     coordinator.run(context, PipelineRollout(shadow=True))
     assert sink.path.exists()
+
+
+def test_shadow_copy_failure_does_not_fail_primary_result():
+    class Uncopyable:
+        def __deepcopy__(self, memo):
+            raise TypeError("lock")
+
+    context = SimpleNamespace(artifacts={"state": Uncopyable()}, page_id="page")
+    coordinator = PipelineExecutionCoordinator(
+        v1_runner=lambda item: Result(artifacts=item.artifacts),
+        v2_runner=lambda item: Result(artifacts=item.artifacts),
+    )
+    result = coordinator.run(context, PipelineRollout(shadow=True))
+    assert result.succeeded
+    assert coordinator.last_comparison is not None
+    assert not coordinator.last_comparison.shadow_succeeded

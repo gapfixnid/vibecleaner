@@ -58,6 +58,12 @@ class PipelineComparison:
         )
 
 
+@dataclass(frozen=True)
+class ShadowExecutionFailure:
+    succeeded: bool = False
+    issues: list[Any] = field(default_factory=list)
+
+
 class PipelineExecutionCoordinator:
     """Run a selected pipeline and optionally a non-mutating shadow pipeline."""
 
@@ -84,7 +90,12 @@ class PipelineExecutionCoordinator:
         shadow_variant = rollout.shadow_variant
         self.last_comparison = None
         if shadow_variant is not None and shadow_variant in self._runners:
-            shadow_result = self._run_shadow(context, shadow_variant)
+            try:
+                shadow_result = self._run_shadow(context, shadow_variant)
+            except Exception as exc:
+                shadow_result = ShadowExecutionFailure(
+                    issues=[f"shadow execution skipped: {exc}"]
+                )
             self.last_comparison = self._compare(
                 primary_variant, primary_result, shadow_variant, shadow_result
             )
