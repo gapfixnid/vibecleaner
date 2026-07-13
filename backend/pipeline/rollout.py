@@ -73,12 +73,14 @@ class PipelineExecutionCoordinator:
         v1_runner: Callable[[Any], Any],
         v2_runner: Callable[[Any], Any] | None = None,
         benchmark_sink: Any | None = None,
+        shadow_context_factory: Callable[[Any], Any] = deepcopy,
     ) -> None:
         self._runners = {PipelineVariant.V1: v1_runner}
         if v2_runner is not None:
             self._runners[PipelineVariant.V2] = v2_runner
         self.last_comparison: PipelineComparison | None = None
         self.benchmark_sink = benchmark_sink
+        self.shadow_context_factory = shadow_context_factory
 
     def run(self, context: Any, rollout: PipelineRollout) -> Any:
         primary_variant = rollout.primary
@@ -86,12 +88,22 @@ class PipelineExecutionCoordinator:
         if primary_runner is None:
             raise RuntimeError(f"Pipeline {primary_variant.value} is not available")
 
-        primary_result = primary_runner(context)
         shadow_variant = rollout.shadow_variant
+        shadow_context = None
+        shadow_copy_error: Exception | None = None
+        if shadow_variant is not None and shadow_variant in self._runners:
+            try:
+                shadow_context = self.shadow_context_factory(context)
+            except Exception as exc:
+                shadow_copy_error = exc
+
+        primary_result = primary_runner(context)
         self.last_comparison = None
         if shadow_variant is not None and shadow_variant in self._runners:
             try:
-                shadow_result = self._run_shadow(context, shadow_variant)
+                if shadow_copy_error is not None:
+                    raise shadow_copy_error
+                shadow_result = self._runners[shadow_variant](shadow_context)
             except Exception as exc:
                 shadow_result = ShadowExecutionFailure(
                     issues=[f"shadow execution skipped: {exc}"]
@@ -119,9 +131,6 @@ class PipelineExecutionCoordinator:
                 metadata=comparison.metadata,
             )
         )
-
-    def _run_shadow(self, context: Any, variant: PipelineVariant) -> Any:
-        return self._runners[variant](deepcopy(context))
 
     @staticmethod
     def _compare(

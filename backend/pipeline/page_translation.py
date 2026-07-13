@@ -9,6 +9,7 @@ from .benchmark import JsonlBenchmarkSink
 from .context import PipelineContext
 from .dag import DagPipelineExecutor
 from .rollout import PipelineExecutionCoordinator, PipelineRollout
+from .shadow import clone_page_translation_context
 
 
 def run_page_translation(
@@ -49,6 +50,7 @@ def run_page_translation(
             item, planner.translate_page_dag_plan()
         ),
         benchmark_sink=benchmark_sink,
+        shadow_context_factory=clone_page_translation_context,
     )
     result = coordinator.run(context, rollout)
     runner.last_result = result
