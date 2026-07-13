@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from .context import PipelineContext
 from .registry import StageRegistry
 from .runner import PipelineResult
+from .resources import ResourceClass, ResourceManager
 from .validation.results import PipelineValidationError
 
 
@@ -12,6 +13,7 @@ from .validation.results import PipelineValidationError
 class DagStage:
     name: str
     depends_on: tuple[str, ...] = ()
+    resource: ResourceClass = ResourceClass.CPU
 
 
 @dataclass(frozen=True)
@@ -48,8 +50,9 @@ class DagPipelinePlan:
 class DagPipelineExecutor:
     """Deterministic v2 DAG executor; parallel scheduling is a later optimization."""
 
-    def __init__(self, registry: StageRegistry) -> None:
+    def __init__(self, registry: StageRegistry, resource_manager: ResourceManager | None = None) -> None:
         self.registry = registry
+        self.resource_manager = resource_manager or ResourceManager()
 
     def run(self, context: PipelineContext, plan: DagPipelinePlan) -> PipelineResult:
         plan.validate()
@@ -65,7 +68,8 @@ class DagPipelineExecutor:
                     spec.name, input_summary={"artifact_count": len(context.artifacts)}
                 )
                 try:
-                    context = stage.run(context)
+                    with self.resource_manager.acquire(spec.resource):
+                        context = stage.run(context)
                 except PipelineValidationError as exc:
                     context.provenance.finish_stage(
                         entry, started_at,
