@@ -25,7 +25,7 @@ if __package__ in (None, ""):
 from backend.infrastructure.runtime import qt  # noqa: F401
 
 from backend.core.version import APP_NAME, __version__ as APP_VERSION
-from backend.core.container import build_container
+from backend.core.container import build_container, start_pipeline_warmup
 from backend.core.errors import PageImageLoadError, PageNotFoundError
 from backend.infrastructure.logging import configure_logging
 from backend.api.routes.jobs import router as jobs_router
@@ -131,5 +131,6 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8000, help="Port to run the API server on")
     args = parser.parse_args()
 
+    start_pipeline_warmup(app.state.container)
     logger.info("Starting FastAPI server on port %d", args.port)
     uvicorn.run(app, host="127.0.0.1", port=args.port)

@@ -78,6 +78,7 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
     )
 
     settings = AppConfigSnapshot.from_object(runtime_config)
+    cache_tasks = CacheTaskQueue()
     pipeline_runner = build_page_translation_runner(
         detection_service=detection_service,
         inpainting_service=inpainting_service,
@@ -96,7 +97,7 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
         config=runtime_config,
         project_state=ProjectState(),
         job_manager=JobManager(),
-        cache_tasks=CacheTaskQueue(),
+        cache_tasks=cache_tasks,
         translation_service=translation_service,
         detection_service=detection_service,
         inpainting_service=inpainting_service,
@@ -108,3 +109,8 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
         pipeline_planner=PipelinePlanner(),
         provider_registry=provider_registry,
     )
+
+
+def start_pipeline_warmup(container: AppContainer) -> None:
+    if container.config.pipeline_v2_enabled and container.config.inpaint_engine != "opencv":
+        container.cache_tasks.submit(container.inpainting_service.prepare)

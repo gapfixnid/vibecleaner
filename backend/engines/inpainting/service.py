@@ -10,6 +10,10 @@ class InpaintingService:
         self.inpainter: HybridInpainter = inpainter or HybridInpainter()
         self.config = config
 
+    def prepare(self, engine: str | None = None) -> None:
+        resolved_engine = engine or config_value(self.config, "inpaint_engine")
+        self.inpainter.prepare(resolved_engine)
+
     def clean_background(
         self,
         image: np.ndarray,
