@@ -4,6 +4,8 @@ from typing import Any
 
 from ..core.models.image import ImageData
 from .context import PipelineContext
+from .dag import DagPipelineExecutor, DagPipelinePlan, DagStage
+from .rollout import PipelineExecutionCoordinator, PipelineRollout
 
 
 def run_page_translation(
@@ -30,7 +32,21 @@ def run_page_translation(
             "job_manager": job_manager,
         },
     )
-    result = runner.run(context, planner.translate_page_plan())
+    plan = planner.translate_page_plan()
+    rollout = PipelineRollout.from_settings(config)
+    coordinator = PipelineExecutionCoordinator(
+        v1_runner=lambda item: runner.run(item, plan),
+        v2_runner=lambda item: DagPipelineExecutor(runner.registry).run(
+            item,
+            DagPipelinePlan(
+                tuple(
+                    DagStage(name, (plan.stages[index - 1],) if index else ())
+                    for index, name in enumerate(plan.stages)
+                )
+            ),
+        ),
+    )
+    result = coordinator.run(context, rollout)
     runner.last_result = result
     if not result.succeeded:
         message = result.issues[0].message if result.issues else "Page translation pipeline failed"
