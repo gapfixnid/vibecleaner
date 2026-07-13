@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import StrEnum
+from time import perf_counter
 from typing import Any, Callable
 
 from .benchmark import ShadowBenchmarkRecord
@@ -47,6 +48,8 @@ class PipelineComparison:
     matching_artifact_keys: bool
     primary_error: str | None = None
     shadow_error: str | None = None
+    primary_duration_ms: float | None = None
+    shadow_duration_ms: float | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -97,19 +100,25 @@ class PipelineExecutionCoordinator:
             except Exception as exc:
                 shadow_copy_error = exc
 
+        primary_started = perf_counter()
         primary_result = primary_runner(context)
+        primary_duration_ms = (perf_counter() - primary_started) * 1000
         self.last_comparison = None
         if shadow_variant is not None and shadow_variant in self._runners:
             try:
                 if shadow_copy_error is not None:
                     raise shadow_copy_error
+                shadow_started = perf_counter()
                 shadow_result = self._runners[shadow_variant](shadow_context)
+                shadow_duration_ms = (perf_counter() - shadow_started) * 1000
             except Exception as exc:
+                shadow_duration_ms = None
                 shadow_result = ShadowExecutionFailure(
                     issues=[f"shadow execution skipped: {exc}"]
                 )
             self.last_comparison = self._compare(
-                primary_variant, primary_result, shadow_variant, shadow_result
+                primary_variant, primary_result, shadow_variant, shadow_result,
+                primary_duration_ms, shadow_duration_ms,
             )
             self._record_benchmark(context, self.last_comparison)
         return primary_result
@@ -128,6 +137,8 @@ class PipelineExecutionCoordinator:
                 primary_succeeded=comparison.primary_succeeded,
                 shadow_succeeded=comparison.shadow_succeeded,
                 matching_artifact_keys=comparison.matching_artifact_keys,
+                primary_duration_ms=comparison.primary_duration_ms,
+                shadow_duration_ms=comparison.shadow_duration_ms,
                 metadata=comparison.metadata,
             )
         )
@@ -138,6 +149,8 @@ class PipelineExecutionCoordinator:
         primary_result: Any,
         shadow_variant: PipelineVariant,
         shadow_result: Any,
+        primary_duration_ms: float,
+        shadow_duration_ms: float | None,
     ) -> PipelineComparison:
         primary_ok = bool(getattr(primary_result, "succeeded", True))
         shadow_ok = bool(getattr(shadow_result, "succeeded", True))
@@ -153,9 +166,36 @@ class PipelineExecutionCoordinator:
             matching_artifact_keys=set(primary_artifacts) == set(shadow_artifacts),
             primary_error=_error_message(primary_result),
             shadow_error=_error_message(shadow_result),
+            primary_duration_ms=primary_duration_ms,
+            shadow_duration_ms=shadow_duration_ms,
+            metadata=_quality_metadata(primary_artifacts, shadow_artifacts),
         )
 
 
 def _error_message(result: Any) -> str | None:
     issues = getattr(result, "issues", None) or []
     return str(getattr(issues[0], "message", issues[0])) if issues else None
+
+
+def _quality_metadata(primary: dict[str, Any], shadow: dict[str, Any]) -> dict[str, Any]:
+    primary_bubbles = list(primary.get("local_bubbles") or [])
+    shadow_bubbles = list(shadow.get("local_bubbles") or [])
+    pair_count = min(len(primary_bubbles), len(shadow_bubbles))
+
+    def ratio(attribute: str) -> float | None:
+        if pair_count == 0:
+            return 1.0 if len(primary_bubbles) == len(shadow_bubbles) else None
+        matches = sum(
+            str(getattr(primary_bubbles[index], attribute, "") or "")
+            == str(getattr(shadow_bubbles[index], attribute, "") or "")
+            for index in range(pair_count)
+        )
+        return round(matches / pair_count, 4)
+
+    return {
+        "primary_bubble_count": len(primary_bubbles),
+        "shadow_bubble_count": len(shadow_bubbles),
+        "bubble_count_match": len(primary_bubbles) == len(shadow_bubbles),
+        "ocr_text_match_ratio": ratio("text"),
+        "translation_match_ratio": ratio("translated"),
+    }

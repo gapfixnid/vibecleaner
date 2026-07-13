@@ -71,3 +71,20 @@ def test_shadow_copy_failure_does_not_fail_primary_result():
     assert result.succeeded
     assert coordinator.last_comparison is not None
     assert not coordinator.last_comparison.shadow_succeeded
+
+
+def test_shadow_comparison_records_duration_and_text_quality():
+    bubbles = [SimpleNamespace(text="hello", translated="안녕")]
+    context = SimpleNamespace(artifacts={"local_bubbles": bubbles})
+    coordinator = PipelineExecutionCoordinator(
+        v1_runner=lambda item: Result(artifacts=item.artifacts),
+        v2_runner=lambda item: Result(artifacts=item.artifacts),
+    )
+    coordinator.run(context, PipelineRollout(shadow=True))
+    comparison = coordinator.last_comparison
+    assert comparison is not None
+    assert comparison.primary_duration_ms is not None
+    assert comparison.shadow_duration_ms is not None
+    assert comparison.metadata["bubble_count_match"] is True
+    assert comparison.metadata["ocr_text_match_ratio"] == 1.0
+    assert comparison.metadata["translation_match_ratio"] == 1.0
