@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from .context import PipelineContext
+from .checkpoint import CheckpointManifest
 from .registry import StageRegistry
 from .runner import PipelineResult
 from .resources import ResourceClass, ResourceManager
@@ -50,9 +52,10 @@ class DagPipelinePlan:
 class DagPipelineExecutor:
     """Deterministic v2 DAG executor; parallel scheduling is a later optimization."""
 
-    def __init__(self, registry: StageRegistry, resource_manager: ResourceManager | None = None) -> None:
+    def __init__(self, registry: StageRegistry, resource_manager: ResourceManager | None = None, checkpoint_store: Any | None = None) -> None:
         self.registry = registry
         self.resource_manager = resource_manager or ResourceManager()
+        self.checkpoint_store = checkpoint_store
 
     def run(self, context: PipelineContext, plan: DagPipelinePlan) -> PipelineResult:
         plan.validate()
@@ -82,4 +85,17 @@ class DagPipelineExecutor:
                 )
                 completed.add(spec.name)
                 pending.remove(spec)
+                self._save_checkpoint(context, completed)
         return PipelineResult(context=context, succeeded=True)
+
+    def _save_checkpoint(self, context: PipelineContext, completed: set[str]) -> None:
+        if self.checkpoint_store is None:
+            return
+        self.checkpoint_store.save(
+            CheckpointManifest(
+                run_id=context.provenance.run_id,
+                page_id=context.page_id,
+                completed_stages=sorted(completed),
+                artifact_keys=sorted(context.artifacts),
+            )
+        )
