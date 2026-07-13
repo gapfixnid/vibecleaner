@@ -19,6 +19,7 @@ from .providers import (
     BaiduTranslatorWrapper
 )
 from .base import BaseTranslator
+from ...core.providers.concurrency import ProviderConcurrencyGate
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ class TranslationService:
         self._cache: Dict[str, str] = {}  # In-memory translation cache (src_text -> translated_text)
         self._cache_lock = threading.RLock()
         self._translator_lock = threading.RLock()
+        self._provider_gate = ProviderConcurrencyGate(max_concurrency=1, queue_capacity=8)
 
         # Save TM and system prompt in user's AppData directory to prevent permission issues
         app_data_dir = get_app_data_dir()
@@ -217,8 +219,9 @@ class TranslationService:
 
         # Call active translator for untranslated blocks
         if to_translate:
-            with self._translator_lock:
-                self.translator.translate_blocks(to_translate, src_lang, tgt_lang, cv_image)
+            with self._provider_gate.slot():
+                with self._translator_lock:
+                    self.translator.translate_blocks(to_translate, src_lang, tgt_lang, cv_image)
 
             # Cache the newly translated text blocks and save to Translation Memory file
             with self._cache_lock:
@@ -288,6 +291,7 @@ class TranslationService:
             "cache_enabled": self.config.translation_cache_enabled,
             "cache_mode": self.config.translation_cache_mode,
             "cache_entries": len(self._cache),
+            "queue": self._provider_gate.status(),
         }
 
     def _load_tm(self) -> None:

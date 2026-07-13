@@ -15,4 +15,7 @@ def get_provider_catalog(container: AppContainer = Depends(get_container)):
 
 @router.get("/api/providers/runtime")
 def get_provider_runtime(container: AppContainer = Depends(get_container)):
-    return {"inpainting": container.inpainting_service.runtime_status()}
+    return {
+        "translation": container.translation_service.get_diagnostics(),
+        "inpainting": container.inpainting_service.runtime_status(),
+    }
