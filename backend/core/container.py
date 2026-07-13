@@ -76,6 +76,26 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
         inpainting_service=inpainting_service,
         render_service=render_service,
     )
+    detection_policy = provider_registry.list("detection")[0].manifest
+    ocr_policy = provider_registry.list("ocr")[0].manifest
+    inpainting_policy = provider_registry.list("inpainting")[0].manifest
+    translation_policy = next(
+        item.manifest
+        for item in provider_registry.list("translation")
+        if item.manifest.selection_value == runtime_config.translation_provider
+    )
+    detection_service.configure_queues(
+        detection=(detection_policy.max_concurrency, detection_policy.queue_capacity),
+        ocr=(ocr_policy.max_concurrency, ocr_policy.queue_capacity),
+    )
+    translation_service.configure_queue(
+        max_concurrency=translation_policy.max_concurrency,
+        queue_capacity=translation_policy.queue_capacity,
+    )
+    inpainting_service.configure_queue(
+        max_concurrency=inpainting_policy.max_concurrency,
+        queue_capacity=inpainting_policy.queue_capacity,
+    )
 
     settings = AppConfigSnapshot.from_object(runtime_config)
     cache_tasks = CacheTaskQueue()

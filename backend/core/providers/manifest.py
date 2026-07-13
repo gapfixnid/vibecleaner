@@ -112,6 +112,7 @@ class ProviderManifest:
     capabilities: ProviderCapabilities
     resource_classes: frozenset[ResourceClass]
     max_concurrency: int = 1
+    queue_capacity: int = 0
     config_schema: tuple[ConfigFieldSpec, ...] = ()
     legacy_adapter: bool = False
     selection_value: str | None = None
@@ -134,6 +135,8 @@ class ProviderManifest:
         object.__setattr__(self, "config_schema", tuple(self.config_schema))
         if self.max_concurrency < 1:
             raise ValueError("Provider max_concurrency must be positive")
+        if self.queue_capacity < 0:
+            raise ValueError("Provider queue_capacity cannot be negative")
         if self.selection_value is not None and not self.selection_value.strip():
             raise ValueError("Provider selection_value cannot be empty")
         if self.catalog_order < 0:
@@ -152,6 +155,7 @@ class ProviderManifest:
             "capabilities": self.capabilities.to_dict(),
             "resource_classes": sorted(self.resource_classes),
             "max_concurrency": self.max_concurrency,
+            "queue_capacity": self.queue_capacity,
             "config_schema": [field.to_dict() for field in self.config_schema],
             "legacy_adapter": self.legacy_adapter,
             "selection_value": self.selection_value or self.provider_id,

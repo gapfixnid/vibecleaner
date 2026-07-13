@@ -61,6 +61,7 @@ def _translation_manifest(
         ),
         resource_classes=resources,
         max_concurrency=1,
+        queue_capacity=8,
         config_schema=config_schema,
         legacy_adapter=True,
         selection_value=provider,
@@ -210,6 +211,7 @@ def register_builtin_providers(
                 features={"regions", "confidence", "tiling"},
             ),
             resource_classes={"cpu", "gpu"},
+            queue_capacity=2,
             config_schema=(
                 ConfigFieldSpec(
                     key="detect_model",
@@ -287,6 +289,7 @@ def register_builtin_providers(
                 supports_batch=True,
             ),
             resource_classes={"cpu", "gpu", "io"},
+            queue_capacity=4,
             config_schema=(
                 ConfigFieldSpec(
                     key="ocr_engine",
@@ -352,6 +355,7 @@ def register_builtin_providers(
                 supports_batch=True,
             ),
             resource_classes={"cpu", "gpu"},
+            queue_capacity=2,
             config_schema=(
                 ConfigFieldSpec(
                     key="inpaint_engine",

@@ -29,6 +29,11 @@ class InpaintingService:
         self._cache_misses = 0
         self._provider_gate = ProviderConcurrencyGate(max_concurrency=1, queue_capacity=2)
 
+    def configure_queue(self, *, max_concurrency: int, queue_capacity: int) -> None:
+        self._provider_gate = ProviderConcurrencyGate(
+            max_concurrency=max_concurrency, queue_capacity=queue_capacity
+        )
+
     def prepare(self, engine: str | None = None) -> None:
         resolved_engine = engine or config_value(self.config, "inpaint_engine")
         started = time.perf_counter()

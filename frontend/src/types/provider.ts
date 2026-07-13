@@ -37,6 +37,7 @@ export interface ProviderManifestDto {
   capabilities: ProviderCapabilitiesDto;
   resource_classes: ProviderResourceClass[];
   max_concurrency: number;
+  queue_capacity: number;
   config_schema: ProviderConfigFieldDto[];
   legacy_adapter: boolean;
   selection_value: string;

@@ -48,6 +48,11 @@ class TranslationService:
         # Load custom system prompt override
         self._load_system_prompt()
 
+    def configure_queue(self, *, max_concurrency: int, queue_capacity: int) -> None:
+        self._provider_gate = ProviderConcurrencyGate(
+            max_concurrency=max_concurrency, queue_capacity=queue_capacity
+        )
+
     @property
     def system_prompt(self) -> str:
         override = getattr(self.translator, "system_prompt_override", None)

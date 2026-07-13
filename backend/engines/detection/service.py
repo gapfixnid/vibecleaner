@@ -54,6 +54,19 @@ class DetectionService:
         atexit.register(self.flush_ocr_cache)
         self._load_cache_from_disk()
 
+    def configure_queues(
+        self,
+        *,
+        detection: tuple[int, int],
+        ocr: tuple[int, int],
+    ) -> None:
+        self._detection_gate = ProviderConcurrencyGate(
+            max_concurrency=detection[0], queue_capacity=detection[1]
+        )
+        self._ocr_gate = ProviderConcurrencyGate(
+            max_concurrency=ocr[0], queue_capacity=ocr[1]
+        )
+
     def _ocr_engine_name(self, engine: str | None = None) -> str:
         return engine or config_value(self.config, "ocr_engine")
 
