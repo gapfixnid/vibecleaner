@@ -101,3 +101,17 @@ def test_shadow_order_alternates_by_page_id_without_changing_primary_result():
     assert calls == ["v1", "v2"]
     assert result.succeeded
     assert coordinator.last_comparison.metadata["execution_order"] == "shadow_first"
+
+
+def test_failed_v2_automatically_falls_back_to_v1():
+    calls = []
+    context = SimpleNamespace(artifacts={})
+    coordinator = PipelineExecutionCoordinator(
+        v1_runner=lambda item: calls.append("v1") or Result(succeeded=True, artifacts=item.artifacts),
+        v2_runner=lambda item: calls.append("v2") or Result(succeeded=False, artifacts=item.artifacts),
+    )
+    result = coordinator.run(context, PipelineRollout(enabled=True))
+    assert result.succeeded
+    assert result.fallback_from == "v2"
+    assert coordinator.last_fallback_used is True
+    assert calls == ["v2", "v1"]

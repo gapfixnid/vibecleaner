@@ -77,6 +77,7 @@ class PipelineExecutionCoordinator:
         v2_runner: Callable[[Any], Any] | None = None,
         benchmark_sink: Any | None = None,
         shadow_context_factory: Callable[[Any], Any] = deepcopy,
+        fallback_context_factory: Callable[[Any], Any] = deepcopy,
         alternate_shadow_order: bool = True,
     ) -> None:
         self._runners = {PipelineVariant.V1: v1_runner}
@@ -85,7 +86,9 @@ class PipelineExecutionCoordinator:
         self.last_comparison: PipelineComparison | None = None
         self.benchmark_sink = benchmark_sink
         self.shadow_context_factory = shadow_context_factory
+        self.fallback_context_factory = fallback_context_factory
         self.alternate_shadow_order = alternate_shadow_order
+        self.last_fallback_used = False
 
     def run(self, context: Any, rollout: PipelineRollout) -> Any:
         primary_variant = rollout.primary
@@ -94,6 +97,14 @@ class PipelineExecutionCoordinator:
             raise RuntimeError(f"Pipeline {primary_variant.value} is not available")
 
         shadow_variant = rollout.shadow_variant
+        fallback_context = None
+        fallback_copy_error: Exception | None = None
+        if primary_variant is PipelineVariant.V2:
+            try:
+                fallback_context = self.fallback_context_factory(context)
+                _set_pipeline_variant(fallback_context, PipelineVariant.V1)
+            except Exception as exc:
+                fallback_copy_error = exc
         shadow_context = None
         shadow_copy_error: Exception | None = None
         if shadow_variant is not None and shadow_variant in self._runners:
@@ -117,6 +128,17 @@ class PipelineExecutionCoordinator:
         primary_started = perf_counter()
         primary_result = primary_runner(context)
         primary_duration_ms = (perf_counter() - primary_started) * 1000
+        self.last_fallback_used = False
+        returned_result = primary_result
+        if (
+            primary_variant is PipelineVariant.V2
+            and not bool(getattr(primary_result, "succeeded", True))
+            and PipelineVariant.V1 in self._runners
+            and fallback_copy_error is None
+        ):
+            returned_result = self._runners[PipelineVariant.V1](fallback_context)
+            self.last_fallback_used = bool(getattr(returned_result, "succeeded", True))
+            setattr(returned_result, "fallback_from", PipelineVariant.V2.value)
 
         if has_shadow:
             if not shadow_first:
@@ -130,8 +152,9 @@ class PipelineExecutionCoordinator:
             self.last_comparison.metadata["execution_order"] = (
                 "shadow_first" if shadow_first else "primary_first"
             )
+            self.last_comparison.metadata["fallback_used"] = self.last_fallback_used
             self._record_benchmark(context, self.last_comparison)
-        return primary_result
+        return returned_result
 
     def _shadow_runs_first(self, context: Any) -> bool:
         if not self.alternate_shadow_order:

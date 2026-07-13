@@ -6,10 +6,10 @@ from pathlib import Path
 from backend.core.config import AppConfig, SETTINGS_FORMAT, SETTINGS_SCHEMA_VERSION
 
 class ConfigMigrationTests(unittest.TestCase):
-    def test_pipeline_v2_flags_default_to_disabled(self):
+    def test_new_install_defaults_to_v2_without_shadow(self):
         cfg = AppConfig()
 
-        self.assertFalse(cfg.pipeline_v2_enabled)
+        self.assertTrue(cfg.pipeline_v2_enabled)
         self.assertFalse(cfg.pipeline_v2_shadow)
 
     def test_pipeline_v2_flags_and_schema_version_round_trip(self):
@@ -67,7 +67,7 @@ class ConfigMigrationTests(unittest.TestCase):
             cfg.load()
 
             self.assertEqual(cfg.source_language, "Existing value")
-            self.assertFalse(cfg.pipeline_v2_enabled)
+            self.assertTrue(cfg.pipeline_v2_enabled)
             self.assertFalse(cfg.save())
             self.assertEqual(json.loads(settings_path.read_text(encoding="utf-8")), original)
 

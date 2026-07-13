@@ -24,7 +24,7 @@ LEGACY_SETTINGS_SCHEMA_VERSION_KEY = "settings_schema_version"
 
 @dataclass(frozen=True)
 class AppConfigSnapshot:
-    pipeline_v2_enabled: bool = False
+    pipeline_v2_enabled: bool = True
     pipeline_v2_shadow: bool = False
     translation_model: str = ""
     translation_provider: str = "google"
@@ -93,9 +93,9 @@ def config_value(config: Any, name: str) -> Any:
 @dataclass
 class AppConfig:
     # -- Pipeline rollout ---------------------------------------------------
-    # Phase A only defines the rollout controls. Both remain off by default;
-    # no v2 execution behavior is enabled here.
-    pipeline_v2_enabled: bool = False
+    # Pipeline v2 is the default for new installs after the Phase C rollout gate.
+    # Existing files keep their explicitly migrated value.
+    pipeline_v2_enabled: bool = True
     pipeline_v2_shadow: bool = False
 
     # -- Translation --------------------------------------------------------

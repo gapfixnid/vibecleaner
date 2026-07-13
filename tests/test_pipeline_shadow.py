@@ -6,7 +6,10 @@ from backend.core.models.image import ImageData
 from backend.core.models.page import MangaPage
 from backend.core.state.project_state import ProjectState
 from backend.pipeline.context import PipelineContext
-from backend.pipeline.shadow import clone_page_translation_context
+from backend.pipeline.shadow import (
+    clone_page_translation_context,
+    clone_page_translation_fallback_context,
+)
 
 
 def test_page_shadow_snapshot_isolates_project_and_job_state():
@@ -30,3 +33,21 @@ def test_page_shadow_snapshot_isolates_project_and_job_state():
     assert state.pages[0].status == "idle"
     assert context.artifacts["job"]["cancel_requested"] is False
     assert shadow.artifacts["state"].lock is not state.lock
+
+
+def test_page_fallback_context_keeps_real_state_but_resets_pipeline_artifacts():
+    state = ProjectState()
+    context = PipelineContext(
+        page_id="page",
+        page=None,
+        image=ImageData(array=None),
+        settings=SimpleNamespace(),
+        artifacts={
+            "state": state, "job": {}, "job_manager": SimpleNamespace(),
+            "config": SimpleNamespace(), "show_progress": False,
+            "partial_v2_result": object(),
+        },
+    )
+    fallback = clone_page_translation_fallback_context(context)
+    assert fallback.artifacts["state"] is state
+    assert "partial_v2_result" not in fallback.artifacts

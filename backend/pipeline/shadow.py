@@ -26,3 +26,18 @@ def clone_page_translation_context(context: PipelineContext) -> PipelineContext:
         settings=context.settings,
         artifacts=artifacts,
     )
+
+
+def clone_page_translation_fallback_context(context: PipelineContext) -> PipelineContext:
+    """Rebuild initial artifacts while retaining the real project state for v1 commit."""
+    artifacts = {
+        key: context.artifacts[key]
+        for key in ("job", "show_progress", "state", "config", "job_manager")
+    }
+    return PipelineContext(
+        page_id=context.page_id,
+        page=None,
+        image=ImageData(array=None),
+        settings=context.settings,
+        artifacts=artifacts,
+    )
