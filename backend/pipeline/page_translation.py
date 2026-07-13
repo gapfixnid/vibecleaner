@@ -4,7 +4,7 @@ from typing import Any
 
 from ..core.models.image import ImageData
 from .context import PipelineContext
-from .dag import DagPipelineExecutor, DagPipelinePlan, DagStage
+from .dag import DagPipelineExecutor
 from .rollout import PipelineExecutionCoordinator, PipelineRollout
 
 
@@ -37,13 +37,7 @@ def run_page_translation(
     coordinator = PipelineExecutionCoordinator(
         v1_runner=lambda item: runner.run(item, plan),
         v2_runner=lambda item: DagPipelineExecutor(runner.registry).run(
-            item,
-            DagPipelinePlan(
-                tuple(
-                    DagStage(name, (plan.stages[index - 1],) if index else ())
-                    for index, name in enumerate(plan.stages)
-                )
-            ),
+            item, planner.translate_page_dag_plan()
         ),
     )
     result = coordinator.run(context, rollout)
