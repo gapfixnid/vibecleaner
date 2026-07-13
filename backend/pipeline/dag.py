@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from time import sleep
 
 from .context import PipelineContext
 from .checkpoint import CheckpointManifest
 from .registry import StageRegistry
 from .runner import PipelineResult
 from .resources import ResourceClass, ResourceManager
-from .validation.results import PipelineValidationError
+from .validation.results import PipelineValidationError, ValidationIssue
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class DagStage:
     name: str
     depends_on: tuple[str, ...] = ()
     resource: ResourceClass = ResourceClass.CPU
+    max_retries: int = 0
 
 
 @dataclass(frozen=True)
@@ -52,10 +54,11 @@ class DagPipelinePlan:
 class DagPipelineExecutor:
     """Deterministic v2 DAG executor; parallel scheduling is a later optimization."""
 
-    def __init__(self, registry: StageRegistry, resource_manager: ResourceManager | None = None, checkpoint_store: Any | None = None) -> None:
+    def __init__(self, registry: StageRegistry, resource_manager: ResourceManager | None = None, checkpoint_store: Any | None = None, retry_backoff_seconds: float = 0.25) -> None:
         self.registry = registry
         self.resource_manager = resource_manager or ResourceManager()
         self.checkpoint_store = checkpoint_store
+        self.retry_backoff_seconds = max(0.0, retry_backoff_seconds)
 
     def run(
         self,
@@ -81,8 +84,7 @@ class DagPipelineExecutor:
                     spec.name, input_summary={"artifact_count": len(context.artifacts)}
                 )
                 try:
-                    with self.resource_manager.acquire(spec.resource):
-                        context = stage.run(context)
+                    context = self._run_with_retry(stage, spec, context)
                 except PipelineValidationError as exc:
                     context.provenance.finish_stage(
                         entry, started_at,
@@ -90,6 +92,16 @@ class DagPipelineExecutor:
                         errors=[issue.message for issue in exc.issues],
                     )
                     return PipelineResult(context=context, succeeded=False, issues=exc.issues)
+                except Exception as exc:
+                    issue = ValidationIssue(
+                        code="stage_failed", severity="error", message=str(exc), stage=spec.name
+                    )
+                    context.provenance.finish_stage(
+                        entry, started_at,
+                        output_summary={"artifact_count": len(context.artifacts)},
+                        errors=[issue.message],
+                    )
+                    return PipelineResult(context=context, succeeded=False, issues=[issue])
                 context.provenance.finish_stage(
                     entry, started_at, output_summary={"artifact_count": len(context.artifacts)}
                 )
@@ -97,6 +109,21 @@ class DagPipelineExecutor:
                 pending.remove(spec)
                 self._save_checkpoint(context, completed)
         return PipelineResult(context=context, succeeded=True)
+
+    def _run_with_retry(self, stage: Any, spec: DagStage, context: PipelineContext) -> PipelineContext:
+        attempts = max(0, spec.max_retries) + 1
+        for attempt in range(attempts):
+            try:
+                with self.resource_manager.acquire(spec.resource):
+                    return stage.run(context)
+            except PipelineValidationError:
+                raise
+            except Exception:
+                if attempt + 1 >= attempts:
+                    raise
+                if self.retry_backoff_seconds:
+                    sleep(self.retry_backoff_seconds * (attempt + 1))
+        raise RuntimeError("unreachable")
 
     @staticmethod
     def _can_resume(

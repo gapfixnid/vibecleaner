@@ -62,3 +62,26 @@ def test_dag_resume_skips_stage_when_checkpoint_artifacts_are_hydrated():
     )
     assert result.succeeded
     assert context.artifacts["order"] == ["hydrated"]
+
+
+def test_dag_retries_transient_stage_failure():
+    class Flaky(Stage):
+        def __init__(self):
+            super().__init__("detect", "detect")
+            self.attempts = 0
+
+        def run(self, context):
+            self.attempts += 1
+            if self.attempts == 1:
+                raise RuntimeError("transient")
+            return super().run(context)
+
+    registry = StageRegistry()
+    stage = Flaky()
+    registry.register(stage)
+    context = SimpleNamespace(artifacts={}, provenance=ProvenanceTrace(), page_id="page-1")
+    result = DagPipelineExecutor(registry, retry_backoff_seconds=0).run(
+        context, DagPipelinePlan((DagStage("detect", max_retries=1),))
+    )
+    assert result.succeeded
+    assert stage.attempts == 2
