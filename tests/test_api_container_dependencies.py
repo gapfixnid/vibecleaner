@@ -16,6 +16,7 @@ def test_app_exposes_container_and_settings_route():
             route_paths.update(child.path for child in original_router.routes if hasattr(child, "path"))
     assert "/api/settings" in route_paths
     assert "/api/providers/catalog" in route_paths
+    assert "/api/providers/runtime" in route_paths
     assert hasattr(app.state.container, "provider_registry")
 
 

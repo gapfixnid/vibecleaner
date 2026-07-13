@@ -19,6 +19,10 @@ def test_inpainting_service_prepares_configured_engine():
     )
     service.prepare()
     assert inpainter.prepared == ["lama"]
+    status = service.runtime_status()
+    assert status["prepared"] is True
+    assert status["prepare_duration_ms"] is not None
+    assert status["inference_count"] == 0
 
 
 def test_inpainting_service_can_prepare_explicit_engine():
