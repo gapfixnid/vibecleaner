@@ -31,3 +31,14 @@ python scripts/benchmark_pipeline_parallel.py `
 
 The corresponding CI test uses deterministic delay stages and requires at
 least a 1.5x wall-clock speedup over the equivalent sequential dependency chain.
+
+Evaluate real shadow records before changing the default rollout flag:
+
+```powershell
+python scripts/evaluate_pipeline_rollout.py `
+  "$env:APPDATA/vibecleaner/pipeline_shadow_benchmark.jsonl" `
+  --minimum-samples 10
+```
+
+The command exits non-zero unless sample count, execution success, structural
+equivalence, OCR text, and translation match thresholds all pass.
