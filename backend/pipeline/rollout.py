@@ -99,8 +99,10 @@ class PipelineExecutionCoordinator:
         if shadow_variant is not None and shadow_variant in self._runners:
             try:
                 shadow_context = self.shadow_context_factory(context)
+                _set_pipeline_variant(shadow_context, shadow_variant)
             except Exception as exc:
                 shadow_copy_error = exc
+        _set_pipeline_variant(context, primary_variant)
 
         self.last_comparison = None
         has_shadow = shadow_variant is not None and shadow_variant in self._runners
@@ -210,6 +212,13 @@ class PipelineExecutionCoordinator:
 def _error_message(result: Any) -> str | None:
     issues = getattr(result, "issues", None) or []
     return str(getattr(issues[0], "message", issues[0])) if issues else None
+
+
+def _set_pipeline_variant(context: Any, variant: PipelineVariant) -> None:
+    try:
+        setattr(context, "pipeline_variant", variant.value)
+    except (AttributeError, TypeError):
+        pass
 
 
 def _stage_durations(context: Any) -> dict[str, int]:

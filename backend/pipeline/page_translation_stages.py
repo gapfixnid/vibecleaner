@@ -84,10 +84,16 @@ class PageDetectionStage:
         if not local_bubbles:
             if show_progress:
                 job_manager.update(job, progress=15, message=msg_from_context("page_translation.detecting", context))
-            context.artifacts["blocks"] = self.detection_service.detect_and_ocr(
-                image,
-                lang=config.source_language,
-            )
+            if getattr(context, "pipeline_variant", None) == "v2" and hasattr(
+                self.detection_service, "detect_only"
+            ):
+                context.artifacts["blocks"] = self.detection_service.detect_only(image)
+                context.artifacts["ocr_pending"] = True
+            else:
+                context.artifacts["blocks"] = self.detection_service.detect_and_ocr(
+                    image,
+                    lang=config.source_language,
+                )
             job_manager.ensure_not_cancelled(job)
         return context
 
@@ -101,10 +107,12 @@ class PageOcrStage:
         page_analysis_service: Any,
         bubble_analysis_service: Any,
         layout_planner_service: Any,
+        detection_service: Any | None = None,
     ) -> None:
         self.page_analysis_service = page_analysis_service
         self.bubble_analysis_service = bubble_analysis_service
         self.layout_planner_service = layout_planner_service
+        self.detection_service = detection_service
 
     def run(self, context: PipelineContext) -> PipelineContext:
         job = context.artifacts["job"]
@@ -115,6 +123,16 @@ class PageOcrStage:
         local_bubbles = context.artifacts["local_bubbles"]
 
         if not local_bubbles:
+            if context.artifacts.pop("ocr_pending", False):
+                if self.detection_service is None or not hasattr(
+                    self.detection_service, "ocr_only"
+                ):
+                    raise RuntimeError("Pipeline v2 OCR adapter is not available")
+                context.artifacts["blocks"] = self.detection_service.ocr_only(
+                    image,
+                    context.artifacts["blocks"],
+                    lang=config.source_language,
+                )
             if show_progress:
                 job_manager.update(job, progress=30, message=msg_from_context("page_translation.analyzing", context))
             local_bubbles = bubbles_from_analysis(
@@ -281,6 +299,7 @@ def build_page_translation_runner(
             page_analysis_service=page_analysis_service,
             bubble_analysis_service=bubble_analysis_service,
             layout_planner_service=layout_planner_service,
+            detection_service=detection_service,
         )
     )
     registry.register(PageTranslationStage(translation_service))

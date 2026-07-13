@@ -115,6 +115,30 @@ def test_detection_service_passes_explicit_detection_options_from_config():
         service.shutdown()
 
 
+def test_detection_and_ocr_can_run_as_independent_operations():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        detector = FakeDetector()
+        ocr = FakeOcr()
+        service = DetectionService(
+            detector=detector,
+            ocr_engine=ocr,
+            config=SimpleNamespace(
+                detect_model="Small (INT8)", confidence_threshold=0.5,
+                tiling_enabled=False, bubbles_only=False, line_merge_sensitivity=1.2,
+                smart_direction=True, text_direction_override="auto", ocr_engine="ppocr",
+            ),
+            cache_file_path=os.path.join(tmpdir, "ocr_cache.sqlite3"),
+            cache_flush_interval=60,
+        )
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+        blocks = service.detect_only(image)
+        assert ocr.calls == 0
+        service.ocr_only(image, blocks, lang="Japanese")
+        assert ocr.calls == 1
+        assert blocks[0].text == "ppocr:text"
+        service.shutdown()
+
+
 def test_cached_single_block_ocr_does_not_wait_for_another_ocr_inference():
     with tempfile.TemporaryDirectory() as tmpdir:
         ocr = BlockingOcr()

@@ -25,6 +25,12 @@ class RecordingDetectionService:
         return [SimpleNamespace(text="detected")]
 
 
+class RecordingSplitDetectionService(RecordingDetectionService):
+    def detect_only(self, image):
+        self.calls.append({"operation": "detect"})
+        return [SimpleNamespace(text="", xyxy=[1, 1, 4, 4])]
+
+
 class NeverCancelledJobManager:
     def ensure_not_cancelled(self, job):
         return None
@@ -95,3 +101,16 @@ def test_v1_existing_bubbles_preserve_user_work_and_skip_detection():
     assert result.artifacts["local_bubbles"][0].text == "manual OCR"
     assert result.artifacts["local_bubbles"][0].translated == "manual translation"
     assert result.artifacts["local_bubbles"][0] is not bubble
+
+
+def test_v2_detection_stage_does_not_run_ocr():
+    service = RecordingSplitDetectionService()
+    page = MangaPage(
+        file_path="sample.png", page_id="page-v2",
+        cv_image=np.zeros((12, 16, 3), dtype=np.uint8),
+    )
+    context, _ = _context_for(page)
+    context.pipeline_variant = "v2"
+    result = PageDetectionStage(service, ensure_page_image=lambda current: None).run(context)
+    assert service.calls == [{"operation": "detect"}]
+    assert result.artifacts["ocr_pending"] is True

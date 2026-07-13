@@ -322,6 +322,77 @@ class DetectionService:
     #  Public API
     # ------------------------------------------------------------------ #
 
+    def detect_only(
+        self,
+        image: np.ndarray,
+        *,
+        model_name: str | None = None,
+        confidence_threshold: float | None = None,
+        tiling_enabled: bool | None = None,
+        bubbles_only: bool | None = None,
+        line_merge_sensitivity: float | None = None,
+        smart_direction: bool | None = None,
+        text_direction_override: str | None = None,
+    ) -> List[Any]:
+        """Detect text blocks without running OCR."""
+        try:
+            with self._detector_lock:
+                blocks = self.detector.detect_bubbles(
+                    image,
+                    model_name=self._detect_model_name(model_name),
+                    confidence_threshold=self._confidence_threshold(confidence_threshold),
+                    tiling_enabled=self._tiling_enabled(tiling_enabled),
+                    bubbles_only=self._bubbles_only(bubbles_only),
+                    line_merge_sensitivity=self._line_merge_sensitivity(line_merge_sensitivity),
+                    smart_direction=self._smart_direction(smart_direction),
+                    text_direction_override=self._text_direction_override(text_direction_override),
+                )
+        except Exception as exc:
+            self._set_last_error(str(exc))
+            logger.exception("Detection failed")
+            raise
+        self._set_last_error(None)
+        return blocks
+
+    def ocr_only(
+        self,
+        image: np.ndarray,
+        blocks: List[Any],
+        *,
+        lang: str = "Japanese",
+        engine: str | None = None,
+    ) -> List[Any]:
+        """Run OCR for previously detected blocks, preserving the legacy cache."""
+        uncached_blocks = []
+        block_hashes = {}
+        for block in blocks:
+            crop_hash = self._get_crop_hash(image, block.xyxy)
+            cached_text = self._get_cached_ocr(crop_hash)
+            if cached_text is not None:
+                block.text = cached_text
+            else:
+                uncached_blocks.append(block)
+                if crop_hash:
+                    block_hashes[block] = crop_hash
+        self._record_ocr_misses(len(uncached_blocks))
+        if uncached_blocks:
+            try:
+                with self._ocr_engine_lock:
+                    self.ocr_engine.lang = lang
+                    self.ocr_engine.recognize_text(
+                        image, uncached_blocks, engine=self._ocr_engine_name(engine)
+                    )
+            except Exception as exc:
+                self._set_last_error(str(exc))
+                logger.exception("OCR failed. lang=%s block_count=%s", lang, len(uncached_blocks))
+                raise
+            for block in uncached_blocks:
+                crop_hash = block_hashes.get(block)
+                if crop_hash:
+                    self._remember_ocr(crop_hash, block.text)
+        self._set_last_error(None)
+        return blocks
+
     def detect_and_ocr(
         self,
         image: np.ndarray,
@@ -338,59 +409,25 @@ class DetectionService:
         """Detect text blocks and run OCR on them, utilizing OCR cache."""
         t0 = time.perf_counter()
         t_detect = time.perf_counter()
-        try:
-            with self._detector_lock:
-                blocks = self.detector.detect_bubbles(
-                    image,
-                    model_name=self._detect_model_name(model_name),
-                    confidence_threshold=self._confidence_threshold(confidence_threshold),
-                    tiling_enabled=self._tiling_enabled(tiling_enabled),
-                    bubbles_only=self._bubbles_only(bubbles_only),
-                    line_merge_sensitivity=self._line_merge_sensitivity(line_merge_sensitivity),
-                    smart_direction=self._smart_direction(smart_direction),
-                    text_direction_override=self._text_direction_override(text_direction_override),
-                )
-        except Exception as exc:
-            self._set_last_error(str(exc))
-            logger.exception("Detection failed. lang=%s", lang)
-            raise
+        blocks = self.detect_only(
+            image,
+            model_name=model_name,
+            confidence_threshold=confidence_threshold,
+            tiling_enabled=tiling_enabled,
+            bubbles_only=bubbles_only,
+            line_merge_sensitivity=line_merge_sensitivity,
+            smart_direction=smart_direction,
+            text_direction_override=text_direction_override,
+        )
         detect_ms = (time.perf_counter() - t_detect) * 1000
-
-        uncached_blocks = []
-        block_hashes = {}
-        cached_count = 0
-        for block in blocks:
-            crop_hash = self._get_crop_hash(image, block.xyxy)
-            cached_text = self._get_cached_ocr(crop_hash)
-            if cached_text is not None:
-                block.text = cached_text
-                cached_count += 1
-            else:
-                uncached_blocks.append(block)
-                if crop_hash:
-                    block_hashes[block] = crop_hash
-        self._record_ocr_misses(len(uncached_blocks))
-
         t_ocr = time.perf_counter()
-        if uncached_blocks:
-            try:
-                with self._ocr_engine_lock:
-                    self.ocr_engine.lang = lang
-                    self.ocr_engine.recognize_text(image, uncached_blocks, engine=self._ocr_engine_name(engine))
-            except Exception as exc:
-                self._set_last_error(str(exc))
-                logger.exception("OCR failed. lang=%s block_count=%s", lang, len(uncached_blocks))
-                raise
-            for block in uncached_blocks:
-                crop_hash = block_hashes.get(block)
-                if crop_hash:
-                    self._remember_ocr(crop_hash, block.text)
+        self.ocr_only(image, blocks, lang=lang, engine=engine)
         ocr_ms = (time.perf_counter() - t_ocr) * 1000
 
         total_ms = (time.perf_counter() - t0) * 1000
         logger.debug(
-            "detect: %.0fms, ocr: %.0fms, total: %.0fms (bubbles=%d, cached=%d, uncached=%d)",
-            detect_ms, ocr_ms, total_ms, len(blocks), cached_count, len(uncached_blocks)
+            "detect: %.0fms, ocr: %.0fms, total: %.0fms (bubbles=%d, cache_hits=%d, cache_misses=%d)",
+            detect_ms, ocr_ms, total_ms, len(blocks), self._ocr_hits, self._ocr_misses
         )
 
         self._set_last_error(None)
