@@ -62,6 +62,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const selectedTranslationManifest = translationProviderManifests.find(
     (provider) => provider.selection_value === localSettings.translation_provider
   );
+  const detectionManifest = providerCatalog?.providers.find((provider) => provider.stage === "detection");
+  const ocrManifest = providerCatalog?.providers.find((provider) => provider.stage === "ocr");
+  const inpaintingManifest = providerCatalog?.providers.find((provider) => provider.stage === "inpainting");
   const selectedFeatures = new Set(selectedTranslationManifest?.capabilities.features || []);
   const fallbackCapabilities = getTranslationProviderCapabilities(localSettings.translation_provider);
   const providerCapabilities = selectedTranslationManifest ? {
@@ -284,6 +287,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const renderCatalogField = (field: ProviderConfigFieldDto) => {
+    if (
+      field.visible_when_key
+      && localSettings[field.visible_when_key as keyof Settings] !== field.visible_when_value
+    ) {
+      return null;
+    }
     if (field.value_type === "model") {
       return (
         <React.Fragment key={field.key}>
@@ -316,7 +325,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <AppleSelect
               value={String(value ?? "")}
               onChange={(next) => updateCatalogSetting(field, next, true)}
-              options={field.choices.map((choice) => ({ value: choice, label: choice }))}
+              options={field.choices.map((choice, index) => ({
+                value: choice,
+                label: catalogText(field.choice_labels[index] || choice),
+              }))}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    if (
+      field.value_type === "integer"
+      && field.minimum !== null
+      && field.maximum !== null
+    ) {
+      return (
+        <div className="form-row-group" key={field.key}>
+          <label className="pref-label">{catalogText(field.label)}</label>
+          <div className="pref-control-right">
+            <NumberStepper
+              label={catalogText(field.label)}
+              value={Number(value ?? field.default ?? 0)}
+              min={field.minimum}
+              max={field.maximum}
+              step={field.step ?? 1}
+              onChange={(next) => updateCatalogSetting(field, next, true)}
             />
           </div>
         </div>
@@ -330,6 +364,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <input
           type={field.value_type === "secret" ? "password" : numeric ? "number" : "text"}
           className="apple-input-text full text-left"
+          min={field.minimum ?? undefined}
+          max={field.maximum ?? undefined}
+          step={field.step ?? undefined}
           placeholder={catalogText(field.placeholder)}
           value={String(value ?? "")}
           onChange={(event) => updateCatalogSetting(
@@ -875,6 +912,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* DETECTION TAB */}
               {activeTab === "detection" && (
                 <div className="settings-section">
+                  {detectionManifest && ocrManifest ? (
+                    <>
+                      <div className="section-title-label">{t("settings.recognitionRules")}</div>
+                      <div className="settings-card">
+                        {renderCatalogProviderConfig(detectionManifest)}
+                      </div>
+                      <div className="section-title-label">{t("settings.ocrOptions")}</div>
+                      <div className="settings-card">
+                        {renderCatalogProviderConfig(ocrManifest)}
+                      </div>
+                    </>
+                  ) : (
+                  <>
                   <div className="section-title-label">{t("settings.recognitionRules")}</div>
                   <div className="settings-card">
                     <div className="form-row-group">
@@ -1027,12 +1077,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                     </div>
                   </div>
+                  </>
+                  )}
                 </div>
               )}
 
               {/* INPAINTING TAB */}
               {activeTab === "inpainting" && (
                 <div className="settings-section">
+                  {inpaintingManifest ? (
+                    <>
+                      <div className="section-title-label">{t("settings.inpaintingOptions")}</div>
+                      <div className="settings-card">
+                        {renderCatalogProviderConfig(inpaintingManifest)}
+                      </div>
+                    </>
+                  ) : (
+                  <>
                   <div className="section-title-label">{t("settings.inpaintingOptions")}</div>
                   <div className="settings-card">
                     <div className="form-row-group">
@@ -1089,6 +1150,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                     </div>
                   </div>
+                  </>
+                  )}
                 </div>
               )}
             </div>

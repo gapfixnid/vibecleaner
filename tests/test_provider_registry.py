@@ -114,3 +114,22 @@ def test_manifest_rejects_duplicate_config_keys():
 
     with pytest.raises(ValueError, match="duplicate config keys"):
         _manifest(config_schema=(field, field))
+
+
+def test_config_field_rejects_mismatched_choice_labels_and_numeric_bounds():
+    with pytest.raises(ValueError, match="choice labels"):
+        ConfigFieldSpec(
+            key="model",
+            value_type="enum",
+            label="Model",
+            choices=("small", "large"),
+            choice_labels=("Small",),
+        )
+    with pytest.raises(ValueError, match="minimum exceeds maximum"):
+        ConfigFieldSpec(
+            key="threshold",
+            value_type="number",
+            label="Threshold",
+            minimum=1.0,
+            maximum=0.0,
+        )

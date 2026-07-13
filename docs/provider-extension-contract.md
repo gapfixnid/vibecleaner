@@ -21,6 +21,12 @@ stable provider ID; the alias exists so the catalog-driven UI can be introduced
 without rewriting existing settings first. `model` fields request the generic
 live-model picker, while string/secret/enum/boolean/number fields use generic
 controls. Labels, placeholders, and help text may be localization keys.
+Numeric fields declare optional minimum, maximum, and step constraints; enum
+fields may declare localized choice labels. `visible_when_key/value` supports
+simple dependent controls without provider-specific JSX. Translation,
+detection, OCR, and inpainting settings now use this catalog contract, while
+the previous controls remain available only as a catalog-load fallback during
+the migration window.
 
 Runtime adapters are stored separately by `ProviderRegistry`. Catalog responses
 never contain adapter objects, credentials, secret defaults, or current secret

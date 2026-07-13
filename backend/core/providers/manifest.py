@@ -25,9 +25,15 @@ class ConfigFieldSpec:
     required: bool = False
     default: Any = None
     choices: tuple[str, ...] = ()
+    choice_labels: tuple[str, ...] = ()
     advanced: bool = True
     placeholder: str | None = None
     help_text: str | None = None
+    minimum: float | None = None
+    maximum: float | None = None
+    step: float | None = None
+    visible_when_key: str | None = None
+    visible_when_value: Any = True
 
     def __post_init__(self) -> None:
         if not self.key or not self.key.replace("_", "").isalnum():
@@ -35,12 +41,19 @@ class ConfigFieldSpec:
         if self.value_type not in VALID_CONFIG_TYPES:
             raise ValueError(f"Unsupported provider config type: {self.value_type!r}")
         object.__setattr__(self, "choices", tuple(self.choices))
+        object.__setattr__(self, "choice_labels", tuple(self.choice_labels))
         if self.value_type == "enum" and not self.choices:
             raise ValueError(f"Enum provider config field {self.key!r} requires choices")
         if self.value_type == "enum" and self.default is not None and self.default not in self.choices:
             raise ValueError(f"Enum provider config field {self.key!r} default must be one of its choices")
         if self.value_type != "enum" and self.choices:
             raise ValueError(f"Only enum provider config fields may declare choices: {self.key!r}")
+        if self.choice_labels and len(self.choice_labels) != len(self.choices):
+            raise ValueError(f"Provider config field {self.key!r} choice labels must match choices")
+        if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
+            raise ValueError(f"Provider config field {self.key!r} minimum exceeds maximum")
+        if self.step is not None and self.step <= 0:
+            raise ValueError(f"Provider config field {self.key!r} step must be positive")
         if self.value_type == "secret" and self.default not in (None, ""):
             raise ValueError(f"Secret provider config field {self.key!r} cannot expose a default")
 
@@ -52,9 +65,15 @@ class ConfigFieldSpec:
             "required": self.required,
             "default": None if self.value_type == "secret" else self.default,
             "choices": list(self.choices),
+            "choice_labels": list(self.choice_labels),
             "advanced": self.advanced,
             "placeholder": self.placeholder,
             "help_text": self.help_text,
+            "minimum": self.minimum,
+            "maximum": self.maximum,
+            "step": self.step,
+            "visible_when_key": self.visible_when_key,
+            "visible_when_value": self.visible_when_value,
         }
 
 

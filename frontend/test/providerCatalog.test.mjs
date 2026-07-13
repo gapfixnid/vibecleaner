@@ -21,3 +21,7 @@ assert.match(settingsModal, /api\.getProviderCatalog\(\)/);
 assert.match(settingsModal, /translationProviderManifests\.map/);
 assert.match(settingsModal, /manifest\.config_schema\.map\(renderCatalogField\)/);
 assert.match(settingsModal, /!selectedTranslationManifest && localSettings\.translation_provider === "google"/);
+assert.match(settingsModal, /detectionManifest && ocrManifest/);
+assert.match(settingsModal, /renderCatalogProviderConfig\(detectionManifest\)/);
+assert.match(settingsModal, /renderCatalogProviderConfig\(inpaintingManifest\)/);
+assert.match(settingsModal, /field\.visible_when_key/);

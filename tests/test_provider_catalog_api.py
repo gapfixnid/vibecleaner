@@ -82,3 +82,26 @@ def test_translation_manifests_drive_provider_specific_configuration():
     papago_fields = {field["key"]: field for field in by_value["papago"]["config_schema"]}
     assert papago_fields["translation_api_base_url"]["label"] == "settings.papagoClientId"
     assert papago_fields["translation_api_key"]["placeholder"] == "settings.papagoClientSecretPlaceholder"
+
+
+def test_local_stage_manifests_cover_current_advanced_settings():
+    registry, _ = _builtin_registry()
+    detection = registry.get("builtin.detection.rtdetr-v2").manifest.to_dict()
+    ocr = registry.get("builtin.ocr.local").manifest.to_dict()
+    inpainting = registry.get("builtin.inpainting.hybrid").manifest.to_dict()
+
+    assert {field["key"] for field in detection["config_schema"]} == {
+        "detect_model", "confidence_threshold", "tiling_enabled", "bubbles_only",
+        "smart_direction", "text_direction_override", "line_merge_sensitivity",
+    }
+    assert {field["key"] for field in ocr["config_schema"]} == {
+        "ocr_engine", "ocr_padding", "ocr_crop_scale",
+        "adaptive_binarization", "adaptive_binarization_strength",
+    }
+    assert {field["key"] for field in inpainting["config_schema"]} == {
+        "inpaint_engine", "inpaint_mask_dilation",
+        "inpaint_use_textbox_only", "inpaint_clip_to_bubble",
+    }
+    strength = next(field for field in ocr["config_schema"] if field["key"] == "adaptive_binarization_strength")
+    assert strength["visible_when_key"] == "adaptive_binarization"
+    assert strength["minimum"] == 0.5

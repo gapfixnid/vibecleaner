@@ -9,9 +9,15 @@ export interface ProviderConfigFieldDto {
   required: boolean;
   default: unknown;
   choices: string[];
+  choice_labels: string[];
   advanced: boolean;
   placeholder: string | null;
   help_text: string | null;
+  minimum: number | null;
+  maximum: number | null;
+  step: number | null;
+  visible_when_key: string | null;
+  visible_when_value: unknown;
 }
 
 export interface ProviderCapabilitiesDto {
