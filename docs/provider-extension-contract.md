@@ -15,6 +15,13 @@ serializable metadata and core-owned capability terms:
 - generic configuration field declarations; and
 - whether the registration is a temporary v1 compatibility adapter.
 
+During the compatibility window, `selection_value` maps a stable manifest ID
+to the existing persisted setting value. New project formats should persist the
+stable provider ID; the alias exists so the catalog-driven UI can be introduced
+without rewriting existing settings first. `model` fields request the generic
+live-model picker, while string/secret/enum/boolean/number fields use generic
+controls. Labels, placeholders, and help text may be localization keys.
+
 Runtime adapters are stored separately by `ProviderRegistry`. Catalog responses
 never contain adapter objects, credentials, secret defaults, or current secret
 values. The read-only catalog is available at `GET /api/providers/catalog` and

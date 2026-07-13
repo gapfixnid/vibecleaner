@@ -16,6 +16,7 @@ import {
   getTranslationProviderCapabilities,
 } from "../translationSettings";
 import type { Settings } from "../types";
+import type { ProviderCatalogDto, ProviderConfigFieldDto, ProviderManifestDto } from "../types";
 import type { ThemeMeta } from "../themes";
 import { NumberStepper } from "./NumberStepper";
 
@@ -47,6 +48,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [providerModels, setProviderModels] = useState<string[]>([]);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [providerCatalog, setProviderCatalog] = useState<ProviderCatalogDto | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("general");
 
   useEffect(() => {
@@ -54,19 +56,61 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [settings, isOpen]);
 
   const LLM_PROVIDERS: string[] = [...LLM_TRANSLATION_PROVIDERS];
-  const providerCapabilities = getTranslationProviderCapabilities(localSettings.translation_provider);
-  const providerNeedsKey = (p: string) => p === "openai" || p === "claude";
+  const translationProviderManifests = (providerCatalog?.providers || [])
+    .filter((provider) => provider.stage === "translation")
+    .sort((left, right) => left.catalog_order - right.catalog_order);
+  const selectedTranslationManifest = translationProviderManifests.find(
+    (provider) => provider.selection_value === localSettings.translation_provider
+  );
+  const selectedFeatures = new Set(selectedTranslationManifest?.capabilities.features || []);
+  const fallbackCapabilities = getTranslationProviderCapabilities(localSettings.translation_provider);
+  const providerCapabilities = selectedTranslationManifest ? {
+    llmOptions: selectedFeatures.has("llm-options"),
+    modelPicker: selectedFeatures.has("model-picker"),
+    visionContext: selectedFeatures.has("vision-context"),
+    systemPrompt: selectedFeatures.has("system-prompt"),
+  } : fallbackCapabilities;
+  const manifestForSelection = (selection: string) => translationProviderManifests.find(
+    (provider) => provider.selection_value === selection
+  );
+  const providerSupportsModelPicker = (selection: string) => {
+    const manifest = manifestForSelection(selection);
+    return manifest ? manifest.capabilities.features.includes("model-picker") : LLM_PROVIDERS.includes(selection);
+  };
+  const providerNeedsKey = (selection: string) => {
+    const manifest = manifestForSelection(selection);
+    return manifest
+      ? manifest.capabilities.features.includes("model-requires-key")
+      : selection === "openai" || selection === "claude";
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    api.getProviderCatalog()
+      .then((catalog) => {
+        if (active) setProviderCatalog(catalog);
+      })
+      .catch((error) => {
+        console.warn("Failed to load provider catalog; using compatibility settings UI", error);
+        if (active) setProviderCatalog(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
 
   // Fetch the live model list for the current LLM provider using the entered
   // credentials. Doubles as API-key validation.
-  const fetchProviderModels = async () => {
-    const provider = localSettings.translation_provider;
-    if (!LLM_PROVIDERS.includes(provider)) {
+  const fetchProviderModels = async (settingsOverride?: Settings) => {
+    const effectiveSettings = settingsOverride || localSettings;
+    const provider = effectiveSettings.translation_provider;
+    if (!providerSupportsModelPicker(provider)) {
       setProviderModels([]);
       setModelsError(null);
       return;
     }
-    if (providerNeedsKey(provider) && !localSettings.translation_api_key) {
+    if (providerNeedsKey(provider) && !effectiveSettings.translation_api_key) {
       setProviderModels([]);
       setModelsError(null);
       return;
@@ -76,8 +120,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
       const res = await api.getTranslationModels(
         provider,
-        localSettings.translation_api_key,
-        localSettings.translation_api_base_url
+        effectiveSettings.translation_api_key,
+        effectiveSettings.translation_api_base_url
       );
       setProviderModels(res.models || []);
       setModelsError(res.error || null);
@@ -91,14 +135,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen && LLM_PROVIDERS.includes(localSettings.translation_provider)) {
+    if (isOpen && providerSupportsModelPicker(localSettings.translation_provider)) {
       fetchProviderModels();
     } else {
       setProviderModels([]);
       setModelsError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, localSettings.translation_provider]);
+  }, [isOpen, localSettings.translation_provider, providerCatalog]);
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -176,7 +220,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       <div className="form-row-group stack">
         <div className="flex-space-between">
           <label className="pref-label">{t("settings.model")}</label>
-          <button type="button" className="refresh-btn" onClick={fetchProviderModels} disabled={isLoadingModels}>
+          <button type="button" className="refresh-btn" onClick={() => fetchProviderModels()} disabled={isLoadingModels}>
             <RefreshCw size={11} className={isLoadingModels ? "spin" : ""} />
             <span>{t("settings.refresh")}</span>
           </button>
@@ -215,6 +259,107 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       </div>
     );
   };
+
+  const catalogText = (value: string | null | undefined) => {
+    if (!value) return "";
+    return value.startsWith("settings.") ? t(value) : value;
+  };
+
+  const updateCatalogSetting = (field: ProviderConfigFieldDto, value: string | number | boolean, save: boolean) => {
+    if (!(field.key in localSettings)) {
+      console.warn(`Provider catalog field is not a known setting: ${field.key}`);
+      return;
+    }
+    const updated = { ...localSettings, [field.key]: value } as Settings;
+    setLocalSettings(updated);
+    if (save) {
+      onSave(updated);
+      if (
+        selectedFeatures.has("model-picker")
+        && (field.value_type === "secret" || field.key === "translation_api_base_url")
+      ) {
+        fetchProviderModels(updated);
+      }
+    }
+  };
+
+  const renderCatalogField = (field: ProviderConfigFieldDto) => {
+    if (field.value_type === "model") {
+      return (
+        <React.Fragment key={field.key}>
+          {renderModelSelector(selectedFeatures.has("manual-model"))}
+        </React.Fragment>
+      );
+    }
+
+    const value = localSettings[field.key as keyof Settings];
+    if (field.value_type === "boolean") {
+      return (
+        <div className="form-row-group checkbox-row" key={field.key}>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={Boolean(value)}
+              onChange={(event) => updateCatalogSetting(field, event.target.checked, true)}
+            />
+            <span>{catalogText(field.label)}</span>
+          </label>
+        </div>
+      );
+    }
+
+    if (field.value_type === "enum") {
+      return (
+        <div className="form-row-group" key={field.key}>
+          <label className="pref-label">{catalogText(field.label)}</label>
+          <div className="pref-control-right">
+            <AppleSelect
+              value={String(value ?? "")}
+              onChange={(next) => updateCatalogSetting(field, next, true)}
+              options={field.choices.map((choice) => ({ value: choice, label: choice }))}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    const numeric = field.value_type === "integer" || field.value_type === "number";
+    return (
+      <div className="form-row-group stack" key={field.key}>
+        <label className="pref-label">{catalogText(field.label)}</label>
+        <input
+          type={field.value_type === "secret" ? "password" : numeric ? "number" : "text"}
+          className="apple-input-text full text-left"
+          placeholder={catalogText(field.placeholder)}
+          value={String(value ?? "")}
+          onChange={(event) => updateCatalogSetting(
+            field,
+            numeric ? Number(event.target.value) : event.target.value,
+            false,
+          )}
+          onBlur={(event) => updateCatalogSetting(
+            field,
+            numeric ? Number(event.target.value) : event.target.value,
+            true,
+          )}
+          onKeyDown={handleKeyDown}
+        />
+        {field.help_text && <span className="pref-help-text">{catalogText(field.help_text)}</span>}
+      </div>
+    );
+  };
+
+  const renderCatalogProviderConfig = (manifest: ProviderManifestDto) => (
+    <>
+      {manifest.description && (
+        <div className="provider-info-block">
+          <HelpCircle className="info-icon" size={16} />
+          <p>{catalogText(manifest.description)}</p>
+        </div>
+      )}
+      {manifest.config_schema.map(renderCatalogField)}
+    </>
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -469,16 +614,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <AppleSelect
                           value={localSettings.translation_provider}
                           onChange={(v) => handleAutoSave("translation_provider", v)}
-                          options={[
-                            { value: "google", label: t("settings.providerGoogle") },
-                            { value: "deepl", label: "DeepL Translation API" },
-                            { value: "openai", label: "OpenAI (ChatGPT API)" },
-                            { value: "claude", label: "Anthropic Claude API" },
-                            { value: "papago", label: "Naver Papago API" },
-                            { value: "baidu", label: "Baidu Fanyi API" },
-                            { value: "ollama", label: t("settings.providerOllama") },
-                            { value: "openai_compatible", label: t("settings.providerCompatible") },
-                          ]}
+                          options={translationProviderManifests.length > 0
+                            ? translationProviderManifests.map((provider) => ({
+                                value: provider.selection_value,
+                                label: provider.display_name,
+                              }))
+                            : [
+                                { value: "google", label: t("settings.providerGoogle") },
+                                { value: "deepl", label: "DeepL Translation API" },
+                                { value: "openai", label: "OpenAI (ChatGPT API)" },
+                                { value: "claude", label: "Anthropic Claude API" },
+                                { value: "papago", label: "Naver Papago API" },
+                                { value: "baidu", label: "Baidu Fanyi API" },
+                                { value: "ollama", label: t("settings.providerOllama") },
+                                { value: "openai_compatible", label: t("settings.providerCompatible") },
+                              ]}
                         />
                       </div>
                     </div>
@@ -487,8 +637,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {/* Provider Specific Configuration Card */}
                   <div className="section-title-label">{t("settings.providerConfig")}</div>
                   <div className="settings-card">
+                    {selectedTranslationManifest && renderCatalogProviderConfig(selectedTranslationManifest)}
                     {/* GOOGLE WEB */}
-                    {localSettings.translation_provider === "google" && (
+                    {!selectedTranslationManifest && localSettings.translation_provider === "google" && (
                       <div className="provider-info-block">
                         <HelpCircle className="info-icon" size={16} />
                         <p>{t("settings.googleProviderInfo")}</p>
@@ -496,7 +647,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
 
                     {/* DEEPL */}
-                    {localSettings.translation_provider === "deepl" && (
+                    {!selectedTranslationManifest && localSettings.translation_provider === "deepl" && (
                       <div className="form-row-group stack">
                         <label className="pref-label">{t("settings.deeplApiKey")}</label>
                         <input
@@ -513,7 +664,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
 
                     {/* OPENAI */}
-                    {localSettings.translation_provider === "openai" && (
+                    {!selectedTranslationManifest && localSettings.translation_provider === "openai" && (
                       <>
                         <div className="form-row-group stack">
                           <label className="pref-label">{t("settings.openaiApiKey")}</label>
@@ -532,7 +683,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
 
                     {/* CLAUDE */}
-                    {localSettings.translation_provider === "claude" && (
+                    {!selectedTranslationManifest && localSettings.translation_provider === "claude" && (
                       <>
                         <div className="form-row-group stack">
                           <label className="pref-label">{t("settings.claudeApiKey")}</label>
@@ -551,7 +702,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
 
                     {/* PAPAGO */}
-                    {localSettings.translation_provider === "papago" && (
+                    {!selectedTranslationManifest && localSettings.translation_provider === "papago" && (
                       <>
                         <div className="form-row-group stack">
                           <label className="pref-label">{t("settings.papagoClientId")}</label>
@@ -581,7 +732,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
 
                     {/* BAIDU */}
-                    {localSettings.translation_provider === "baidu" && (
+                    {!selectedTranslationManifest && localSettings.translation_provider === "baidu" && (
                       <>
                         <div className="form-row-group stack">
                           <label className="pref-label">{t("settings.baiduAppId")}</label>
@@ -611,7 +762,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
 
                     {/* OLLAMA */}
-                    {localSettings.translation_provider === "ollama" && (
+                    {!selectedTranslationManifest && localSettings.translation_provider === "ollama" && (
                       <>
                         <div className="provider-info-block">
                           <HelpCircle className="info-icon" size={16} />
@@ -622,7 +773,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
 
                     {/* OPENAI COMPATIBLE */}
-                    {localSettings.translation_provider === "openai_compatible" && (
+                    {!selectedTranslationManifest && localSettings.translation_provider === "openai_compatible" && (
                       <>
                         <div className="form-row-group stack">
                           <label className="pref-label">{t("settings.apiBaseUrl")}</label>

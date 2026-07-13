@@ -9,11 +9,11 @@ from typing import Any, Literal
 
 ProviderStage = Literal["detection", "ocr", "translation", "inpainting", "rendering"]
 ResourceClass = Literal["cpu", "gpu", "io", "network"]
-ConfigValueType = Literal["string", "integer", "number", "boolean", "enum", "secret"]
+ConfigValueType = Literal["string", "integer", "number", "boolean", "enum", "secret", "model"]
 
 VALID_STAGES = frozenset({"detection", "ocr", "translation", "inpainting", "rendering"})
 VALID_RESOURCES = frozenset({"cpu", "gpu", "io", "network"})
-VALID_CONFIG_TYPES = frozenset({"string", "integer", "number", "boolean", "enum", "secret"})
+VALID_CONFIG_TYPES = frozenset({"string", "integer", "number", "boolean", "enum", "secret", "model"})
 _PROVIDER_ID = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 
 
@@ -26,6 +26,8 @@ class ConfigFieldSpec:
     default: Any = None
     choices: tuple[str, ...] = ()
     advanced: bool = True
+    placeholder: str | None = None
+    help_text: str | None = None
 
     def __post_init__(self) -> None:
         if not self.key or not self.key.replace("_", "").isalnum():
@@ -51,6 +53,8 @@ class ConfigFieldSpec:
             "default": None if self.value_type == "secret" else self.default,
             "choices": list(self.choices),
             "advanced": self.advanced,
+            "placeholder": self.placeholder,
+            "help_text": self.help_text,
         }
 
 
@@ -91,6 +95,9 @@ class ProviderManifest:
     max_concurrency: int = 1
     config_schema: tuple[ConfigFieldSpec, ...] = ()
     legacy_adapter: bool = False
+    selection_value: str | None = None
+    description: str = ""
+    catalog_order: int = 100
 
     def __post_init__(self) -> None:
         if not _PROVIDER_ID.fullmatch(self.provider_id):
@@ -108,6 +115,10 @@ class ProviderManifest:
         object.__setattr__(self, "config_schema", tuple(self.config_schema))
         if self.max_concurrency < 1:
             raise ValueError("Provider max_concurrency must be positive")
+        if self.selection_value is not None and not self.selection_value.strip():
+            raise ValueError("Provider selection_value cannot be empty")
+        if self.catalog_order < 0:
+            raise ValueError("Provider catalog_order cannot be negative")
         keys = [field.key for field in self.config_schema]
         if len(keys) != len(set(keys)):
             raise ValueError(f"Provider {self.provider_id!r} has duplicate config keys")
@@ -124,6 +135,9 @@ class ProviderManifest:
             "max_concurrency": self.max_concurrency,
             "config_schema": [field.to_dict() for field in self.config_schema],
             "legacy_adapter": self.legacy_adapter,
+            "selection_value": self.selection_value or self.provider_id,
+            "description": self.description,
+            "catalog_order": self.catalog_order,
         }
 
 

@@ -34,6 +34,155 @@ def _legacy(provider_id: str, service: Any) -> LegacyProviderAdapter:
     return LegacyProviderAdapter(provider_id=provider_id, service=service)
 
 
+def _translation_manifest(
+    provider: str,
+    display_name: str,
+    *,
+    execution_modes: set[str],
+    features: set[str],
+    config_schema: tuple[ConfigFieldSpec, ...] = (),
+    description: str = "",
+    catalog_order: int,
+) -> ProviderManifest:
+    provider_id = f"builtin.translation.{provider.replace('_', '-')}"
+    resources = {"cpu"} if execution_modes == {"local"} else {"cpu", "network"}
+    return ProviderManifest(
+        provider_id=provider_id,
+        display_name=display_name,
+        stage="translation",
+        api_version="1",
+        implementation_version=APP_VERSION,
+        capabilities=ProviderCapabilities(
+            languages={"en", "ja", "ko", "zh"},
+            devices={"cpu"},
+            execution_modes=execution_modes,
+            features={"text", *features},
+            supports_batch=True,
+        ),
+        resource_classes=resources,
+        max_concurrency=1,
+        config_schema=config_schema,
+        legacy_adapter=True,
+        selection_value=provider,
+        description=description,
+        catalog_order=catalog_order,
+    )
+
+
+def _translation_manifests() -> tuple[ProviderManifest, ...]:
+    api_key = lambda label, placeholder=None, help_text=None: ConfigFieldSpec(
+        key="translation_api_key",
+        value_type="secret",
+        label=label,
+        placeholder=placeholder,
+        help_text=help_text,
+    )
+    model = ConfigFieldSpec(
+        key="translation_model",
+        value_type="model",
+        label="settings.model",
+        default="",
+    )
+    return (
+        _translation_manifest(
+            "google",
+            "Google Translate",
+            execution_modes={"remote"},
+            features=set(),
+            description="settings.googleProviderInfo",
+            catalog_order=10,
+        ),
+        _translation_manifest(
+            "deepl",
+            "DeepL Translation API",
+            execution_modes={"remote"},
+            features=set(),
+            config_schema=(
+                api_key(
+                    "settings.deeplApiKey",
+                    "settings.deeplApiKeyPlaceholder",
+                    "settings.deeplApiKeyHelp",
+                ),
+            ),
+            catalog_order=20,
+        ),
+        _translation_manifest(
+            "openai",
+            "OpenAI",
+            execution_modes={"remote"},
+            features={"context", "llm-options", "model-picker", "model-requires-key", "vision-context", "system-prompt"},
+            config_schema=(api_key("settings.openaiApiKey", "sk-proj-..."), model),
+            catalog_order=30,
+        ),
+        _translation_manifest(
+            "claude",
+            "Anthropic Claude",
+            execution_modes={"remote"},
+            features={"context", "llm-options", "model-picker", "model-requires-key", "vision-context", "system-prompt"},
+            config_schema=(api_key("settings.claudeApiKey", "sk-ant-..."), model),
+            catalog_order=40,
+        ),
+        _translation_manifest(
+            "papago",
+            "Naver Papago API",
+            execution_modes={"remote"},
+            features=set(),
+            config_schema=(
+                ConfigFieldSpec(
+                    key="translation_api_base_url",
+                    value_type="string",
+                    label="settings.papagoClientId",
+                    placeholder="settings.papagoClientIdPlaceholder",
+                ),
+                api_key("settings.papagoClientSecret", "settings.papagoClientSecretPlaceholder"),
+            ),
+            catalog_order=50,
+        ),
+        _translation_manifest(
+            "baidu",
+            "Baidu Fanyi API",
+            execution_modes={"remote"},
+            features=set(),
+            config_schema=(
+                ConfigFieldSpec(
+                    key="translation_api_base_url",
+                    value_type="string",
+                    label="settings.baiduAppId",
+                    placeholder="settings.baiduAppIdPlaceholder",
+                ),
+                api_key("settings.baiduSecretKey", "settings.baiduSecretKeyPlaceholder"),
+            ),
+            catalog_order=60,
+        ),
+        _translation_manifest(
+            "ollama",
+            "Ollama",
+            execution_modes={"local"},
+            features={"context", "llm-options", "model-picker", "vision-context", "system-prompt"},
+            config_schema=(model,),
+            description="settings.ollamaProviderInfo",
+            catalog_order=70,
+        ),
+        _translation_manifest(
+            "openai_compatible",
+            "OpenAI Compatible",
+            execution_modes={"local", "remote"},
+            features={"context", "llm-options", "model-picker", "manual-model", "vision-context", "system-prompt"},
+            config_schema=(
+                ConfigFieldSpec(
+                    key="translation_api_base_url",
+                    value_type="string",
+                    label="settings.apiBaseUrl",
+                    placeholder="http://localhost:1234/v1",
+                ),
+                model,
+                api_key("settings.apiKeyOptional", "settings.optionalApiKeyPlaceholder"),
+            ),
+            catalog_order=80,
+        ),
+    )
+
+
 def register_builtin_providers(
     registry: ProviderRegistry,
     *,
@@ -126,55 +275,8 @@ def register_builtin_providers(
         ),
         _legacy("builtin.ocr.local", detection_service),
     )
-    registry.register(
-        ProviderManifest(
-            provider_id="builtin.translation.configured",
-            display_name="Configured Translation Provider",
-            stage="translation",
-            api_version="1",
-            implementation_version=APP_VERSION,
-            capabilities=ProviderCapabilities(
-                languages={"en", "ja", "ko", "zh"},
-                devices={"cpu"},
-                execution_modes={"local", "remote"},
-                features={"text", "configurable-provider", "context"},
-                supports_batch=True,
-            ),
-            resource_classes={"cpu", "network"},
-            max_concurrency=1,
-            config_schema=(
-                ConfigFieldSpec(
-                    key="translation_provider",
-                    value_type="enum",
-                    label="settings.translationProvider",
-                    default="google",
-                    choices=(
-                        "google", "deepl", "openai", "claude", "papago",
-                        "baidu", "ollama", "openai_compatible",
-                    ),
-                ),
-                ConfigFieldSpec(
-                    key="translation_model",
-                    value_type="string",
-                    label="settings.model",
-                    default="",
-                ),
-                ConfigFieldSpec(
-                    key="translation_api_base_url",
-                    value_type="string",
-                    label="settings.apiBaseUrl",
-                    default="",
-                ),
-                ConfigFieldSpec(
-                    key="translation_api_key",
-                    value_type="secret",
-                    label="settings.apiKeyOptional",
-                ),
-            ),
-            legacy_adapter=True,
-        ),
-        _legacy("builtin.translation.configured", translation_service),
-    )
+    for manifest in _translation_manifests():
+        registry.register(manifest, _legacy(manifest.provider_id, translation_service))
     registry.register(
         ProviderManifest(
             provider_id="builtin.inpainting.hybrid",

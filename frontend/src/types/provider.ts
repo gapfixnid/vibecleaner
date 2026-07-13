@@ -1,6 +1,6 @@
 export type ProviderStage = "detection" | "ocr" | "translation" | "inpainting" | "rendering";
 export type ProviderResourceClass = "cpu" | "gpu" | "io" | "network";
-export type ProviderConfigValueType = "string" | "integer" | "number" | "boolean" | "enum" | "secret";
+export type ProviderConfigValueType = "string" | "integer" | "number" | "boolean" | "enum" | "secret" | "model";
 
 export interface ProviderConfigFieldDto {
   key: string;
@@ -10,6 +10,8 @@ export interface ProviderConfigFieldDto {
   default: unknown;
   choices: string[];
   advanced: boolean;
+  placeholder: string | null;
+  help_text: string | null;
 }
 
 export interface ProviderCapabilitiesDto {
@@ -31,6 +33,9 @@ export interface ProviderManifestDto {
   max_concurrency: number;
   config_schema: ProviderConfigFieldDto[];
   legacy_adapter: boolean;
+  selection_value: string;
+  description: string;
+  catalog_order: number;
 }
 
 export interface ProviderCatalogDto {
