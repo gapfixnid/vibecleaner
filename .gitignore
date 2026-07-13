@@ -17,7 +17,7 @@ venv/
 
 # Model directories
 weights/
-models/
+/models/
 checkpoints/
 assets/models/
 
@@ -49,3 +49,6 @@ artifacts/
 
 # CodeGraphCache
 .codegraph/
+
+# Machine-specific benchmark output
+benchmarks/results/

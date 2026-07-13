@@ -18,6 +18,8 @@ class SettingsUiLanguageTest(unittest.TestCase):
 
     def test_get_settings_includes_pipeline_options(self):
         cfg = AppConfig(
+            pipeline_v2_enabled=True,
+            pipeline_v2_shadow=True,
             detect_model="Small (INT8)",
             ocr_engine="ppocr",
             inpaint_engine="opencv",
@@ -29,6 +31,8 @@ class SettingsUiLanguageTest(unittest.TestCase):
 
         payload = settings_route.get_settings_payload(cfg, make_translation_service())
 
+        self.assertTrue(payload["pipeline_v2_enabled"])
+        self.assertTrue(payload["pipeline_v2_shadow"])
         self.assertEqual(payload["detect_model"], "Small (INT8)")
         self.assertEqual(payload["ocr_engine"], "ppocr")
         self.assertEqual(payload["inpaint_engine"], "opencv")
@@ -64,6 +68,8 @@ class SettingsUiLanguageTest(unittest.TestCase):
         current = settings_route.get_settings_payload(cfg, translation_service)
         updated = {
             **current,
+            "pipeline_v2_enabled": True,
+            "pipeline_v2_shadow": True,
             "detect_model": "Small (INT8)",
             "ocr_engine": "manga_ocr",
             "inpaint_engine": "opencv",
@@ -83,6 +89,8 @@ class SettingsUiLanguageTest(unittest.TestCase):
             response = settings_route.update_settings_payload(schema, cfg, translation_service)
 
         self.assertEqual(cfg.detect_model, "Small (INT8)")
+        self.assertTrue(cfg.pipeline_v2_enabled)
+        self.assertTrue(cfg.pipeline_v2_shadow)
         self.assertEqual(cfg.ocr_engine, "manga_ocr")
         self.assertEqual(cfg.inpaint_engine, "opencv")
         self.assertEqual(cfg.ocr_crop_scale, 1.75)
@@ -91,6 +99,27 @@ class SettingsUiLanguageTest(unittest.TestCase):
         self.assertEqual(cfg.adaptive_binarization_strength, 2.75)
         self.assertEqual(response["ocr_engine"], "manga_ocr")
         self.assertEqual(response["inpaint_engine"], "opencv")
+
+    def test_legacy_settings_client_does_not_disable_pipeline_flags(self):
+        cfg = AppConfig(pipeline_v2_enabled=True, pipeline_v2_shadow=True)
+        translation_service = make_translation_service()
+        legacy_payload = settings_route.get_settings_payload(cfg, translation_service)
+        legacy_payload.pop("pipeline_v2_enabled")
+        legacy_payload.pop("pipeline_v2_shadow")
+        legacy_payload.update(
+            translation_api_key="",
+            translation_api_key_configured=True,
+        )
+        schema = settings_route.SettingsSchema(**legacy_payload)
+
+        with (
+            patch.object(cfg, "save", return_value=True),
+            patch.object(translation_service, "reload"),
+        ):
+            settings_route.update_settings_payload(schema, cfg, translation_service)
+
+        self.assertTrue(cfg.pipeline_v2_enabled)
+        self.assertTrue(cfg.pipeline_v2_shadow)
 
 if __name__ == "__main__":
     unittest.main()

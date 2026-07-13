@@ -2,6 +2,8 @@ import os
 import zipfile
 import json
 import logging
+import tempfile
+from copy import deepcopy
 import cv2
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Form
@@ -12,6 +14,11 @@ from ...core.version import APP_NAME
 from ...core.container import AppContainer
 from ...infrastructure.image.encoding import encode_preview_jpeg_bytes
 from ...infrastructure.image.loading import load_cv_image, warm_original_thumbnail
+from ...infrastructure.storage.project_schema import (
+    ProjectSchemaError,
+    create_project_metadata,
+    normalize_project_metadata,
+)
 
 router = APIRouter()
 logger = logging.getLogger(APP_NAME)
@@ -80,6 +87,7 @@ def new_project(container: AppContainer = Depends(get_container)):
     with state.lock:
         state.pages = []
         state.current_page_idx = -1
+        state.project_extensions = {}
         state.touch()
     return {"page_count": 0, "current_index": -1}
 
@@ -202,6 +210,7 @@ def save_project(
     except Exception:
         parsed_selected = []
 
+    temporary_project_path = None
     try:
         # Capture a lightweight, consistent snapshot under the lock: image
         # references (not copies) + serialized bubble metadata. Image bytes are
@@ -213,10 +222,12 @@ def save_project(
 
             page_total = len(state.pages)
             current_index = state.current_page_idx
+            project_extensions = deepcopy(state.project_extensions)
 
             snapshot = []
             for source in state.pages:
                 snapshot.append({
+                    "page_id": source.page_id,
                     "file_path": source.file_path,
                     "cv_image": source.cv_image,  # may be None if lazily unloaded
                     "inpainted_image": source.inpainted_image,
@@ -225,6 +236,7 @@ def save_project(
                     "status": source.status,
                     "problems": list(source.problems),
                     "bubbles": [bubble.to_project_dict() for bubble in source.bubbles],
+                    "project_extensions": deepcopy(source.project_extensions),
                 })
 
         # Normalize selection against the captured page count.
@@ -237,7 +249,13 @@ def save_project(
             current_index = 0
 
 
-        with zipfile.ZipFile(file_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        temporary_fd, temporary_project_path = tempfile.mkstemp(
+            prefix=".vibecleaner-project-",
+            suffix=".tmp",
+            dir=parent,
+        )
+        os.close(temporary_fd)
+        with zipfile.ZipFile(temporary_project_path, "w", zipfile.ZIP_DEFLATED) as zf:
             pages_meta = []
             for idx, snap in enumerate(snapshot):
                 # Resolve the original image without retaining it: prefer the
@@ -274,6 +292,8 @@ def save_project(
                     del inp_buf
 
                 pages_meta.append({
+                    **snap["project_extensions"],
+                    "page_id": snap["page_id"],
                     "original_file_path": os.path.basename(snap["file_path"]),
                     "file_name": orig_name,
                     "inpaint_file_name": inpaint_name,
@@ -284,20 +304,37 @@ def save_project(
                     "bubbles": snap["bubbles"],
                 })
 
-            project_meta = {
-                "version": "2.0",
-                "current_index": current_index,
-                "selected_indices": selected_clean,
-                "pages": pages_meta,
-            }
+            project_meta = create_project_metadata(
+                pages=pages_meta,
+                current_index=current_index,
+                selected_indices=selected_clean,
+                extensions=project_extensions,
+            )
             zf.writestr("project.json", json.dumps(project_meta, ensure_ascii=False, indent=4))
 
+        if not zipfile.is_zipfile(temporary_project_path):
+            raise ValueError("Project archive verification failed")
+        with zipfile.ZipFile(temporary_project_path, "r") as verification_archive:
+            corrupt_member = verification_archive.testzip()
+            if corrupt_member is not None:
+                raise ValueError(f"Project archive member is corrupt: {corrupt_member}")
+            normalize_project_metadata(
+                json.loads(verification_archive.read("project.json").decode("utf-8"))
+            )
+        os.replace(temporary_project_path, file_path)
+        temporary_project_path = None
         return {"status": "ok"}
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Save project failed")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temporary_project_path and os.path.exists(temporary_project_path):
+            try:
+                os.unlink(temporary_project_path)
+            except OSError:
+                logger.warning("Failed to remove temporary project file: %s", temporary_project_path)
 
 @router.post("/api/project/load")
 def load_project(file_path: str = Form(...), container: AppContainer = Depends(get_container)):
@@ -315,7 +352,7 @@ def load_project(file_path: str = Form(...), container: AppContainer = Depends(g
         if zipfile.is_zipfile(file_path):
             with zipfile.ZipFile(file_path, "r") as zf:
                 project_json_data = zf.read("project.json").decode("utf-8")
-                project_meta = json.loads(project_json_data)
+                project_meta = normalize_project_metadata(json.loads(project_json_data))
                 restored_current = project_meta.get("current_index", 0)
                 restored_selected = project_meta.get("selected_indices", []) or []
                 
@@ -346,7 +383,7 @@ def load_project(file_path: str = Form(...), container: AppContainer = Depends(g
         else:
             # Legacy JSON load
             with open(file_path, "r", encoding="utf-8") as f:
-                project_meta = json.load(f)
+                project_meta = normalize_project_metadata(json.load(f))
             restored_current = project_meta.get("current_index", 0)
             restored_selected = project_meta.get("selected_indices", []) or []
             base_dir = os.path.dirname(file_path)
@@ -389,9 +426,20 @@ def load_project(file_path: str = Form(...), container: AppContainer = Depends(g
         if not selected_clean:
             selected_clean = [restored_current]
 
+        project_known_keys = {
+            "format", "schema_version", "app_version", "version",
+            "current_index", "selected_indices", "pages",
+        }
+        project_extensions = {
+            key: deepcopy(value)
+            for key, value in project_meta.items()
+            if key not in project_known_keys
+        }
+
         with state.lock:
             state.pages = loaded_pages
             state.current_page_idx = restored_current
+            state.project_extensions = project_extensions
             state.touch()
             page_count = len(state.pages)
             current_index = state.current_page_idx
@@ -403,6 +451,8 @@ def load_project(file_path: str = Form(...), container: AppContainer = Depends(g
             "selected_indices": selected_clean,
         }
 
+    except ProjectSchemaError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:

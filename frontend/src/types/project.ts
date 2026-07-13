@@ -1,6 +1,8 @@
 import type { BubbleDto } from "./bubble";
 
 export interface SettingsDto {
+  pipeline_v2_enabled: boolean;
+  pipeline_v2_shadow: boolean;
   translation_model: string;
   translation_provider: string;
   translation_api_base_url: string;

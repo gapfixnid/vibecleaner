@@ -1,8 +1,14 @@
 # Backend Dependency Contract
 
-This document is the working dependency contract for the Big Bang composition
-root refactor. Keep it aligned with `README.md` and the design plan under
+This document is the dependency contract established by the composition-root
+refactor. Keep it aligned with `README.md` and the design plan under
 `docs/superpowers/`.
+
+Pipeline v2 evolves this architecture incrementally; it does not authorize a
+second full-product rewrite. The preserve/replace boundary, extension rules,
+shadow rollout, and v1 retirement gates are defined in
+`docs/adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md`. Persisted
+contracts follow `docs/schema-versioning-policy.md`.
 
 ## Runtime Entry Points
 
@@ -128,6 +134,12 @@ runner -> validation issues and provenance trace
 must record stage execution, strategies must translate settings into options,
 and validation must return structured issues that can stop unsafe downstream
 work.
+
+Pipeline v2 stages communicate through explicit, versioned DTOs and stable core
+ports. A stage must not import a concrete provider or model class. Provider
+selection is capability-based through a registry assembled at the composition
+root; adding a provider must not require provider-specific pipeline, API, or UI
+branches.
 
 ## OCR Concurrency And Cache
 

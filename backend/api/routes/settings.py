@@ -14,6 +14,10 @@ router = APIRouter()
 logger = logging.getLogger(APP_NAME)
 
 class SettingsSchema(BaseModel):
+    # Optional on input so older clients do not disable rollout flags when
+    # posting a settings payload that predates Phase A.
+    pipeline_v2_enabled: bool | None = None
+    pipeline_v2_shadow: bool | None = None
     translation_model: str
     translation_provider: str
     translation_api_base_url: str
@@ -60,6 +64,8 @@ def get_settings(container: AppContainer = Depends(get_container)):
 
 def get_settings_payload(config, translation_service):
     return {
+        "pipeline_v2_enabled": config.pipeline_v2_enabled,
+        "pipeline_v2_shadow": config.pipeline_v2_shadow,
         "translation_model": config.translation_model,
         "translation_provider": config.translation_provider,
         "translation_api_base_url": config.translation_api_base_url,
@@ -106,6 +112,10 @@ def update_settings(settings: SettingsSchema, container: AppContainer = Depends(
 
 
 def update_settings_payload(settings: SettingsSchema, config, translation_service):
+    if settings.pipeline_v2_enabled is not None:
+        config.pipeline_v2_enabled = settings.pipeline_v2_enabled
+    if settings.pipeline_v2_shadow is not None:
+        config.pipeline_v2_shadow = settings.pipeline_v2_shadow
     config.translation_model = settings.translation_model
     config.translation_provider = settings.translation_provider
     config.translation_api_base_url = settings.translation_api_base_url

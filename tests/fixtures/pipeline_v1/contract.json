@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "pipeline": "v1",
+  "execution_model": "sequential",
+  "stages": [
+    "detection",
+    "ocr",
+    "translation",
+    "inpainting",
+    "layout",
+    "rendering"
+  ],
+  "empty_page_detection_entrypoint": "detect_and_ocr",
+  "existing_bubbles_skip_detection": true
+}

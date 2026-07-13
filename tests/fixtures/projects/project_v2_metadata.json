@@ -1,0 +1,17 @@
+{
+  "version": "2.0",
+  "current_index": 0,
+  "selected_indices": [0],
+  "pages": [
+    {
+      "original_file_path": "page-001.png",
+      "file_name": "page_0_orig.png",
+      "inpaint_file_name": null,
+      "bubble_counter": 0,
+      "display_name": "Page 1",
+      "status": "untranslated",
+      "problems": [],
+      "bubbles": []
+    }
+  ]
+}

@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 from dataclasses import dataclass, field
 from typing import Any
+
+from .version import __version__ as APP_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +16,16 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 OLLAMA_API_URL = "http://127.0.0.1:11434"
+SETTINGS_FORMAT = "vibecleaner-settings"
+SETTINGS_SCHEMA_VERSION = 1
+SETTINGS_SCHEMA_VERSION_KEY = "schema_version"
+LEGACY_SETTINGS_SCHEMA_VERSION_KEY = "settings_schema_version"
 
 
 @dataclass(frozen=True)
 class AppConfigSnapshot:
+    pipeline_v2_enabled: bool = False
+    pipeline_v2_shadow: bool = False
     translation_model: str = ""
     translation_provider: str = "google"
     translation_api_base_url: str = ""
@@ -83,6 +92,12 @@ def config_value(config: Any, name: str) -> Any:
 
 @dataclass
 class AppConfig:
+    # -- Pipeline rollout ---------------------------------------------------
+    # Phase A only defines the rollout controls. Both remain off by default;
+    # no v2 execution behavior is enabled here.
+    pipeline_v2_enabled: bool = False
+    pipeline_v2_shadow: bool = False
+
     # -- Translation --------------------------------------------------------
     translation_model: str = ""
     translation_provider: str = "google"
@@ -134,6 +149,8 @@ class AppConfig:
 
     # -- Persistence target (injected; not persisted) ------------------------
     settings_path: str | None = field(default=None, repr=False, compare=False)
+    _settings_write_blocked: bool = field(default=False, init=False, repr=False, compare=False)
+    _settings_unknown_fields: dict[str, Any] = field(default_factory=dict, init=False, repr=False, compare=False)
 
     @property
     def DETECT_MODEL(self) -> str:
@@ -215,6 +232,8 @@ class AppConfig:
         repr=False,
         compare=False,
         default_factory=lambda: {
+            "pipeline_v2_enabled": "pipeline_v2_enabled",
+            "pipeline_v2_shadow": "pipeline_v2_shadow",
             "translation_model": "translation_model",
             "translation_provider": "translation_provider",
             "translation_api_base_url": "translation_api_base_url",
@@ -266,47 +285,144 @@ class AppConfig:
 
         try:
             with open(self.settings_path, "r", encoding="utf-8") as fh:
-                data: dict[str, Any] = json.load(fh)
+                data: Any = json.load(fh)
         except Exception:
             logger.exception("Failed to read settings from %s", self.settings_path)
+            self._settings_write_blocked = True
             return
+        if not isinstance(data, dict):
+            logger.error("Cannot load settings from %s: root value must be an object", self.settings_path)
+            self._settings_write_blocked = True
+            return
+
+        settings_format = data.get("format")
+        if settings_format is not None and settings_format != SETTINGS_FORMAT:
+            logger.error("Cannot load settings from %s: unsupported format=%r", self.settings_path, settings_format)
+            self._settings_write_blocked = True
+            return
+
+        schema_version = data.get(
+            SETTINGS_SCHEMA_VERSION_KEY,
+            data.get(LEGACY_SETTINGS_SCHEMA_VERSION_KEY, 0),
+        )
+        if isinstance(schema_version, bool) or not isinstance(schema_version, int) or schema_version < 0:
+            logger.error(
+                "Cannot load settings from %s: invalid %s=%r",
+                self.settings_path,
+                SETTINGS_SCHEMA_VERSION_KEY,
+                schema_version,
+            )
+            self._settings_write_blocked = True
+            return
+        if schema_version > SETTINGS_SCHEMA_VERSION:
+            logger.error(
+                "Cannot load settings from %s: schema version %s is newer than supported version %s",
+                self.settings_path,
+                schema_version,
+                SETTINGS_SCHEMA_VERSION,
+            )
+            # Do not allow a later save to replace settings written by a newer
+            # application version with this version's incomplete schema.
+            self._settings_write_blocked = True
+            return
+
+        data = self._migrate_settings(data, schema_version)
+        self._settings_write_blocked = False
+        metadata_keys = {
+            "format",
+            SETTINGS_SCHEMA_VERSION_KEY,
+            LEGACY_SETTINGS_SCHEMA_VERSION_KEY,
+            "app_version",
+        }
+        self._settings_unknown_fields = {
+            key: value
+            for key, value in data.items()
+            if key not in self._FIELD_MAP and key not in metadata_keys
+        }
 
         for json_key, field_name in self._FIELD_MAP.items():
             value = data.get(json_key)
             if value is None:
                 continue
-            # Legacy migrations
-            if field_name == "translation_provider" and value == "argos":
-                value = "google"
-            if field_name == "detect_model" and value == "Small (INT8) [기본값]":
-                value = "High Precision (FP32)"
-            if field_name == "ocr_engine" and value in {"auto", "high_precision", "high-quality", "high_quality", "quality"}:
-                value = "balanced"
-            if field_name == "inpaint_engine" and value in {"aot", "high_precision", "high-quality", "high_quality", "quality"}:
-                value = "lama"
-            if field_name == "confidence_threshold" and value == 0.30:
-                value = 0.45
+            if field_name in {"pipeline_v2_enabled", "pipeline_v2_shadow"} and not isinstance(value, bool):
+                logger.warning("Ignoring non-boolean pipeline rollout setting %s=%r", json_key, value)
+                continue
             setattr(self, field_name, value)
 
-        if "setup_completed" not in data:
-            self.setup_completed = True
-
         logger.info("Settings loaded from %s", self.settings_path)
+
+    @staticmethod
+    def _migrate_settings(data: dict[str, Any], schema_version: int) -> dict[str, Any]:
+        """Return settings upgraded to the current in-memory schema.
+
+        Version 0 is the unversioned settings format used before Phase A.
+        Migration is deliberately non-destructive: the source file is only
+        rewritten when the normal settings save path runs.
+        """
+        migrated = dict(data)
+        if schema_version == 0:
+            migrated.setdefault("pipeline_v2_enabled", False)
+            migrated.setdefault("pipeline_v2_shadow", False)
+            migrated.setdefault("setup_completed", True)
+            if migrated.get("translation_provider") == "argos":
+                migrated["translation_provider"] = "google"
+            if migrated.get("detect_model") == "Small (INT8) [기본값]":
+                migrated["detect_model"] = "High Precision (FP32)"
+            if migrated.get("ocr_engine") in {
+                "auto", "high_precision", "high-quality", "high_quality", "quality"
+            }:
+                migrated["ocr_engine"] = "balanced"
+            if migrated.get("inpaint_engine") in {
+                "aot", "high_precision", "high-quality", "high_quality", "quality"
+            }:
+                migrated["inpaint_engine"] = "lama"
+            if migrated.get("confidence_threshold") == 0.30:
+                migrated["confidence_threshold"] = 0.45
+        migrated["format"] = SETTINGS_FORMAT
+        migrated[SETTINGS_SCHEMA_VERSION_KEY] = SETTINGS_SCHEMA_VERSION
+        migrated.setdefault("app_version", "unknown")
+        migrated.pop(LEGACY_SETTINGS_SCHEMA_VERSION_KEY, None)
+        return migrated
 
     def save(self) -> bool:
         """Persist current settings to ``self.settings_path``."""
         if not self.settings_path:
             logger.error("Cannot save settings: no settings_path configured")
             return False
+        if self._settings_write_blocked:
+            logger.error(
+                "Cannot save settings to %s after loading an unsupported schema",
+                self.settings_path,
+            )
+            return False
 
-        data = {json_key: getattr(self, field_name)
-                for json_key, field_name in self._FIELD_MAP.items()}
+        data = {
+            **self._settings_unknown_fields,
+            "format": SETTINGS_FORMAT,
+            SETTINGS_SCHEMA_VERSION_KEY: SETTINGS_SCHEMA_VERSION,
+            "app_version": APP_VERSION,
+            **{
+                json_key: getattr(self, field_name)
+                for json_key, field_name in self._FIELD_MAP.items()
+            },
+        }
         try:
             parent_dir = os.path.dirname(self.settings_path)
             if parent_dir:
                 os.makedirs(parent_dir, exist_ok=True)
-            with open(self.settings_path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh, indent=4, ensure_ascii=False)
+            fd, temporary_path = tempfile.mkstemp(prefix=".settings-", suffix=".tmp", dir=parent_dir or ".")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    json.dump(data, fh, indent=4, ensure_ascii=False)
+                    fh.flush()
+                    os.fsync(fh.fileno())
+                os.replace(temporary_path, self.settings_path)
+            except Exception:
+                try:
+                    os.unlink(temporary_path)
+                except OSError:
+                    pass
+                raise
             logger.info("Settings saved to %s", self.settings_path)
             return True
         except Exception:
