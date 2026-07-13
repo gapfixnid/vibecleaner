@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.pipeline.dag import DagPipelineExecutor, DagPipelinePlan, DagStage
-from backend.pipeline.checkpoint import JsonCheckpointStore
+from backend.pipeline.checkpoint import CheckpointManifest, JsonCheckpointStore
 from backend.pipeline.registry import StageRegistry
 from backend.pipeline.provenance import ProvenanceTrace
 
@@ -48,3 +48,17 @@ def test_dag_writes_stage_checkpoint(tmp_path):
     manifest = store.load(context.provenance.run_id)
     assert manifest is not None
     assert manifest.completed_stages == ["detect"]
+
+
+def test_dag_resume_skips_stage_when_checkpoint_artifacts_are_hydrated():
+    registry = StageRegistry()
+    registry.register(Stage("detect", "detect"))
+    context = SimpleNamespace(artifacts={"order": ["hydrated"]}, provenance=ProvenanceTrace(), page_id="page-1")
+    manifest = CheckpointManifest(
+        run_id="old-run", page_id="page-1", completed_stages=["detect"], artifact_keys=["order"]
+    )
+    result = DagPipelineExecutor(registry).run(
+        context, DagPipelinePlan((DagStage("detect"),)), resume_manifest=manifest
+    )
+    assert result.succeeded
+    assert context.artifacts["order"] == ["hydrated"]

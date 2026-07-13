@@ -57,7 +57,13 @@ class DagPipelineExecutor:
         self.resource_manager = resource_manager or ResourceManager()
         self.checkpoint_store = checkpoint_store
 
-    def run(self, context: PipelineContext, plan: DagPipelinePlan) -> PipelineResult:
+    def run(
+        self,
+        context: PipelineContext,
+        plan: DagPipelinePlan,
+        *,
+        resume_manifest: CheckpointManifest | None = None,
+    ) -> PipelineResult:
         plan.validate()
         completed: set[str] = set()
         pending = list(plan.stages)
@@ -66,6 +72,10 @@ class DagPipelineExecutor:
             if not ready:
                 raise ValueError("DAG could not make progress")
             for spec in ready:
+                if self._can_resume(spec, resume_manifest, context):
+                    completed.add(spec.name)
+                    pending.remove(spec)
+                    continue
                 stage = self.registry.get(spec.name)
                 entry, started_at = context.provenance.start_stage(
                     spec.name, input_summary={"artifact_count": len(context.artifacts)}
@@ -87,6 +97,17 @@ class DagPipelineExecutor:
                 pending.remove(spec)
                 self._save_checkpoint(context, completed)
         return PipelineResult(context=context, succeeded=True)
+
+    @staticmethod
+    def _can_resume(
+        spec: DagStage,
+        manifest: CheckpointManifest | None,
+        context: PipelineContext,
+    ) -> bool:
+        if manifest is None or spec.name not in manifest.completed_stages:
+            return False
+        # A manifest alone is not enough: the caller must hydrate artifacts first.
+        return bool(manifest.artifact_keys) and set(manifest.artifact_keys) <= set(context.artifacts)
 
     def _save_checkpoint(self, context: PipelineContext, completed: set[str]) -> None:
         if self.checkpoint_store is None:
