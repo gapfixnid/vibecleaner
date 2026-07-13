@@ -32,7 +32,7 @@ interface SettingsModalProps {
   t?: (key: string) => string;
 }
 
-type TabType = "general" | "translation" | "detection" | "inpainting";
+type TabType = "general" | "translation" | "detection" | "inpainting" | "advanced";
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -463,6 +463,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
               <span>{t("settings.inpainting")}</span>
             </button>
+            <button
+              type="button"
+              className={`menu-btn-pref ${activeTab === "advanced" ? "active" : ""}`}
+              onClick={() => setActiveTab("advanced")}
+            >
+              <div className="btn-icon-wrapper general">
+                <HelpCircle size={14} />
+              </div>
+              <span>{t("settings.advanced")}</span>
+            </button>
           </div>
         </div>
 
@@ -475,12 +485,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {activeTab === "translation" && t("settings.translationTitle")}
                 {activeTab === "detection" && t("settings.detectionTitle")}
                 {activeTab === "inpainting" && t("settings.inpaintingTitle")}
+                {activeTab === "advanced" && t("settings.advancedTitle")}
               </h2>
               <p className="header-desc">
                 {activeTab === "general" && t("settings.generalDesc")}
                 {activeTab === "translation" && t("settings.translationDesc")}
                 {activeTab === "detection" && t("settings.detectionDesc")}
                 {activeTab === "inpainting" && t("settings.inpaintingDesc")}
+                {activeTab === "advanced" && t("settings.advancedDesc")}
               </p>
             </div>
             <button type="button" className="close-btn-top" onClick={onClose} data-tooltip={t("settings.close")} aria-label={t("settings.close")}>
@@ -1152,6 +1164,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   </>
                   )}
+                </div>
+              )}
+
+              {activeTab === "advanced" && (
+                <div className="settings-section">
+                  <div className="section-title-label">{t("settings.pipelineRollout")}</div>
+                  <div className="settings-card">
+                    <div className="form-row-group checkbox-row">
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={localSettings.pipeline_v2_enabled}
+                          onChange={(e) => handleAutoSave("pipeline_v2_enabled", e.target.checked)}
+                        />
+                        <span>{t("settings.pipelineV2Enabled")}</span>
+                      </label>
+                    </div>
+                    <div className="form-row-group checkbox-row">
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={localSettings.pipeline_v2_shadow}
+                          onChange={(e) => handleAutoSave("pipeline_v2_shadow", e.target.checked)}
+                        />
+                        <span>{t("settings.pipelineV2Shadow")}</span>
+                      </label>
+                      <span className="pref-help-text">{t("settings.pipelineV2ShadowHelp")}</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
