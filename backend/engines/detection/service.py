@@ -10,6 +10,7 @@ import time
 import numpy as np
 from typing import List, Optional, Any, Dict
 from ...core.config import config_value
+from ...core.providers.concurrency import ProviderConcurrencyGate
 from .wrapper import RTDETRv2Detector
 from ..ocr.local import LocalOCR
 
@@ -36,6 +37,8 @@ class DetectionService:
         self._cache_lock = threading.RLock()
         self._cache_flush_lock = threading.Lock()
         self._state_lock = threading.Lock()
+        self._detection_gate = ProviderConcurrencyGate(max_concurrency=1, queue_capacity=2)
+        self._ocr_gate = ProviderConcurrencyGate(max_concurrency=1, queue_capacity=4)
         self._cache_file_path_override = cache_file_path
         self._cache_flush_interval = max(0.0, float(cache_flush_interval))
         self._cache_flush_timer: threading.Timer | None = None
@@ -336,8 +339,9 @@ class DetectionService:
     ) -> List[Any]:
         """Detect text blocks without running OCR."""
         try:
-            with self._detector_lock:
-                blocks = self.detector.detect_bubbles(
+            with self._detection_gate.slot():
+                with self._detector_lock:
+                    blocks = self.detector.detect_bubbles(
                     image,
                     model_name=self._detect_model_name(model_name),
                     confidence_threshold=self._confidence_threshold(confidence_threshold),
@@ -377,11 +381,12 @@ class DetectionService:
         self._record_ocr_misses(len(uncached_blocks))
         if uncached_blocks:
             try:
-                with self._ocr_engine_lock:
-                    self.ocr_engine.lang = lang
-                    self.ocr_engine.recognize_text(
-                        image, uncached_blocks, engine=self._ocr_engine_name(engine)
-                    )
+                with self._ocr_gate.slot():
+                    with self._ocr_engine_lock:
+                        self.ocr_engine.lang = lang
+                        self.ocr_engine.recognize_text(
+                            image, uncached_blocks, engine=self._ocr_engine_name(engine)
+                        )
             except Exception as exc:
                 self._set_last_error(str(exc))
                 logger.exception("OCR failed. lang=%s block_count=%s", lang, len(uncached_blocks))
@@ -449,9 +454,10 @@ class DetectionService:
         self._record_ocr_misses(1)
 
         try:
-            with self._ocr_engine_lock:
-                self.ocr_engine.lang = lang
-                self.ocr_engine.recognize_text(image, [block], engine=self._ocr_engine_name(engine))
+            with self._ocr_gate.slot():
+                with self._ocr_engine_lock:
+                    self.ocr_engine.lang = lang
+                    self.ocr_engine.recognize_text(image, [block], engine=self._ocr_engine_name(engine))
         except Exception as exc:
             self._set_last_error(str(exc))
             logger.exception("Single-block OCR failed. lang=%s bbox=%s", lang, getattr(block, "xyxy", None))
@@ -500,5 +506,7 @@ class DetectionService:
             "ocr_cache_misses": cache_misses,
             "ocr_cache_hit_rate": f"{hit_rate:.1f}%",
             "ocr_cache_dirty": cache_dirty,
+            "detection_queue": self._detection_gate.status(),
+            "ocr_queue": self._ocr_gate.status(),
             "last_error": last_error,
         }

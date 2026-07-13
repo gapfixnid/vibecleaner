@@ -8,6 +8,7 @@ from threading import RLock
 from typing import Any, List, Optional
 
 from ...core.config import config_value
+from ...core.providers.concurrency import ProviderConcurrencyGate
 from .hybrid import HybridInpainter
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ class InpaintingService:
         self._cache_limit = 4
         self._cache_hits = 0
         self._cache_misses = 0
+        self._provider_gate = ProviderConcurrencyGate(max_concurrency=1, queue_capacity=2)
 
     def prepare(self, engine: str | None = None) -> None:
         resolved_engine = engine or config_value(self.config, "inpaint_engine")
@@ -47,6 +49,7 @@ class InpaintingService:
                 "cache_hits": self._cache_hits,
                 "cache_misses": self._cache_misses,
                 "cache_entries": len(self._cache),
+                "queue": self._provider_gate.status(),
             }
 
     def clean_background(
@@ -81,27 +84,29 @@ class InpaintingService:
             return cached
         if int_bubble_boxes is not None:
             started = time.perf_counter()
+            with self._provider_gate.slot():
+                result = self.inpainter.inpaint(
+                    image,
+                    int_boxes,
+                    int_bubble_boxes,
+                    protect_edges=protect_edges,
+                    engine=resolved_engine,
+                    mask_dilation=resolved_dilation,
+                    clip_to_bubble=resolved_clip,
+                )
+            self._record_inference(started)
+            self._remember(cache_key, result)
+            return result
+        started = time.perf_counter()
+        with self._provider_gate.slot():
             result = self.inpainter.inpaint(
                 image,
                 int_boxes,
-                int_bubble_boxes,
                 protect_edges=protect_edges,
                 engine=resolved_engine,
                 mask_dilation=resolved_dilation,
                 clip_to_bubble=resolved_clip,
             )
-            self._record_inference(started)
-            self._remember(cache_key, result)
-            return result
-        started = time.perf_counter()
-        result = self.inpainter.inpaint(
-            image,
-            int_boxes,
-            protect_edges=protect_edges,
-            engine=resolved_engine,
-            mask_dilation=resolved_dilation,
-            clip_to_bubble=resolved_clip,
-        )
         self._record_inference(started)
         self._remember(cache_key, result)
         return result
