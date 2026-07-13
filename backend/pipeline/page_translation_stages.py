@@ -16,6 +16,7 @@ from .page_analysis import (
 from .context import PipelineContext
 from .registry import StageRegistry
 from .runner import PipelineRunner
+from .quality import AdaptiveQualityRouter
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +41,10 @@ def _ensure_project_revision(state: Any, start_revision: int) -> None:
 class PageDetectionStage:
     name = "detection"
 
-    def __init__(self, detection_service: Any, *, ensure_page_image: Any) -> None:
+    def __init__(self, detection_service: Any, *, ensure_page_image: Any, quality_router: Any | None = None) -> None:
         self.detection_service = detection_service
         self.ensure_page_image = ensure_page_image
+        self.quality_router = quality_router or AdaptiveQualityRouter()
 
     def run(self, context: PipelineContext) -> PipelineContext:
         state = context.artifacts["state"]
@@ -89,6 +91,9 @@ class PageDetectionStage:
             ):
                 context.artifacts["blocks"] = self.detection_service.detect_only(image)
                 context.artifacts["ocr_pending"] = True
+                context.artifacts.setdefault("quality_scores", {})["detection"] = (
+                    self.quality_router.evaluate_detection(context.artifacts["blocks"])
+                )
             else:
                 context.artifacts["blocks"] = self.detection_service.detect_and_ocr(
                     image,
@@ -108,11 +113,13 @@ class PageOcrStage:
         bubble_analysis_service: Any,
         layout_planner_service: Any,
         detection_service: Any | None = None,
+        quality_router: Any | None = None,
     ) -> None:
         self.page_analysis_service = page_analysis_service
         self.bubble_analysis_service = bubble_analysis_service
         self.layout_planner_service = layout_planner_service
         self.detection_service = detection_service
+        self.quality_router = quality_router or AdaptiveQualityRouter()
 
     def run(self, context: PipelineContext) -> PipelineContext:
         job = context.artifacts["job"]
@@ -132,6 +139,9 @@ class PageOcrStage:
                     image,
                     context.artifacts["blocks"],
                     lang=config.source_language,
+                )
+                context.artifacts.setdefault("quality_scores", {})["ocr"] = (
+                    self.quality_router.evaluate_ocr(context.artifacts["blocks"])
                 )
             if show_progress:
                 job_manager.update(job, progress=30, message=msg_from_context("page_translation.analyzing", context))
@@ -293,13 +303,21 @@ def build_page_translation_runner(
     refresh_page_status: Any,
 ) -> PipelineRunner:
     registry = StageRegistry()
-    registry.register(PageDetectionStage(detection_service, ensure_page_image=ensure_page_image))
+    quality_router = AdaptiveQualityRouter()
+    registry.register(
+        PageDetectionStage(
+            detection_service,
+            ensure_page_image=ensure_page_image,
+            quality_router=quality_router,
+        )
+    )
     registry.register(
         PageOcrStage(
             page_analysis_service=page_analysis_service,
             bubble_analysis_service=bubble_analysis_service,
             layout_planner_service=layout_planner_service,
             detection_service=detection_service,
+            quality_router=quality_router,
         )
     )
     registry.register(PageTranslationStage(translation_service))

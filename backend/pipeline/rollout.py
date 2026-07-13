@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from time import perf_counter
 from typing import Any, Callable
@@ -265,10 +265,20 @@ def _quality_metadata(primary: dict[str, Any], shadow: dict[str, Any]) -> dict[s
         )
         return round(matches / pair_count, 4)
 
+    primary_scores = primary.get("quality_scores") or {}
+    shadow_scores = shadow.get("quality_scores") or {}
     return {
         "primary_bubble_count": len(primary_bubbles),
         "shadow_bubble_count": len(shadow_bubbles),
         "bubble_count_match": len(primary_bubbles) == len(shadow_bubbles),
         "ocr_text_match_ratio": ratio("text"),
         "translation_match_ratio": ratio("translated"),
+        "primary_quality_scores": {
+            name: asdict(score) if hasattr(score, "__dataclass_fields__") else score
+            for name, score in primary_scores.items()
+        },
+        "shadow_quality_scores": {
+            name: asdict(score) if hasattr(score, "__dataclass_fields__") else score
+            for name, score in shadow_scores.items()
+        },
     }
