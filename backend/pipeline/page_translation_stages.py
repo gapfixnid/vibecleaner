@@ -89,10 +89,26 @@ class PageDetectionStage:
             if getattr(context, "pipeline_variant", None) == "v2" and hasattr(
                 self.detection_service, "detect_only"
             ):
-                context.artifacts["blocks"] = self.detection_service.detect_only(image)
+                blocks = self.detection_service.detect_only(image)
+                detection_score = self.quality_router.evaluate_detection(blocks)
+                selected_model = self.quality_router.detection_model_for(
+                    config.detect_model, detection_score
+                )
+                if (
+                    not detection_score.passed
+                    and selected_model != config.detect_model
+                ):
+                    blocks = self.detection_service.detect_only(
+                        image, model_name=selected_model
+                    )
+                    detection_score = self.quality_router.evaluate_detection(blocks)
+                    context.artifacts.setdefault("quality_replans", []).append(
+                        {"stage": "detection", "model": selected_model}
+                    )
+                context.artifacts["blocks"] = blocks
                 context.artifacts["ocr_pending"] = True
                 context.artifacts.setdefault("quality_scores", {})["detection"] = (
-                    self.quality_router.evaluate_detection(context.artifacts["blocks"])
+                    detection_score
                 )
             else:
                 context.artifacts["blocks"] = self.detection_service.detect_and_ocr(

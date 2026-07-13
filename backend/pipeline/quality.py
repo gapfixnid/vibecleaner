@@ -31,7 +31,14 @@ class AdaptiveQualityRouter:
             for region in regions
             if (value := getattr(region, "confidence", None)) is not None
         ]
-        mean_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+        if not confidences:
+            return QualityScore(
+                stage="detection",
+                score=1.0,
+                passed=True,
+                signals={"confidence_available": 0.0, "region_count": float(len(regions))},
+            )
+        mean_confidence = sum(confidences) / len(confidences)
         score = max(0.0, min(1.0, mean_confidence))
         passed = score >= self.thresholds.detection
         return QualityScore(

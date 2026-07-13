@@ -24,3 +24,9 @@ def test_empty_ocr_result_is_valid_empty_page_signal():
     score = AdaptiveQualityRouter().evaluate_ocr([])
     assert score.passed is True
     assert score.recommended_action == "accept"
+
+
+def test_detection_without_confidence_does_not_trigger_speculative_replan():
+    score = AdaptiveQualityRouter().evaluate_detection([SimpleNamespace()])
+    assert score.passed is True
+    assert score.signals["confidence_available"] == 0.0

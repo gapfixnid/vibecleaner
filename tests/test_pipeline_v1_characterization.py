@@ -31,6 +31,17 @@ class RecordingSplitDetectionService(RecordingDetectionService):
         return [SimpleNamespace(text="", xyxy=[1, 1, 4, 4])]
 
 
+class LowConfidenceDetectionService(RecordingSplitDetectionService):
+    def __init__(self):
+        super().__init__()
+        self.models = []
+
+    def detect_only(self, image, model_name=None):
+        self.models.append(model_name)
+        confidence = 0.4 if model_name is None else 0.95
+        return [SimpleNamespace(text="", xyxy=[1, 1, 4, 4], confidence=confidence)]
+
+
 class NeverCancelledJobManager:
     def ensure_not_cancelled(self, job):
         return None
@@ -114,3 +125,19 @@ def test_v2_detection_stage_does_not_run_ocr():
     result = PageDetectionStage(service, ensure_page_image=lambda current: None).run(context)
     assert service.calls == [{"operation": "detect"}]
     assert result.artifacts["ocr_pending"] is True
+
+
+def test_v2_detection_replans_to_high_precision_on_low_confidence():
+    service = LowConfidenceDetectionService()
+    page = MangaPage(
+        file_path="sample.png", page_id="page-replan",
+        cv_image=np.zeros((12, 16, 3), dtype=np.uint8),
+    )
+    context, _ = _context_for(page)
+    context.pipeline_variant = "v2"
+    context.artifacts["config"].detect_model = "Small (INT8)"
+    result = PageDetectionStage(service, ensure_page_image=lambda current: None).run(context)
+    assert service.models == [None, "High Precision (FP32)"]
+    assert result.artifacts["quality_replans"] == [
+        {"stage": "detection", "model": "High Precision (FP32)"}
+    ]
