@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 import threading
+from time import sleep
 
 import pytest
 
@@ -109,3 +110,29 @@ def test_dag_runs_parallel_safe_independent_stages_concurrently():
     result = DagPipelineExecutor(registry).run(context, plan)
     assert result.succeeded
     assert context.artifacts == {"translate": True, "inpaint": True}
+
+
+def test_parallel_stage_duration_uses_worker_completion_time():
+    registry = StageRegistry()
+    registry.register(DelayStage("slow", 0.04))
+    registry.register(DelayStage("fast", 0.01))
+    context = SimpleNamespace(artifacts={}, provenance=ProvenanceTrace(), page_id="page-1")
+    result = DagPipelineExecutor(registry).run(context, DagPipelinePlan((
+        DagStage("slow", resource=ResourceClass.NETWORK, parallel_safe=True),
+        DagStage("fast", resource=ResourceClass.GPU, parallel_safe=True),
+    )))
+    assert result.succeeded
+    durations = {stage.stage: stage.duration_ms for stage in context.provenance.stages}
+    assert durations["slow"] >= 30
+    assert durations["fast"] < durations["slow"]
+
+
+class DelayStage(Stage):
+    def __init__(self, name, delay):
+        super().__init__(name, name)
+        self.delay = delay
+
+    def run(self, context):
+        sleep(self.delay)
+        context.artifacts[self.name] = True
+        return context

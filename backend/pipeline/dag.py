@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
-from time import sleep
+from time import perf_counter, sleep
 
 from .context import PipelineContext
 from .checkpoint import CheckpointManifest
@@ -135,13 +135,15 @@ class DagPipelineExecutor:
                 entry, started_at = context.provenance.start_stage(
                     spec.name, input_summary={"artifact_count": len(context.artifacts)}
                 )
-                records[pool.submit(self._run_with_retry, stage, spec, context)] = (
+                records[pool.submit(self._run_parallel_timed, stage, spec, context)] = (
                     spec, entry, started_at
                 )
             issues: list[ValidationIssue] = []
             for future, (spec, entry, started_at) in records.items():
+                result_context, finished_at, error = future.result()
                 try:
-                    result_context = future.result()
+                    if error is not None:
+                        raise error
                     if result_context is not context:
                         raise RuntimeError("Parallel stages must mutate and return their input context")
                 except PipelineValidationError as exc:
@@ -162,9 +164,21 @@ class DagPipelineExecutor:
                     output_summary={"artifact_count": len(context.artifacts)},
                     errors=[issue.message for issue in stage_issues],
                 )
+                entry.duration_ms = int((finished_at - started_at) * 1000)
         if issues:
             return PipelineResult(context=context, succeeded=False, issues=issues)
         return None
+
+    def _run_parallel_timed(
+        self,
+        stage: Any,
+        spec: DagStage,
+        context: PipelineContext,
+    ) -> tuple[PipelineContext | None, float, Exception | None]:
+        try:
+            return self._run_with_retry(stage, spec, context), perf_counter(), None
+        except Exception as exc:
+            return None, perf_counter(), exc
 
     def _run_with_retry(self, stage: Any, spec: DagStage, context: PipelineContext) -> PipelineContext:
         attempts = max(0, spec.max_retries) + 1
