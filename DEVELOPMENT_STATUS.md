@@ -117,10 +117,15 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - parallel scheduler smoke benchmark: 약 `1.96x` speedup 확인
 - 실제 shadow rollout gate: 10 sample, success/equivalence/OCR/translation 모두 `1.0`
 - 실제 페이지 benchmark에서 v1/v2 artifact·bubble·OCR·translation 결과 일치 확인
+- NVIDIA CUDA 환경에서 detection·LaMa ONNX 실추론 및 `CUDAExecutionProvider` 사용 확인
+- CUDA 실추론 시 GPU 전력 사용량이 약 `48W`에서 `77W`로 증가하는 것을 확인
 
 ## 5. 남은 작업
 
-아래 항목은 계획 단계이며 이 문서 작성 시점에 완료로 표시하지 않는다.
+현재 사용자가 없는 개발 단계이므로 v1 제거는 보류한다. v1 fallback과
+backward compatibility 테스트는 유지하고, 실제 운영 기간이 생긴 뒤 다시 판단한다.
+
+향후 운영 단계에서 재검토할 항목:
 
 - 충분한 운영 기간 후 v1 제거 여부 결정 및 migration 공지
 - v1 제거 전 프로젝트 파일/API backward compatibility 최종 검증
@@ -160,6 +165,11 @@ rollout gate 실행:
 ```
 
 ## 7. 최근 주요 커밋
+
+- `d282fd8` GPU runtime verification benchmark
+- `5b510f9` NVIDIA package DLL directory registration
+- `994c5f9` ONNX Runtime CUDA DLL preload
+- `4848a55` NVIDIA CUDA runtime setup documentation
 
 - `220ee05` low-confidence detection replan
 - `6434760` adaptive stage quality scoring
