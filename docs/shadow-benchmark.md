@@ -24,3 +24,14 @@ machine-readable JSON summary:
 The repository workflow `.github/workflows/benchmark.yml` runs regression tests
 and uploads the dashboard and summary as a CI artifact. It evaluates the
 rollout gate automatically when a benchmark JSONL fixture is available.
+
+## Rollout telemetry
+
+Each page rollout also records a telemetry event at
+`%APPDATA%/vibecleaner/pipeline_rollout_telemetry.jsonl` by default. The event
+tracks v2 primary failures, fallback attempts, fallback success, and shadow
+execution. The current aggregate is available from:
+
+```text
+GET /api/pipeline/telemetry
+```

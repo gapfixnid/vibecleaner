@@ -87,6 +87,8 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - inpainting 품질 미달 시 대체 engine과 확장 dilation profile로 1회 자동 replan
 - detection/OCR/inpainting/translation provider queue
 - provider runtime metrics API
+- rollout telemetry JSONL 저장 및 v2 primary failure/fallback 성공률 집계
+- `/api/pipeline/telemetry` 운영 요약 endpoint 추가
 - shadow context snapshot에서 `RLock` 등 runtime lock 제외
 - shadow 실패가 primary 작업을 중단하지 않도록 보호
 - v2 primary 실패 시 깨끗한 context에서 v1 fallback
@@ -108,7 +110,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 
 현재 마지막 검증 기준:
 
-- Python 전체 테스트: `174 passed`
+- Python 전체 테스트: `176 passed`
 - frontend build: 통과
 - frontend Node 테스트: 통과
 - parallel scheduler smoke benchmark: 약 `1.96x` speedup 확인
@@ -119,7 +121,6 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 
 아래 항목은 계획 단계이며 이 문서 작성 시점에 완료로 표시하지 않는다.
 
-- 신규 설치/기존 설치 rollout telemetry와 fallback 발생률 모니터링
 - 충분한 운영 기간 후 v1 제거 여부 결정 및 migration 공지
 - v1 제거 전 프로젝트 파일/API backward compatibility 최종 검증
 

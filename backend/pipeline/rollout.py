@@ -7,6 +7,7 @@ from time import perf_counter
 from typing import Any, Callable
 
 from .benchmark import ShadowBenchmarkRecord
+from .telemetry import PipelineTelemetryRecord
 
 
 class PipelineVariant(StrEnum):
@@ -76,6 +77,7 @@ class PipelineExecutionCoordinator:
         v1_runner: Callable[[Any], Any],
         v2_runner: Callable[[Any], Any] | None = None,
         benchmark_sink: Any | None = None,
+        telemetry_sink: Any | None = None,
         shadow_context_factory: Callable[[Any], Any] = deepcopy,
         fallback_context_factory: Callable[[Any], Any] = deepcopy,
         alternate_shadow_order: bool = True,
@@ -85,6 +87,7 @@ class PipelineExecutionCoordinator:
             self._runners[PipelineVariant.V2] = v2_runner
         self.last_comparison: PipelineComparison | None = None
         self.benchmark_sink = benchmark_sink
+        self.telemetry_sink = telemetry_sink
         self.shadow_context_factory = shadow_context_factory
         self.fallback_context_factory = fallback_context_factory
         self.alternate_shadow_order = alternate_shadow_order
@@ -154,7 +157,54 @@ class PipelineExecutionCoordinator:
             )
             self.last_comparison.metadata["fallback_used"] = self.last_fallback_used
             self._record_benchmark(context, self.last_comparison)
+        self._record_telemetry(
+            context,
+            rollout,
+            primary_result,
+            returned_result,
+            primary_duration_ms,
+            shadow_result,
+            shadow_duration_ms,
+            fallback_copy_error,
+        )
         return returned_result
+
+    def _record_telemetry(
+        self, context: Any, rollout: PipelineRollout, primary_result: Any,
+        returned_result: Any, primary_duration_ms: float,
+        shadow_result: Any, shadow_duration_ms: float | None,
+        fallback_copy_error: Exception | None,
+    ) -> None:
+        if self.telemetry_sink is None:
+            return
+        comparison = self.last_comparison
+        primary_ok = bool(getattr(primary_result, "succeeded", True))
+        fallback_attempted = (
+            rollout.primary is PipelineVariant.V2
+            and not primary_ok
+            and fallback_copy_error is None
+        )
+        provenance = getattr(context, "provenance", None)
+        self.telemetry_sink.record(PipelineTelemetryRecord(
+            run_id=str(getattr(provenance, "run_id", "unknown")),
+            page_id=str(getattr(context, "page_id", "unknown")),
+            primary=rollout.primary.value,
+            primary_succeeded=primary_ok,
+            returned_variant=("v1" if self.last_fallback_used else rollout.primary.value),
+            fallback_attempted=fallback_attempted,
+            fallback_used=self.last_fallback_used,
+            fallback_succeeded=(bool(getattr(returned_result, "succeeded", True)) if fallback_attempted else None),
+            shadow_enabled=comparison is not None,
+            shadow_succeeded=(comparison.shadow_succeeded if comparison else None),
+            primary_error=(comparison.primary_error if comparison else _error_message(primary_result)),
+            shadow_error=(comparison.shadow_error if comparison else None),
+            primary_duration_ms=primary_duration_ms,
+            shadow_duration_ms=shadow_duration_ms,
+            metadata={
+                "execution_order": (comparison.metadata.get("execution_order") if comparison else None),
+                "fallback_copy_error": str(fallback_copy_error) if fallback_copy_error else None,
+            },
+        ))
 
     def _shadow_runs_first(self, context: Any) -> bool:
         if not self.alternate_shadow_order:

@@ -9,6 +9,7 @@ from .benchmark import JsonlBenchmarkSink
 from .context import PipelineContext
 from .dag import DagPipelineExecutor
 from .rollout import PipelineExecutionCoordinator, PipelineRollout
+from .telemetry import JsonlTelemetrySink
 from .shadow import clone_page_translation_context, clone_page_translation_fallback_context
 
 
@@ -41,6 +42,10 @@ def run_page_translation(
     plan = planner.translate_page_plan()
     rollout = PipelineRollout.from_settings(config)
     benchmark_sink = None
+    telemetry_path = getattr(config, "pipeline_telemetry_path", None)
+    if not telemetry_path:
+        telemetry_path = os.path.join(get_app_data_dir(), "pipeline_rollout_telemetry.jsonl")
+    telemetry_sink = JsonlTelemetrySink(telemetry_path)
     if rollout.shadow:
         benchmark_path = getattr(config, "pipeline_benchmark_path", None)
         if not benchmark_path:
@@ -52,6 +57,7 @@ def run_page_translation(
             runner.registry, checkpoint_store=checkpoint_store
         ).run(item, planner.translate_page_dag_plan(), resume_manifest=resume_manifest),
         benchmark_sink=benchmark_sink,
+        telemetry_sink=telemetry_sink,
         shadow_context_factory=clone_page_translation_context,
         fallback_context_factory=clone_page_translation_fallback_context,
     )
