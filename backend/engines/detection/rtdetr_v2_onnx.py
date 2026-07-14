@@ -135,10 +135,37 @@ class RTDetrV2ONNXDetection(DetectionEngine):
         if isinstance(boxes, np.ndarray) and boxes.ndim == 3 and boxes.shape[0] == 1:
             boxes = boxes[0]
 
-        bubble_boxes = []
-        text_boxes = []
-        for lab, box, scr in zip(labels, boxes, scores):
-            if float(scr) < float(self.confidence_threshold):
+        candidates = list(zip(labels, boxes, scores))
+        bubble_boxes, text_boxes = self._select_detection_boxes(
+            candidates,
+            threshold=float(self.confidence_threshold),
+        )
+
+        # Preserve recall for faint/small text without lowering the user's
+        # normal threshold globally. A low-confidence retry is only allowed
+        # when the normal pass found no text at all; this avoids turning a
+        # successful high-confidence detection into a noisy result.
+        if not text_boxes:
+            recall_threshold = max(0.15, float(self.confidence_threshold) * 0.65)
+            bubble_boxes, text_boxes = self._select_detection_boxes(
+                candidates,
+                threshold=recall_threshold,
+            )
+
+        bubble_boxes = np.array(bubble_boxes) if bubble_boxes else np.array([])
+        text_boxes = np.array(text_boxes) if text_boxes else np.array([])
+        return bubble_boxes, text_boxes
+
+    @staticmethod
+    def _select_detection_boxes(
+        candidates: list[tuple[object, object, object]],
+        *,
+        threshold: float,
+    ) -> tuple[list[list[int]], list[list[int]]]:
+        bubble_boxes: list[list[int]] = []
+        text_boxes: list[list[int]] = []
+        for lab, box, scr in candidates:
+            if float(scr) < threshold:
                 continue
             x1, y1, x2, y2 = map(int, box)
             label_id = int(lab)
@@ -146,7 +173,4 @@ class RTDetrV2ONNXDetection(DetectionEngine):
                 bubble_boxes.append([x1, y1, x2, y2])
             elif label_id in [1, 2]:
                 text_boxes.append([x1, y1, x2, y2])
-
-        bubble_boxes = np.array(bubble_boxes) if bubble_boxes else np.array([])
-        text_boxes = np.array(text_boxes) if text_boxes else np.array([])
         return bubble_boxes, text_boxes
