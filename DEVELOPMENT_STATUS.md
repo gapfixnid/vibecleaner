@@ -63,7 +63,11 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - v2 DAG stage resource 및 retry 정책
 - OCR 이후 translation과 inpainting 병렬 실행
 - provider별 bounded queue 및 resource semaphore
+- provider manifest에 model profile별 quality/latency/resource metadata 추가
+- quality score 미달 시 catalog 기반 compatible model 자동 선택
 - checkpoint manifest 저장과 hydrated artifact resume
+- page-level checkpoint payload 저장·복원 및 quality replan 상태 통합
+- page translation 완료 시 checkpoint manifest/payload 자동 정리
 - stage별 partial retry 및 backoff
 
 ### Detection/OCR 분리
@@ -73,11 +77,14 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - legacy detection/OCR adapter와 DTO 경계 추가
 - detection confidence 부족 시 high precision model로 1회 replan
 - OCR quality score 및 detection quality score 기록
+- OCR quality 미달 시 cache를 우회한 enhanced preprocessing으로 1회 자동 retry
 
 ### 성능·안정성
 
 - LaMa inpainting background warm-up
 - inpainting bounded LRU result cache
+- inpainting 결과 shape/dtype·target change·outside preservation 품질 검증
+- inpainting 품질 미달 시 대체 engine과 확장 dilation profile로 1회 자동 replan
 - detection/OCR/inpainting/translation provider queue
 - provider runtime metrics API
 - shadow context snapshot에서 `RLock` 등 runtime lock 제외
@@ -92,6 +99,8 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - execution order 교대(primary-first/shadow-first)
 - deterministic parallel scheduler speedup benchmark 추가
 - rollout quality gate 스크립트 추가
+- 장기 benchmark JSONL 집계 및 self-contained HTML dashboard 생성
+- CI에서 benchmark summary/dashboard artifact 업로드 workflow 추가
 - 신규 설치 기본값은 v2, 기존 명시 설정은 보존
 - Advanced 설정 UI에서 v2/shadow 토글 제공
 
@@ -99,7 +108,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 
 현재 마지막 검증 기준:
 
-- Python 전체 테스트: `168 passed`
+- Python 전체 테스트: `174 passed`
 - frontend build: 통과
 - frontend Node 테스트: 통과
 - parallel scheduler smoke benchmark: 약 `1.96x` speedup 확인
@@ -110,11 +119,6 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 
 아래 항목은 계획 단계이며 이 문서 작성 시점에 완료로 표시하지 않는다.
 
-- OCR quality 미달 시 preprocessing/profile 변경 후 자동 1회 retry
-- inpainting 결과 품질 validation 및 품질 미달 자동 재계획
-- quality score 기반 실제 model catalog 선택 확장
-- quality replan과 checkpoint resume의 page-level 완전 통합
-- benchmark 결과의 장기 집계 dashboard 및 CI artifact 업로드
 - 신규 설치/기존 설치 rollout telemetry와 fallback 발생률 모니터링
 - 충분한 운영 기간 후 v1 제거 여부 결정 및 migration 공지
 - v1 제거 전 프로젝트 파일/API backward compatibility 최종 검증
@@ -163,4 +167,3 @@ rollout gate 실행:
 - `133c6c8` independent v2 stage parallel execution
 - `03c3ab0` manifest-driven provider queue policy
 - `4a311cc` actual detection/OCR split in v2
-

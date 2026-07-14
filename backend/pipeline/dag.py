@@ -70,6 +70,7 @@ class DagPipelineExecutor:
         resume_manifest: CheckpointManifest | None = None,
     ) -> PipelineResult:
         plan.validate()
+        self._hydrate_resume_artifacts(context, resume_manifest)
         completed: set[str] = set()
         pending = list(plan.stages)
         while pending:
@@ -209,11 +210,41 @@ class DagPipelineExecutor:
     def _save_checkpoint(self, context: PipelineContext, completed: set[str]) -> None:
         if self.checkpoint_store is None:
             return
+        artifacts = self._checkpoint_artifacts(context)
         self.checkpoint_store.save(
             CheckpointManifest(
                 run_id=context.provenance.run_id,
                 page_id=context.page_id,
                 completed_stages=sorted(completed),
-                artifact_keys=sorted(context.artifacts),
+                artifact_keys=sorted(artifacts),
+                metadata={
+                    "schema_version": 1,
+                    "quality_replans": context.artifacts.get("quality_replans", []),
+                    "quality_scores": context.artifacts.get("quality_scores", {}),
+                },
             )
         )
+        save_artifacts = getattr(self.checkpoint_store, "save_artifacts", None)
+        if callable(save_artifacts):
+            save_artifacts(context.provenance.run_id, artifacts)
+
+    @staticmethod
+    def _checkpoint_artifacts(context: PipelineContext) -> dict[str, Any]:
+        ephemeral = {"state", "job", "job_manager", "config", "show_progress"}
+        return {
+            key: value for key, value in context.artifacts.items()
+            if key not in ephemeral
+        }
+
+    def _hydrate_resume_artifacts(
+        self, context: PipelineContext, manifest: CheckpointManifest | None
+    ) -> None:
+        if manifest is None:
+            return
+        if manifest.page_id != context.page_id:
+            raise ValueError(
+                f"Checkpoint page mismatch: expected {context.page_id!r}, got {manifest.page_id!r}"
+            )
+        load_artifacts = getattr(self.checkpoint_store, "load_artifacts", None)
+        if callable(load_artifacts):
+            context.artifacts.update(load_artifacts(manifest.run_id))

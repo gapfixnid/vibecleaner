@@ -22,6 +22,8 @@ def run_page_translation(
     runner: Any,
     planner: Any,
     show_progress: bool = True,
+    checkpoint_store: Any | None = None,
+    resume_manifest: Any | None = None,
 ) -> dict[str, int]:
     context = PipelineContext(
         page_id=page_id,
@@ -46,9 +48,9 @@ def run_page_translation(
         benchmark_sink = JsonlBenchmarkSink(benchmark_path)
     coordinator = PipelineExecutionCoordinator(
         v1_runner=lambda item: runner.run(item, plan),
-        v2_runner=lambda item: DagPipelineExecutor(runner.registry).run(
-            item, planner.translate_page_dag_plan()
-        ),
+        v2_runner=lambda item: DagPipelineExecutor(
+            runner.registry, checkpoint_store=checkpoint_store
+        ).run(item, planner.translate_page_dag_plan(), resume_manifest=resume_manifest),
         benchmark_sink=benchmark_sink,
         shadow_context_factory=clone_page_translation_context,
         fallback_context_factory=clone_page_translation_fallback_context,
@@ -58,4 +60,10 @@ def run_page_translation(
     if not result.succeeded:
         message = result.issues[0].message if result.issues else "Page translation pipeline failed"
         raise RuntimeError(message)
+    if checkpoint_store is not None:
+        delete = getattr(checkpoint_store, "delete", None)
+        if callable(delete):
+            if resume_manifest is not None:
+                delete(resume_manifest.run_id)
+            delete(result.context.provenance.run_id)
     return result.context.artifacts["result"]

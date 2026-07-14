@@ -67,6 +67,25 @@ def test_dag_resume_skips_stage_when_checkpoint_artifacts_are_hydrated():
     assert context.artifacts["order"] == ["hydrated"]
 
 
+def test_dag_resume_hydrates_page_artifacts_from_checkpoint_payload(tmp_path):
+    registry = StageRegistry()
+    registry.register(Stage("detect", "detect"))
+    store = JsonCheckpointStore(tmp_path)
+    first = SimpleNamespace(artifacts={}, provenance=ProvenanceTrace(), page_id="page-1")
+    assert DagPipelineExecutor(registry, checkpoint_store=store).run(
+        first, DagPipelinePlan((DagStage("detect"),))
+    ).succeeded
+    manifest = store.load(first.provenance.run_id)
+
+    resumed = SimpleNamespace(artifacts={}, provenance=ProvenanceTrace(), page_id="page-1")
+    result = DagPipelineExecutor(registry, checkpoint_store=store).run(
+        resumed, DagPipelinePlan((DagStage("detect"),)), resume_manifest=manifest
+    )
+    assert result.succeeded
+    assert resumed.artifacts["order"] == ["detect"]
+    assert store.payload_path_for(first.provenance.run_id).exists()
+
+
 def test_dag_retries_transient_stage_failure():
     class Flaky(Stage):
         def __init__(self):

@@ -111,6 +111,11 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
         encode_preview_jpeg_bytes=encode_preview_jpeg_bytes,
         encode_thumbnail_bytes=encode_thumbnail_bytes,
         refresh_page_status=refresh_page_status,
+        provider_manifests={
+            "detection": detection_policy,
+            "ocr": ocr_policy,
+            "inpainting": inpainting_policy,
+        },
     )
 
     return AppContainer(

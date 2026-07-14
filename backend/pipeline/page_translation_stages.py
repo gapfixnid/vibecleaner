@@ -41,10 +41,11 @@ def _ensure_project_revision(state: Any, start_revision: int) -> None:
 class PageDetectionStage:
     name = "detection"
 
-    def __init__(self, detection_service: Any, *, ensure_page_image: Any, quality_router: Any | None = None) -> None:
+    def __init__(self, detection_service: Any, *, ensure_page_image: Any, quality_router: Any | None = None, provider_manifest: Any | None = None) -> None:
         self.detection_service = detection_service
         self.ensure_page_image = ensure_page_image
         self.quality_router = quality_router or AdaptiveQualityRouter()
+        self.provider_manifest = provider_manifest
 
     def run(self, context: PipelineContext) -> PipelineContext:
         state = context.artifacts["state"]
@@ -91,8 +92,8 @@ class PageDetectionStage:
             ):
                 blocks = self.detection_service.detect_only(image)
                 detection_score = self.quality_router.evaluate_detection(blocks)
-                selected_model = self.quality_router.detection_model_for(
-                    config.detect_model, detection_score
+                selected_model = self.quality_router.select_model(
+                    "detection", config.detect_model, detection_score, self.provider_manifest
                 )
                 if (
                     not detection_score.passed
@@ -130,12 +131,14 @@ class PageOcrStage:
         layout_planner_service: Any,
         detection_service: Any | None = None,
         quality_router: Any | None = None,
+        provider_manifest: Any | None = None,
     ) -> None:
         self.page_analysis_service = page_analysis_service
         self.bubble_analysis_service = bubble_analysis_service
         self.layout_planner_service = layout_planner_service
         self.detection_service = detection_service
         self.quality_router = quality_router or AdaptiveQualityRouter()
+        self.provider_manifest = provider_manifest
 
     def run(self, context: PipelineContext) -> PipelineContext:
         job = context.artifacts["job"]
@@ -156,9 +159,32 @@ class PageOcrStage:
                     context.artifacts["blocks"],
                     lang=config.source_language,
                 )
-                context.artifacts.setdefault("quality_scores", {})["ocr"] = (
-                    self.quality_router.evaluate_ocr(context.artifacts["blocks"])
-                )
+                ocr_score = self.quality_router.evaluate_ocr(context.artifacts["blocks"])
+                if not ocr_score.passed:
+                    retry_engine = self.quality_router.select_model(
+                        "ocr", config.ocr_engine, ocr_score, self.provider_manifest
+                    )
+                    retry_padding = max(1, int(getattr(config, "ocr_padding", 8)) * 2)
+                    retry_scale = max(1.0, float(getattr(config, "ocr_crop_scale", 1.5)) * 1.25)
+                    context.artifacts["blocks"] = self.detection_service.ocr_only(
+                        image,
+                        context.artifacts["blocks"],
+                        lang=config.source_language,
+                        engine=retry_engine,
+                        padding=retry_padding,
+                        crop_scale=retry_scale,
+                        adaptive_binarization=True,
+                        adaptive_binarization_strength=max(
+                            1.0, float(getattr(config, "adaptive_binarization_strength", 2.0)) + 1.0
+                        ),
+                        use_cache=False,
+                    )
+                    ocr_score = self.quality_router.evaluate_ocr(context.artifacts["blocks"])
+                    context.artifacts.setdefault("quality_replans", []).append({
+                        "stage": "ocr", "model": retry_engine,
+                        "profile": "enhanced_preprocessing", "passed": ocr_score.passed
+                    })
+                context.artifacts.setdefault("quality_scores", {})["ocr"] = ocr_score
             if show_progress:
                 job_manager.update(job, progress=30, message=msg_from_context("page_translation.analyzing", context))
             local_bubbles = bubbles_from_analysis(
@@ -218,8 +244,10 @@ class PageTranslationStage:
 class PageInpaintingStage:
     name = "inpainting"
 
-    def __init__(self, inpainting_service: Any) -> None:
+    def __init__(self, inpainting_service: Any, *, quality_router: Any | None = None, provider_manifest: Any | None = None) -> None:
         self.inpainting_service = inpainting_service
+        self.quality_router = quality_router or AdaptiveQualityRouter()
+        self.provider_manifest = provider_manifest
 
     def run(self, context: PipelineContext) -> PipelineContext:
         job = context.artifacts["job"]
@@ -241,6 +269,26 @@ class PageInpaintingStage:
                 protect_edges=True,
             )
             job_manager.ensure_not_cancelled(job)
+
+            quality_score = self.quality_router.evaluate_inpainting(image, inpainted_image, boxes)
+            if not quality_score.passed:
+                current_engine = str(getattr(config, "inpaint_engine", "lama"))
+                retry_engine = self.quality_router.select_model(
+                    "inpainting", current_engine, quality_score, self.provider_manifest
+                )
+                inpainted_image = self.inpainting_service.clean_background(
+                    image,
+                    boxes,
+                    bubble_clip_boxes(local_bubbles),
+                    protect_edges=True,
+                    engine=retry_engine,
+                    mask_dilation=max(1, int(getattr(config, "inpaint_mask_dilation", 2)) + 2),
+                )
+                quality_score = self.quality_router.evaluate_inpainting(image, inpainted_image, boxes)
+                context.artifacts.setdefault("quality_replans", []).append({
+                    "stage": "inpainting", "engine": retry_engine, "passed": quality_score.passed
+                })
+            context.artifacts.setdefault("quality_scores", {})["inpainting"] = quality_score
 
         context.artifacts["inpainted_image"] = inpainted_image
         context.artifacts["inpaint_result"] = inpainted_image
@@ -317,6 +365,7 @@ def build_page_translation_runner(
     encode_preview_jpeg_bytes: Any,
     encode_thumbnail_bytes: Any,
     refresh_page_status: Any,
+    provider_manifests: dict[str, Any] | None = None,
 ) -> PipelineRunner:
     registry = StageRegistry()
     quality_router = AdaptiveQualityRouter()
@@ -325,6 +374,7 @@ def build_page_translation_runner(
             detection_service,
             ensure_page_image=ensure_page_image,
             quality_router=quality_router,
+            provider_manifest=(provider_manifests or {}).get("detection"),
         )
     )
     registry.register(
@@ -334,10 +384,15 @@ def build_page_translation_runner(
             layout_planner_service=layout_planner_service,
             detection_service=detection_service,
             quality_router=quality_router,
+            provider_manifest=(provider_manifests or {}).get("ocr"),
         )
     )
     registry.register(PageTranslationStage(translation_service))
-    registry.register(PageInpaintingStage(inpainting_service))
+    registry.register(PageInpaintingStage(
+        inpainting_service,
+        quality_router=quality_router,
+        provider_manifest=(provider_manifests or {}).get("inpainting"),
+    ))
     registry.register(PageLayoutStage())
     registry.register(
         PageRenderingStage(

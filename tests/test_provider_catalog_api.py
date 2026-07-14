@@ -105,3 +105,8 @@ def test_local_stage_manifests_cover_current_advanced_settings():
     strength = next(field for field in ocr["config_schema"] if field["key"] == "adaptive_binarization_strength")
     assert strength["visible_when_key"] == "adaptive_binarization"
     assert strength["minimum"] == 0.5
+    assert {model["selection_value"] for model in detection["model_catalog"]} == {
+        "High Precision (FP32)", "Small (INT8)"
+    }
+    assert {model["selection_value"] for model in ocr["model_catalog"]} == {"balanced", "fast"}
+    assert {model["selection_value"] for model in inpainting["model_catalog"]} == {"lama", "opencv"}

@@ -18,6 +18,36 @@ _PROVIDER_ID = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 
 
 @dataclass(frozen=True)
+class ProviderModelProfile:
+    """Selectable model/profile metadata used by adaptive quality routing."""
+
+    selection_value: str
+    display_name: str
+    quality_score: float
+    latency_score: float
+    resource_classes: frozenset[ResourceClass] = field(default_factory=frozenset)
+
+    def __post_init__(self) -> None:
+        if not self.selection_value.strip() or not self.display_name.strip():
+            raise ValueError("Provider model profile requires a selection value and display name")
+        if not 0.0 <= self.quality_score <= 1.0 or not 0.0 <= self.latency_score <= 1.0:
+            raise ValueError("Provider model scores must be between 0 and 1")
+        resources = frozenset(self.resource_classes)
+        if not resources or not resources.issubset(VALID_RESOURCES):
+            raise ValueError(f"Invalid model resource classes: {sorted(resources)!r}")
+        object.__setattr__(self, "resource_classes", resources)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "selection_value": self.selection_value,
+            "display_name": self.display_name,
+            "quality_score": self.quality_score,
+            "latency_score": self.latency_score,
+            "resource_classes": sorted(self.resource_classes),
+        }
+
+
+@dataclass(frozen=True)
 class ConfigFieldSpec:
     key: str
     value_type: ConfigValueType
@@ -118,6 +148,7 @@ class ProviderManifest:
     selection_value: str | None = None
     description: str = ""
     catalog_order: int = 100
+    model_catalog: tuple[ProviderModelProfile, ...] = ()
 
     def __post_init__(self) -> None:
         if not _PROVIDER_ID.fullmatch(self.provider_id):
@@ -133,6 +164,7 @@ class ProviderManifest:
             raise ValueError(f"Invalid provider resource classes: {sorted(resources)!r}")
         object.__setattr__(self, "resource_classes", resources)
         object.__setattr__(self, "config_schema", tuple(self.config_schema))
+        object.__setattr__(self, "model_catalog", tuple(self.model_catalog))
         if self.max_concurrency < 1:
             raise ValueError("Provider max_concurrency must be positive")
         if self.queue_capacity < 0:
@@ -161,6 +193,7 @@ class ProviderManifest:
             "selection_value": self.selection_value or self.provider_id,
             "description": self.description,
             "catalog_order": self.catalog_order,
+            "model_catalog": [model.to_dict() for model in self.model_catalog],
         }
 
 

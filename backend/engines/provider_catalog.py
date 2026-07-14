@@ -9,6 +9,7 @@ from ..core.providers import (
     ConfigFieldSpec,
     ProviderCapabilities,
     ProviderManifest,
+    ProviderModelProfile,
     ProviderRegistry,
 )
 from ..core.version import __version__ as APP_VERSION
@@ -211,6 +212,10 @@ def register_builtin_providers(
                 features={"regions", "confidence", "tiling"},
             ),
             resource_classes={"cpu", "gpu"},
+            model_catalog=(
+                ProviderModelProfile("High Precision (FP32)", "High Precision (FP32)", 0.95, 0.45, frozenset({"cpu", "gpu"})),
+                ProviderModelProfile("Small (INT8)", "Small (INT8)", 0.75, 0.90, frozenset({"cpu"})),
+            ),
             queue_capacity=2,
             config_schema=(
                 ConfigFieldSpec(
@@ -289,6 +294,10 @@ def register_builtin_providers(
                 supports_batch=True,
             ),
             resource_classes={"cpu", "gpu", "io"},
+            model_catalog=(
+                ProviderModelProfile("balanced", "Balanced OCR", 0.90, 0.55, frozenset({"cpu", "gpu", "io"})),
+                ProviderModelProfile("fast", "Fast OCR", 0.72, 0.92, frozenset({"cpu", "io"})),
+            ),
             queue_capacity=4,
             config_schema=(
                 ConfigFieldSpec(
@@ -355,6 +364,10 @@ def register_builtin_providers(
                 supports_batch=True,
             ),
             resource_classes={"cpu", "gpu"},
+            model_catalog=(
+                ProviderModelProfile("lama", "LaMa", 0.92, 0.45, frozenset({"cpu", "gpu"})),
+                ProviderModelProfile("opencv", "OpenCV Telea", 0.68, 0.95, frozenset({"cpu"})),
+            ),
             queue_capacity=2,
             config_schema=(
                 ConfigFieldSpec(

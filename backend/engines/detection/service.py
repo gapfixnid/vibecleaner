@@ -378,13 +378,18 @@ class DetectionService:
         *,
         lang: str = "Japanese",
         engine: str | None = None,
+        padding: int | None = None,
+        crop_scale: float | None = None,
+        adaptive_binarization: bool | None = None,
+        adaptive_binarization_strength: float | None = None,
+        use_cache: bool = True,
     ) -> List[Any]:
         """Run OCR for previously detected blocks, preserving the legacy cache."""
         uncached_blocks = []
         block_hashes = {}
         for block in blocks:
             crop_hash = self._get_crop_hash(image, block.xyxy)
-            cached_text = self._get_cached_ocr(crop_hash)
+            cached_text = self._get_cached_ocr(crop_hash) if use_cache else None
             if cached_text is not None:
                 block.text = cached_text
             else:
@@ -397,9 +402,17 @@ class DetectionService:
                 with self._ocr_gate.slot():
                     with self._ocr_engine_lock:
                         self.ocr_engine.lang = lang
-                        self.ocr_engine.recognize_text(
-                            image, uncached_blocks, engine=self._ocr_engine_name(engine)
-                        )
+                        ocr_options = {"engine": self._ocr_engine_name(engine)}
+                        if any(value is not None for value in (
+                            padding, crop_scale, adaptive_binarization, adaptive_binarization_strength
+                        )):
+                            ocr_options.update({
+                                "padding": padding,
+                                "crop_scale": crop_scale,
+                                "adaptive_binarization": adaptive_binarization,
+                                "adaptive_binarization_strength": adaptive_binarization_strength,
+                            })
+                        self.ocr_engine.recognize_text(image, uncached_blocks, **ocr_options)
             except Exception as exc:
                 self._set_last_error(str(exc))
                 logger.exception("OCR failed. lang=%s block_count=%s", lang, len(uncached_blocks))
