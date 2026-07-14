@@ -8,6 +8,7 @@ from ..dependencies import get_container
 from ...core.version import APP_NAME
 from ...core.container import AppContainer
 from ...core.config import OLLAMA_API_URL
+from ...core.languages import validate_translation_language_pair
 from ...infrastructure.downloads.requirements import download_required_models, get_model_status
 
 router = APIRouter()
@@ -112,6 +113,12 @@ def update_settings(settings: SettingsSchema, container: AppContainer = Depends(
 
 
 def update_settings_payload(settings: SettingsSchema, config, translation_service):
+    try:
+        source_language, target_language = validate_translation_language_pair(
+            settings.source_language, settings.target_language
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if settings.pipeline_v2_enabled is not None:
         config.pipeline_v2_enabled = settings.pipeline_v2_enabled
     if settings.pipeline_v2_shadow is not None:
@@ -133,8 +140,8 @@ def update_settings_payload(settings: SettingsSchema, config, translation_servic
     config.translation_llm_top_p = settings.translation_llm_top_p
     config.translation_llm_max_tokens = settings.translation_llm_max_tokens
     config.ui_language = settings.ui_language
-    config.source_language = settings.source_language
-    config.target_language = settings.target_language
+    config.source_language = source_language
+    config.target_language = target_language
     config.system_prompt = settings.system_prompt
     config.detect_model = settings.detect_model
     config.confidence_threshold = settings.confidence_threshold

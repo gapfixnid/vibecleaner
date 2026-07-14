@@ -19,6 +19,7 @@ import type { Settings } from "../types";
 import type { ProviderCatalogDto, ProviderConfigFieldDto, ProviderManifestDto } from "../types";
 import type { ThemeMeta } from "../themes";
 import { NumberStepper } from "./NumberStepper";
+import { getSafeTargetLanguage, getTargetLanguageOptions, SUPPORTED_TRANSLATION_LANGUAGES } from "../languageOptions";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -174,7 +175,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleAutoSave = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     const updated = {
       ...localSettings,
-      [key]: value,
+      ...(key === "source_language"
+        ? {
+            source_language: value as Settings["source_language"],
+            target_language: getSafeTargetLanguage(String(value), localSettings.target_language),
+          }
+        : { [key]: value }),
     };
     setLocalSettings(updated);
     onSave(updated);
@@ -629,12 +635,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <AppleSelect
                           value={localSettings.source_language}
                           onChange={(v) => handleAutoSave("source_language", v)}
-                          options={[
-                            { value: "Japanese", label: "Japanese" },
-                            { value: "Korean", label: "Korean" },
-                            { value: "Chinese", label: "Chinese" },
-                            { value: "English", label: "English" },
-                          ]}
+                          options={[...SUPPORTED_TRANSLATION_LANGUAGES]}
                         />
                       </div>
                     </div>
@@ -644,12 +645,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <AppleSelect
                           value={localSettings.target_language}
                           onChange={(v) => handleAutoSave("target_language", v)}
-                          options={[
-                            { value: "Korean", label: "Korean" },
-                            { value: "English", label: "English" },
-                            { value: "Japanese", label: "Japanese" },
-                            { value: "Chinese", label: "Chinese" },
-                          ]}
+                          options={[...getTargetLanguageOptions(localSettings.source_language)]}
                         />
                       </div>
                     </div>
