@@ -160,6 +160,33 @@ class PageOcrStage:
                     lang=config.source_language,
                 )
                 ocr_score = self.quality_router.evaluate_ocr(context.artifacts["blocks"])
+                empty_blocks = [
+                    block for block in context.artifacts["blocks"]
+                    if not str(getattr(block, "text", "") or "").strip()
+                ]
+                if empty_blocks:
+                    retry_padding = max(1, int(getattr(config, "ocr_padding", 8)) * 2)
+                    retry_scale = max(1.0, float(getattr(config, "ocr_crop_scale", 1.5)) * 1.25)
+                    retry_engine = config.ocr_engine
+                    self.detection_service.ocr_only(
+                        image,
+                        empty_blocks,
+                        lang=config.source_language,
+                        engine=retry_engine,
+                        padding=retry_padding,
+                        crop_scale=retry_scale,
+                        adaptive_binarization=True,
+                        adaptive_binarization_strength=max(
+                            1.0, float(getattr(config, "adaptive_binarization_strength", 2.0)) + 1.0
+                        ),
+                        use_cache=False,
+                    )
+                    ocr_score = self.quality_router.evaluate_ocr(context.artifacts["blocks"])
+                    context.artifacts.setdefault("quality_replans", []).append({
+                        "stage": "ocr", "model": retry_engine,
+                        "profile": "empty_block_recovery", "recovered_blocks": len(empty_blocks),
+                        "passed": ocr_score.passed,
+                    })
                 if not ocr_score.passed:
                     retry_engine = self.quality_router.select_model(
                         "ocr", config.ocr_engine, ocr_score, self.provider_manifest

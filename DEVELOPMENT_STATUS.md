@@ -87,6 +87,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - inpainting 품질 미달 시 대체 engine과 확장 dilation profile로 1회 자동 replan
 - heuristic line integral-image 경계 좌표 clamp 및 invalid inpainting 결과 fail-fast 검증
 - RT-DETR ONNX detection에서 고신뢰 텍스트가 없을 때만 저신뢰 후보를 재검토하는 recall 보강
+- OCR 전체 점수가 통과해도 빈 텍스트 블록만 확장 crop으로 개별 재시도
 - detection/OCR/inpainting/translation provider queue
 - provider runtime metrics API
 - rollout telemetry JSONL 저장 및 v2 primary failure/fallback 성공률 집계
