@@ -129,6 +129,34 @@ For the default ONNX-backed local workflow, `requirements-runtime.txt` is enough
 .\venv\Scripts\python.exe -m pip install -r requirements-torch.txt
 ```
 
+### NVIDIA CUDA acceleration
+
+The runtime requirements install the CPU build of ONNX Runtime by default so
+the app works on machines without NVIDIA hardware. To use CUDA for the ONNX
+detection, OCR, and LaMa inpainting paths on Windows, replace that package in
+the same virtual environment with the GPU build:
+
+```powershell
+.\venv\Scripts\python.exe -m pip uninstall -y onnxruntime
+.\venv\Scripts\python.exe -m pip install --upgrade "onnxruntime-gpu[cuda,cudnn]"
+```
+
+Restart the app after installation and verify that CUDA is available:
+
+```powershell
+.\venv\Scripts\python.exe -c "import onnxruntime as ort; print(ort.__version__); print(ort.get_available_providers())"
+```
+
+The output must include `CUDAExecutionProvider`. If it is absent, check that
+the NVIDIA driver is installed with `nvidia-smi`, then reinstall the GPU
+package in the repository `venv`. The application intentionally falls back to
+`CPUExecutionProvider` when CUDA is unavailable.
+
+The GPU wheel uses CUDA 12.x by default and requires compatible CUDA/cuDNN
+runtime libraries. See the [ONNX Runtime installation guide](https://onnxruntime.ai/docs/install/)
+and [CUDA Execution Provider requirements](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html)
+for compatibility details.
+
 Download local models. The minimal profile is the fastest way to get the app
 running; use the full profile only when you need every local model path.
 
