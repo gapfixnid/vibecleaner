@@ -152,6 +152,16 @@ the NVIDIA driver is installed with `nvidia-smi`, then reinstall the GPU
 package in the repository `venv`. The application intentionally falls back to
 `CPUExecutionProvider` when CUDA is unavailable.
 
+To verify actual GPU inference with the locally downloaded detection and LaMa
+models, run:
+
+```powershell
+.\venv\Scripts\python.exe scripts\verify_gpu_runtime.py
+```
+
+The command reports each ONNX session's providers and one inference duration;
+both sessions must list `CUDAExecutionProvider`.
+
 The GPU wheel uses CUDA 12.x by default and requires compatible CUDA/cuDNN
 runtime libraries. See the [ONNX Runtime installation guide](https://onnxruntime.ai/docs/install/)
 and [CUDA Execution Provider requirements](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html)
