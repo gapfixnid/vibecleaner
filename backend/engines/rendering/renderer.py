@@ -34,9 +34,17 @@ class TextLayoutResult:
 
 
 class TextRenderer:
+    # Automatic layouts should remain readable even when a translation is
+    # longer than the source text. A manually selected font size can still be
+    # smaller; this floor applies only while choosing an automatic size.
+    AUTO_READABILITY_MIN_FONT_SIZE = 11.0
+
     def __init__(self, min_font_size: float = 6.0, max_font_size: float = 48.0):
         self.min_font_size = float(min_font_size)
         self.max_font_size = float(max_font_size)
+
+    def _automatic_min_font_size(self, min_size: float, max_size: float) -> float:
+        return min(max_size, max(min_size, self.AUTO_READABILITY_MIN_FONT_SIZE))
         
     def wrap_text(self, text: str, width: float, font: QFont, allow_char_break: bool = False) -> list[str] | None:
         """Wrap text using DP for optimal line breaking; falls back to greedy."""
@@ -184,8 +192,9 @@ class TextRenderer:
             app = QApplication.instance()
             if app is None or not app.font().family():
                 font_family = "Segoe UI"
-        min_size = float(self.min_font_size if min_size is None else min_size)
         max_size = float(self.max_font_size if max_size is None else max_size)
+        configured_min_size = float(self.min_font_size if min_size is None else min_size)
+        min_size = self._automatic_min_font_size(configured_min_size, max_size)
 
         padding_x = min(8.0, rect.width() * 0.08)
         padding_y = min(6.0, rect.height() * 0.08)
@@ -336,8 +345,9 @@ class TextRenderer:
             resolved_font, chain = font_resolver.resolve(text, target_lang="Korean")
             font_family = resolved_font.name
             logger.debug(f"Font resolved (mask): {font_family} (chain: {' → '.join(chain)})")
-        min_size = float(self.min_font_size if min_size is None else min_size)
         max_size = float(self.max_font_size if max_size is None else max_size)
+        configured_min_size = float(self.min_font_size if min_size is None else min_size)
+        min_size = self._automatic_min_font_size(configured_min_size, max_size)
 
         # Preprocess mask: Erode to reserve padding away from speech bubble outlines
         if mask is not None and mask.ndim == 2 and np.any(mask):
@@ -424,7 +434,10 @@ class TextRenderer:
             if layout is None:
                 continue
 
-            font_reward = (size / max(1.0, dynamic_max)) * 0.22
+            # Reward readable font sizes strongly enough that the optimizer
+            # does not prefer excessive wrapping merely to minimize unused
+            # mask area.
+            font_reward = (size / max(1.0, dynamic_max)) * 0.45
             candidate_score = layout.score - font_reward
             if candidate_score < best_score:
                 best_score = candidate_score

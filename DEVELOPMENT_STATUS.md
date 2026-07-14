@@ -88,6 +88,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - heuristic line integral-image 경계 좌표 clamp 및 invalid inpainting 결과 fail-fast 검증
 - RT-DETR ONNX detection에서 고신뢰 텍스트가 없을 때만 저신뢰 후보를 재검토하는 recall 보강
 - OCR 전체 점수가 통과해도 빈 텍스트 블록만 확장 crop으로 개별 재시도
+- 자동 말풍선 렌더링의 가독성 최소 폰트 하한(`11px`) 및 overflow 표시 보강
 - detection/OCR/inpainting/translation provider queue
 - provider runtime metrics API
 - rollout telemetry JSONL 저장 및 v2 primary failure/fallback 성공률 집계
@@ -121,6 +122,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - 실제 페이지 benchmark에서 v1/v2 artifact·bubble·OCR·translation 결과 일치 확인
 - NVIDIA CUDA 환경에서 detection·LaMa ONNX 실추론 및 `CUDAExecutionProvider` 사용 확인
 - CUDA 실추론 시 GPU 전력 사용량이 약 `48W`에서 `77W`로 증가하는 것을 확인
+- 긴 번역문·좁은 말풍선 자동 배치 회귀 테스트 포함, 전체 `182 passed`
 
 ## 5. 남은 작업
 
