@@ -12,6 +12,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+_LINE_START_PUNCTUATION = set(",.!?;:)]}〉》」』】〕〉！？。，、：；》」』】")
+_LINE_END_PUNCTUATION = set("([{〈《「『【〔")
+
 
 def font_pixel_size(font: QFont) -> int:
     """Return the effective font size in pixels for every render boundary."""
@@ -363,6 +366,7 @@ class TextRenderer:
         min_size = self._automatic_min_font_size(configured_min_size, max_size)
 
         # Preprocess mask: Erode to reserve padding away from speech bubble outlines
+        original_mask = np.asarray(mask) > 0
         if mask is not None and mask.ndim == 2 and np.any(mask):
             import cv2
             mh, mw = mask.shape[:2]
@@ -402,6 +406,23 @@ class TextRenderer:
 
         if best_layout is not None:
             return best_layout
+
+        # The eroded mask protects the bubble outline, but can become too
+        # restrictive for very dense text. Retry with the original mask before
+        # falling back to a rectangular layout that may overflow.
+        if not np.array_equal(original_mask, mask_bool):
+            best_layout = self._best_layout_for_font_candidates(
+                text,
+                rect,
+                original_mask,
+                font_family,
+                candidate_sizes,
+                allow_char_break=True,
+                dynamic_max=dynamic_max,
+                min_size=min_size,
+            )
+            if best_layout is not None:
+                return best_layout
 
         font, lines, render_width = self.find_optimal_font_size(text, rect, font_family, min_size, max_size)
         return self.layout_lines_in_rect(lines, rect, font, render_width, min_size=min_size)
@@ -727,6 +748,11 @@ class TextRenderer:
             score = unused * unused * 1.45
             if util < 0.55:
                 score += (0.55 - util) ** 2 * 1.8
+
+        if line[:1] in _LINE_START_PUNCTUATION:
+            score += 2.6
+        if line[-1:] in _LINE_END_PUNCTUATION:
+            score += 1.8
 
         if len(line.strip()) <= 1:
             score += 1.2

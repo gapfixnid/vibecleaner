@@ -62,6 +62,9 @@ WEIGHT_FIT_TOO_MANY_LINES = 5.0  # for font fitting
 # Widow/orphan threshold (fraction of total lines)
 WIDOW_ORPHAN_THRESHOLD = 0.3
 
+_LINE_START_PUNCTUATION = set(",.!?;:)]}〉》」』】〕〉！？。，、：；》」』】")
+_LINE_END_PUNCTUATION = set("([{〈《「『【〔")
+
 
 # ---------------------------------------------------------------------------
 # Text segmentation helpers
@@ -202,10 +205,15 @@ def dp_wrap_text(
                 return 0.0
             c1 = chunks[seg_indices[idx1]]
             c2 = chunks[seg_indices[idx2]]
+            penalty = 0.0
+            if c2[:1] in _LINE_START_PUNCTUATION:
+                penalty += 260.0
+            if c1[-1:] in _LINE_END_PUNCTUATION:
+                penalty += 180.0
             if c1 != ' ' and c2 != ' ' and len(c1.strip()) > 0 and len(c2.strip()) > 0:
                 # Add word break penalty for Korean / CJK
-                return 150.0
-            return 0.0
+                penalty += 150.0
+            return penalty
 
         for r in range(R - 1, -1, -1):
             # Calculate elliptical limit width for row r

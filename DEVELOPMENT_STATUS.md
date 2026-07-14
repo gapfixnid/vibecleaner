@@ -90,6 +90,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - OCR 전체 점수가 통과해도 빈 텍스트 블록만 확장 crop으로 개별 재시도
 - 자동 말풍선 렌더링의 가독성 최소 폰트 하한(`11px`) 및 overflow 표시 보강
 - Qt 자동 레이아웃·API·Pillow export의 폰트 단위를 실제 픽셀(`px`) 기준으로 통일
+- 긴 문장 typesetting에서 구두점 고아 줄 억제 및 원본 bubble mask 재시도 경로 추가
 - detection/OCR/inpainting/translation provider queue
 - provider runtime metrics API
 - rollout telemetry JSONL 저장 및 v2 primary failure/fallback 성공률 집계
