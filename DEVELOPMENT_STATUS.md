@@ -85,6 +85,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - inpainting bounded LRU result cache
 - inpainting 결과 shape/dtype·target change·outside preservation 품질 검증
 - inpainting 품질 미달 시 대체 engine과 확장 dilation profile로 1회 자동 replan
+- heuristic line integral-image 경계 좌표 clamp 및 invalid inpainting 결과 fail-fast 검증
 - detection/OCR/inpainting/translation provider queue
 - provider runtime metrics API
 - rollout telemetry JSONL 저장 및 v2 primary failure/fallback 성공률 집계
@@ -110,7 +111,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 
 현재 마지막 검증 기준:
 
-- Python 전체 테스트: `176 passed`
+- Python 전체 테스트: `177 passed`
 - frontend build: 통과
 - frontend Node 테스트: 통과
 - parallel scheduler smoke benchmark: 약 `1.96x` speedup 확인

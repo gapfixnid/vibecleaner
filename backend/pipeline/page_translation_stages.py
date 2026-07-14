@@ -289,6 +289,8 @@ class PageInpaintingStage:
                     "stage": "inpainting", "engine": retry_engine, "passed": quality_score.passed
                 })
             context.artifacts.setdefault("quality_scores", {})["inpainting"] = quality_score
+            if inpainted_image is None or getattr(inpainted_image, "shape", None) != getattr(image, "shape", None):
+                raise RuntimeError("Inpainting did not produce a valid page image")
 
         context.artifacts["inpainted_image"] = inpainted_image
         context.artifacts["inpaint_result"] = inpainted_image
