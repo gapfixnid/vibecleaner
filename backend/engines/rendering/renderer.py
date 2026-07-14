@@ -13,6 +13,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def font_pixel_size(font: QFont) -> int:
+    """Return the effective font size in pixels for every render boundary."""
+    pixel_size = getattr(font, "pixelSize", lambda: -1)()
+    if pixel_size is not None and int(pixel_size) > 0:
+        return int(pixel_size)
+    point_size = getattr(font, "pointSizeF", lambda: -1.0)()
+    return max(1, int(round(float(point_size) * 96.0 / 72.0)))
+
+
+def _set_font_pixel_size(font: QFont, size: float) -> None:
+    font.setPixelSize(max(1, int(round(size))))
+
+
 @dataclass
 class TextLineLayout:
     text: str
@@ -213,7 +226,7 @@ class TextRenderer:
         for _ in range(8):
             mid = (low + high) / 2.0
             font = QFont(font_family)
-            font.setPointSizeF(mid)
+            _set_font_pixel_size(font, mid)
             
             lines = self.wrap_korean_text(text, width, font, allow_char_break=False)
             if lines is None:
@@ -249,7 +262,7 @@ class TextRenderer:
             for _ in range(8):
                 mid = (low + high) / 2.0
                 font = QFont(font_family)
-                font.setPointSizeF(mid)
+                _set_font_pixel_size(font, mid)
                 
                 lines = self.wrap_korean_text(text, width, font, allow_char_break=True)
                 metrics = QFontMetricsF(font)
@@ -273,7 +286,7 @@ class TextRenderer:
                     high = mid - 0.1
                     
         final_font = QFont(font_family)
-        final_font.setPointSizeF(optimal_size)
+        _set_font_pixel_size(final_font, optimal_size)
         return final_font, optimal_lines or [text], width
 
     def layout_lines_in_rect(
@@ -316,7 +329,7 @@ class TextRenderer:
             render_width=render_width,
             line_layouts=line_layouts,
             is_overflow=is_overflow,
-            reached_min_font=font.pointSizeF() <= min_size + 0.1,
+            reached_min_font=font_pixel_size(font) <= int(round(min_size)),
         )
 
     def make_ellipse_mask(self, width: int, height: int, inset: int = 0) -> np.ndarray:
@@ -422,7 +435,7 @@ class TextRenderer:
 
         for size in candidate_sizes:
             font = QFont(font_family)
-            font.setPointSizeF(size)
+            _set_font_pixel_size(font, size)
             layout = self._layout_text_in_mask(
                 text,
                 rect,
@@ -492,7 +505,7 @@ class TextRenderer:
                     line_layouts=line_layouts,
                     score=score,
                     is_overflow=False,
-                    reached_min_font=font.pointSizeF() <= min_size + 0.1,
+                    reached_min_font=font_pixel_size(font) <= int(round(min_size)),
                 )
 
         return best_result

@@ -9,6 +9,7 @@ from ...infrastructure.image.loading import ensure_page_image, invalidate_page_c
 from ...infrastructure.job_messages import msg
 from ...core.state.review import derive_bubble_status, refresh_bubble_status, refresh_page_status
 from ...core.version import APP_NAME
+from ...engines.rendering.renderer import font_pixel_size
 from .page_crud import resolve_page, resolve_page_index
 
 import logging
@@ -102,7 +103,7 @@ def _compute_bubble_layout(bubble: TextBubble, image, render_service) -> dict:
     )
     computed_font_family = layout.font.family() if hasattr(layout.font, "family") else ""
     return {
-        "font_size": bubble.font_size if bubble.font_size > 0 else int(layout.font.pointSizeF()),
+        "font_size": bubble.font_size if bubble.font_size > 0 else font_pixel_size(layout.font),
         "font_family": computed_font_family,
         "overflow": bool(getattr(layout, "is_overflow", False)),
         "reached_min_font": bool(getattr(layout, "reached_min_font", False)),

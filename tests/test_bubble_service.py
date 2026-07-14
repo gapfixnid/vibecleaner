@@ -71,7 +71,7 @@ class BubbleServiceTests(unittest.TestCase):
             self.state.pages = [page]
             self.state.current_page_idx = 0
 
-        fake_font = SimpleNamespace(pointSizeF=lambda: 17.0, family=lambda: "Resolved Font")
+        fake_font = SimpleNamespace(pixelSize=lambda: 17, family=lambda: "Resolved Font")
         fake_layout = SimpleNamespace(font=fake_font, line_layouts=[])
         response = bubble_service.get_bubbles_response(self.state, "page_a", FakeRenderService(fake_layout))
 

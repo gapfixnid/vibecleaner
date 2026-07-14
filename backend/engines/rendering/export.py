@@ -8,6 +8,7 @@ from PySide6.QtGui import QFontMetricsF
 from typing import Optional, Any, Callable
 from ...core.models import MangaPage
 from .service import RenderService
+from .renderer import font_pixel_size
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +72,10 @@ class ExportService:
                 text, b, image=page.cv_image, font_family=bubble_font_family
             )
             font = layout.font
-            font_size = b.font_size if b.font_size > 0 else int(font.pointSizeF())
+            font_size = b.font_size if b.font_size > 0 else font_pixel_size(font)
             if font_size <= 0:
                 font_size = 12
-            font.setPointSize(font_size)
+            font.setPixelSize(font_size)
             font.setBold(b.bold)
             font.setItalic(b.italic)
 

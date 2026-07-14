@@ -26,7 +26,7 @@ def test_automatic_mask_layout_does_not_shrink_below_readability_floor():
         font_family="Arial",
     )
 
-    assert layout.font.pointSizeF() >= renderer.AUTO_READABILITY_MIN_FONT_SIZE
+    assert layout.font.pixelSize() >= renderer.AUTO_READABILITY_MIN_FONT_SIZE
 
 
 def test_automatic_layout_still_uses_larger_font_when_text_fits():
@@ -41,5 +41,5 @@ def test_automatic_layout_still_uses_larger_font_when_text_fits():
         font_family="Arial",
     )
 
-    assert layout.font.pointSizeF() > renderer.AUTO_READABILITY_MIN_FONT_SIZE
+    assert layout.font.pixelSize() > renderer.AUTO_READABILITY_MIN_FONT_SIZE
     assert layout.is_overflow is False
