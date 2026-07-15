@@ -57,3 +57,16 @@ python scripts/benchmark_detection_recall.py `
 
 The capture output includes the model, threshold, tiling setting, predicted
 boxes, and raw model confidence values used for the run.
+
+If ground-truth coordinates are not known, create them with the temporary
+local annotator. It is not included in the product UI or release package:
+
+```powershell
+python scripts/annotate_detection_corpus.py `
+  path/to/image-folder `
+  --output path/to/detection-corpus.json
+```
+
+Left-drag each text region, press `Enter` or `Right Arrow` for the next image,
+and use `U` to undo, `C` to clear, and `S` to save. The saved coordinates are
+original image pixels and can be passed to the capture command above.
