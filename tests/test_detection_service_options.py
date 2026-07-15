@@ -171,6 +171,35 @@ def test_cached_single_block_ocr_does_not_wait_for_another_ocr_inference():
         service.shutdown()
 
 
+def test_ocr_cache_key_includes_language_engine_and_preprocessing():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        service = DetectionService(
+            detector=FakeDetector(),
+            ocr_engine=FakeOcr(),
+            config=SimpleNamespace(
+                source_language="Japanese",
+                ocr_engine="manga_ocr",
+                ocr_padding=8,
+                ocr_crop_scale=1.5,
+                adaptive_binarization=True,
+                adaptive_binarization_strength=2.0,
+            ),
+            cache_file_path=os.path.join(tmpdir, "ocr-cache.sqlite3"),
+        )
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+        bbox = [2, 2, 12, 14]
+
+        base = service._get_crop_hash(image, bbox, lang="Japanese", engine="manga_ocr")
+        other_language = service._get_crop_hash(image, bbox, lang="English", engine="manga_ocr")
+        other_engine = service._get_crop_hash(image, bbox, lang="Japanese", engine="ppocr")
+        other_padding = service._get_crop_hash(
+            image, bbox, lang="Japanese", engine="manga_ocr", padding=16
+        )
+
+        assert len({base, other_language, other_engine, other_padding}) == 4
+        service.shutdown()
+
+
 def test_second_page_detection_starts_while_first_page_ocr_is_running():
     with tempfile.TemporaryDirectory() as tmpdir:
         detector = CountingDetector()

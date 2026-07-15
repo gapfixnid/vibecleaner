@@ -279,7 +279,18 @@ class DetectionService:
     #  LRU cache helpers
     # ------------------------------------------------------------------ #
 
-    def _get_crop_hash(self, image: np.ndarray, bbox: Any) -> Optional[str]:
+    def _get_crop_hash(
+        self,
+        image: np.ndarray,
+        bbox: Any,
+        *,
+        lang: str | None = None,
+        engine: str | None = None,
+        padding: int | None = None,
+        crop_scale: float | None = None,
+        adaptive_binarization: bool | None = None,
+        adaptive_binarization_strength: float | None = None,
+    ) -> Optional[str]:
         if bbox is None:
             return None
         try:
@@ -290,7 +301,28 @@ class DetectionService:
             if x2 <= x1 or y2 <= y1:
                 return None
             crop = image[y1:y2, x1:x2]
-            return hashlib.md5(crop.tobytes()).hexdigest()
+            crop_digest = hashlib.md5(crop.tobytes()).hexdigest()
+            cache_context = {
+                "version": 2,
+                "crop": crop_digest,
+                "lang": lang or config_value(self.config, "source_language"),
+                "engine": engine or self._ocr_engine_name(),
+                "padding": int(padding if padding is not None else config_value(self.config, "ocr_padding")),
+                "crop_scale": float(crop_scale if crop_scale is not None else config_value(self.config, "ocr_crop_scale")),
+                "adaptive_binarization": bool(
+                    adaptive_binarization
+                    if adaptive_binarization is not None
+                    else config_value(self.config, "adaptive_binarization")
+                ),
+                "adaptive_binarization_strength": float(
+                    adaptive_binarization_strength
+                    if adaptive_binarization_strength is not None
+                    else config_value(self.config, "adaptive_binarization_strength")
+                ),
+            }
+            return hashlib.sha256(
+                json.dumps(cache_context, ensure_ascii=False, sort_keys=True).encode("utf-8")
+            ).hexdigest()
         except Exception:
             logger.exception("Failed to hash OCR crop for bbox=%s", bbox)
             return None
@@ -388,7 +420,11 @@ class DetectionService:
         uncached_blocks = []
         block_hashes = {}
         for block in blocks:
-            crop_hash = self._get_crop_hash(image, block.xyxy)
+            crop_hash = self._get_crop_hash(
+                image, block.xyxy, lang=lang, engine=engine, padding=padding,
+                crop_scale=crop_scale, adaptive_binarization=adaptive_binarization,
+                adaptive_binarization_strength=adaptive_binarization_strength,
+            )
             cached_text = self._get_cached_ocr(crop_hash) if use_cache else None
             if cached_text is not None:
                 block.text = cached_text
@@ -472,7 +508,7 @@ class DetectionService:
         engine: str | None = None,
     ) -> None:
         """Run OCR on a single block without blocking cache hits on model inference."""
-        crop_hash = self._get_crop_hash(image, block.xyxy)
+        crop_hash = self._get_crop_hash(image, block.xyxy, lang=lang, engine=engine)
         cached_text = self._get_cached_ocr(crop_hash)
         if cached_text is not None:
             block.text = cached_text
