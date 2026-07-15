@@ -172,8 +172,7 @@ Use the dependency files for distinct purposes:
 | --- | --- |
 | `npm install` | Installs the root Tauri CLI dependency used by `npm run dev` and `npm run build`. |
 | `npm --prefix frontend install` | Installs React, Vite, TypeScript, and Tauri frontend API dependencies. |
-| `requirements-runtime.txt` | Default Python backend runtime for local desktop dev and sidecar packaging. Excludes optional Torch packages. |
-| `requirements-torch.txt` | Optional Torch-backed model paths for development or advanced local features. |
+| `requirements-runtime.txt` | ONNX Runtime backend for local desktop development and sidecar packaging. |
 | `requirements-build.txt` | PyInstaller-only dependencies for building the backend sidecar. |
 | `requirements.txt` | Full development environment. Do not use this for lean release sidecar packaging. |
 

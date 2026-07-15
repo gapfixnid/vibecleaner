@@ -98,7 +98,6 @@ python --version
 | Root Node package | `npm install` | Installs the Tauri CLI used by `npm run dev` and `npm run build`. |
 | Frontend package | `npm --prefix frontend install` | Installs React, Vite, TypeScript, and the Tauri frontend API. |
 | Backend runtime | `.\venv\Scripts\python.exe -m pip install -r requirements-runtime.txt` | Default local desktop backend and release sidecar runtime. |
-| Optional Torch runtime | `.\venv\Scripts\python.exe -m pip install -r requirements-torch.txt` | Torch-backed OCR, inpainting, RT-DETR, or font-detection paths. |
 | Sidecar build tools | installed by `npm run build:sidecar:runtime` | PyInstaller build environment for the packaged backend sidecar. |
 | Full Python dev file | `requirements.txt` | Full development environment; avoid it for lean sidecar packaging. |
 
@@ -123,11 +122,8 @@ python -m venv venv
 .\venv\Scripts\python.exe -m pip install -r requirements-runtime.txt
 ```
 
-For the default ONNX-backed local workflow, `requirements-runtime.txt` is enough to start the desktop app. Install Torch only when you need Torch-backed OCR, inpainting, RT-DETR, or font-detection paths:
-
-```powershell
-.\venv\Scripts\python.exe -m pip install -r requirements-torch.txt
-```
+The local model workflow is ONNX Runtime based. CPU execution works by default;
+CUDA acceleration is optional and uses the same ONNX model files.
 
 ### NVIDIA CUDA acceleration
 
@@ -218,7 +214,7 @@ Release sidecar builds use a separate `.venv-runtime` environment created by `sc
 - Local browser and local process access are not the same security boundary. Treat the local API as a loopback service for the desktop app, not as a network service.
 - Translation provider credentials are configured in app settings. Do not commit local settings or API keys.
 - Model files are downloaded into the user data directory and are not committed to the repository.
-- Runtime sidecar builds use `.venv-runtime/`, `requirements-runtime.txt`, and PyInstaller excludes so optional Torch packages and model weights are not bundled into the installer.
+- Runtime sidecar builds use `.venv-runtime/`, `requirements-runtime.txt`, and PyInstaller excludes so model weights are not bundled into the installer.
 - Release builds need a backend sidecar at `desktop/src-tauri/binaries/server-x86_64-pc-windows-msvc.exe`.
 - Pretendard is bundled for Korean text rendering under `backend/infrastructure/assets/fonts/`.
 
@@ -232,7 +228,7 @@ npm run verify:packaging
 npm run build
 ```
 
-Do not build the sidecar from `venv/` if that environment contains optional packages such as Torch, torchvision, spaCy, or notebook tooling. PyInstaller can detect imports even when they are only used by optional code paths, which inflates the sidecar. The runtime sidecar script creates `.venv-runtime/`, installs `requirements-runtime.txt`, excludes optional Torch modules, and copies the generated server to `desktop/src-tauri/binaries/server-x86_64-pc-windows-msvc.exe`.
+Build the sidecar from the clean `.venv-runtime/` environment created by the build script. The runtime sidecar script installs `requirements-runtime.txt` and copies the generated server to `desktop/src-tauri/binaries/server-x86_64-pc-windows-msvc.exe`.
 
 Model files are external runtime assets. They are resolved through `ModelDownloader` and saved under the platform-specific user data directory, for example `%LOCALAPPDATA%\vibecleaner\models` on Windows. Use `download_models.py` only to pre-warm a local machine; do not add downloaded model folders to Tauri resources.
 

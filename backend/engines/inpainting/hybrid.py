@@ -10,7 +10,7 @@ class HybridInpainter:
                 import onnxruntime as ort
                 try:
                     providers = ort.get_available_providers()
-                    return "CUDAExecutionProvider" in providers or "ROCMExecutionProvider" in providers
+                    return "CUDAExecutionProvider" in providers
                 except Exception:
                     return False
         self.settings = DummySettings()
