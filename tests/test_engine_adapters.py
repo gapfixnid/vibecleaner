@@ -103,6 +103,14 @@ class FakeRecognizeTextOcr:
         return blocks
 
 
+class ReorderingRecognizeTextOcr(FakeRecognizeTextOcr):
+    def recognize_text(self, image, blocks, **kwargs):
+        return [
+            type("Result", (), {"xyxy": blocks[1].xyxy, "text": "second"})(),
+            type("Result", (), {"xyxy": blocks[0].xyxy, "text": "first"})(),
+        ]
+
+
 class FakeLegacyTranslator:
     def translate(self, text, source_language, target_language):
         return f"{text}:{target_language}"
@@ -239,6 +247,18 @@ def test_ocr_adapter_wraps_recognize_text_legacy_engine():
     assert ocr.calls[0]["engine"] == "ppocr"
     assert ocr.calls[0]["blocks"][0].xyxy == [1, 2, 11, 12]
     assert result.regions[0].text == "ppocr:1"
+
+
+def test_ocr_adapter_matches_reordered_results_by_coordinates():
+    adapter = OcrEngineAdapter(engine=ReorderingRecognizeTextOcr())
+    regions = [
+        TextRegion(box=Box(1, 2, 11, 12)),
+        TextRegion(box=Box(20, 22, 31, 32)),
+    ]
+
+    result = adapter.recognize(ImageData(array=object()), regions, OcrOptions())
+
+    assert [region.text for region in result.regions] == ["first", "second"]
 
 
 def test_ocr_adapter_passes_explicit_crop_options_to_legacy_engine():
