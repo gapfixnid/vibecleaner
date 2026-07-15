@@ -13,6 +13,7 @@ from ...core.config import config_value
 from ...core.providers.concurrency import ProviderConcurrencyGate
 from .wrapper import RTDETRv2Detector
 from ..ocr.local import LocalOCR
+from ..ocr.preprocessing_profile import resolve_ocr_preprocessing_profile
 
 logger = logging.getLogger(__name__)
 
@@ -417,13 +418,22 @@ class DetectionService:
         use_cache: bool = True,
     ) -> List[Any]:
         """Run OCR for previously detected blocks, preserving the legacy cache."""
+        profile = resolve_ocr_preprocessing_profile(
+            lang,
+            self._ocr_engine_name(engine),
+            padding=padding,
+            crop_scale=crop_scale,
+            adaptive_binarization=adaptive_binarization,
+            adaptive_binarization_strength=adaptive_binarization_strength,
+        )
         uncached_blocks = []
         block_hashes = {}
         for block in blocks:
             crop_hash = self._get_crop_hash(
-                image, block.xyxy, lang=lang, engine=engine, padding=padding,
-                crop_scale=crop_scale, adaptive_binarization=adaptive_binarization,
-                adaptive_binarization_strength=adaptive_binarization_strength,
+                image, block.xyxy, lang=lang, engine=self._ocr_engine_name(engine),
+                padding=profile.padding, crop_scale=profile.crop_scale,
+                adaptive_binarization=profile.adaptive_binarization,
+                adaptive_binarization_strength=profile.adaptive_binarization_strength,
             )
             cached_text = self._get_cached_ocr(crop_hash) if use_cache else None
             if cached_text is not None:
@@ -439,15 +449,12 @@ class DetectionService:
                     with self._ocr_engine_lock:
                         self.ocr_engine.lang = lang
                         ocr_options = {"engine": self._ocr_engine_name(engine)}
-                        if any(value is not None for value in (
-                            padding, crop_scale, adaptive_binarization, adaptive_binarization_strength
-                        )):
-                            ocr_options.update({
-                                "padding": padding,
-                                "crop_scale": crop_scale,
-                                "adaptive_binarization": adaptive_binarization,
-                                "adaptive_binarization_strength": adaptive_binarization_strength,
-                            })
+                        ocr_options.update({
+                            "padding": profile.padding,
+                            "crop_scale": profile.crop_scale,
+                            "adaptive_binarization": profile.adaptive_binarization,
+                            "adaptive_binarization_strength": profile.adaptive_binarization_strength,
+                        })
                         self.ocr_engine.recognize_text(image, uncached_blocks, **ocr_options)
             except Exception as exc:
                 self._set_last_error(str(exc))
@@ -508,7 +515,13 @@ class DetectionService:
         engine: str | None = None,
     ) -> None:
         """Run OCR on a single block without blocking cache hits on model inference."""
-        crop_hash = self._get_crop_hash(image, block.xyxy, lang=lang, engine=engine)
+        profile = resolve_ocr_preprocessing_profile(lang, self._ocr_engine_name(engine))
+        crop_hash = self._get_crop_hash(
+            image, block.xyxy, lang=lang, engine=self._ocr_engine_name(engine),
+            padding=profile.padding, crop_scale=profile.crop_scale,
+            adaptive_binarization=profile.adaptive_binarization,
+            adaptive_binarization_strength=profile.adaptive_binarization_strength,
+        )
         cached_text = self._get_cached_ocr(crop_hash)
         if cached_text is not None:
             block.text = cached_text
@@ -519,7 +532,12 @@ class DetectionService:
             with self._ocr_gate.slot():
                 with self._ocr_engine_lock:
                     self.ocr_engine.lang = lang
-                    self.ocr_engine.recognize_text(image, [block], engine=self._ocr_engine_name(engine))
+                    self.ocr_engine.recognize_text(
+                        image, [block], engine=self._ocr_engine_name(engine),
+                        padding=profile.padding, crop_scale=profile.crop_scale,
+                        adaptive_binarization=profile.adaptive_binarization,
+                        adaptive_binarization_strength=profile.adaptive_binarization_strength,
+                    )
         except Exception as exc:
             self._set_last_error(str(exc))
             logger.exception("Single-block OCR failed. lang=%s bbox=%s", lang, getattr(block, "xyxy", None))

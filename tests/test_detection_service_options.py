@@ -47,9 +47,11 @@ class FakeOcr:
     def __init__(self):
         self.lang = None
         self.calls = 0
+        self.options = []
 
-    def recognize_text(self, image, blocks, engine=None):
+    def recognize_text(self, image, blocks, engine=None, **kwargs):
         self.calls += 1
+        self.options.append({"engine": engine, **kwargs})
         for block in blocks:
             block.text = f"{engine}:text"
         return blocks
@@ -61,8 +63,9 @@ class BlockingOcr(FakeOcr):
         self.started = threading.Event()
         self.release = threading.Event()
 
-    def recognize_text(self, image, blocks, engine=None):
+    def recognize_text(self, image, blocks, engine=None, **kwargs):
         self.calls += 1
+        self.options.append({"engine": engine, **kwargs})
         self.started.set()
         if not self.release.wait(timeout=2):
             raise TimeoutError("test OCR release timed out")
@@ -136,6 +139,33 @@ def test_detection_and_ocr_can_run_as_independent_operations():
         service.ocr_only(image, blocks, lang="Japanese")
         assert ocr.calls == 1
         assert blocks[0].text == "ppocr:text"
+        service.shutdown()
+
+
+def test_ocr_uses_language_profile_and_explicit_overrides():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ocr = FakeOcr()
+        service = DetectionService(
+            detector=FakeDetector(),
+            ocr_engine=ocr,
+            config=SimpleNamespace(ocr_engine="ppocr"),
+            cache_file_path=os.path.join(tmpdir, "ocr_cache.sqlite3"),
+        )
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+        service.ocr_only(image, [FakeBlock()], lang="English")
+        assert ocr.options[-1] == {
+            "engine": "ppocr", "padding": 6, "crop_scale": 1.25,
+            "adaptive_binarization": True, "adaptive_binarization_strength": 1.5,
+        }
+        service.ocr_only(
+            image, [FakeBlock()], lang="English", padding=12,
+            crop_scale=2.0, adaptive_binarization=False,
+            adaptive_binarization_strength=3.0,
+        )
+        assert ocr.options[-1]["padding"] == 12
+        assert ocr.options[-1]["crop_scale"] == 2.0
+        assert ocr.options[-1]["adaptive_binarization"] is False
+        assert ocr.options[-1]["adaptive_binarization_strength"] == 3.0
         service.shutdown()
 
 

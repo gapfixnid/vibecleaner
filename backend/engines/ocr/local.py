@@ -4,6 +4,7 @@ import threading
 from ..common.textblock import TextBlock
 from .manga_ocr.mobile.onnx_engine import MangaOCRMobileONNXEngine
 from .ppocr.engine import PPOCRv5Engine
+from .preprocessing_profile import resolve_ocr_preprocessing_profile
 
 class DummySettings:
     def is_gpu_enabled(self):
@@ -65,6 +66,14 @@ class LocalOCR:
             return text_blocks
             
         engine_name = self._resolve_engine_name(engine)
+        profile = resolve_ocr_preprocessing_profile(
+            self.lang,
+            engine_name,
+            padding=padding,
+            crop_scale=crop_scale,
+            adaptive_binarization=adaptive_binarization,
+            adaptive_binarization_strength=adaptive_binarization_strength,
+        )
         if engine_name == "manga_ocr":
             if self.japanese_engine is None:
                 with self._lock:
@@ -75,10 +84,10 @@ class LocalOCR:
             return self.japanese_engine.process_image(
                 image,
                 text_blocks,
-                padding=padding,
-                crop_scale=crop_scale,
-                adaptive_binarization=adaptive_binarization,
-                adaptive_binarization_strength=adaptive_binarization_strength,
+                padding=profile.padding,
+                crop_scale=profile.crop_scale,
+                adaptive_binarization=profile.adaptive_binarization,
+                adaptive_binarization_strength=profile.adaptive_binarization_strength,
             )
         else:
             lang_code = self._ppocr_lang_code()
@@ -93,8 +102,8 @@ class LocalOCR:
             return self.ppocr_engines[lang_code].process_image(
                 image,
                 text_blocks,
-                padding=padding,
-                crop_scale=crop_scale,
-                adaptive_binarization=adaptive_binarization,
-                adaptive_binarization_strength=adaptive_binarization_strength,
+                padding=profile.padding,
+                crop_scale=profile.crop_scale,
+                adaptive_binarization=profile.adaptive_binarization,
+                adaptive_binarization_strength=profile.adaptive_binarization_strength,
             )
