@@ -585,7 +585,8 @@ class DetectionService:
             "ocr_engine": self.ocr_engine.__class__.__name__,
             "ocr_execution_providers": sorted({
                 provider
-                for engine in getattr(self.ocr_engine, "ppocr_engines", {}).values()
+                for engine in list(getattr(self.ocr_engine, "ppocr_engines", {}).values())
+                + [getattr(self.ocr_engine, "japanese_engine", None)]
                 for provider in model_session_providers(engine)
             }),
             "ocr_cache_entries": cache_entries,
