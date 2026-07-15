@@ -47,3 +47,23 @@ def test_recall_threshold_does_not_override_existing_high_confidence_text():
         threshold=0.45,
     )
     assert primary_text == [[4, 5, 20, 25]]
+
+
+def test_partial_recall_recovers_low_confidence_text_inside_detected_bubble():
+    recovered = RTDetrV2ONNXDetection._append_recall_text_boxes(
+        [[10, 10, 30, 30]],
+        [[60, 20, 82, 42]],
+        [[0, 0, 100, 80]],
+    )
+
+    assert recovered == [[10, 10, 30, 30], [60, 20, 82, 42]]
+
+
+def test_partial_recall_rejects_low_confidence_text_outside_detected_bubbles():
+    recovered = RTDetrV2ONNXDetection._append_recall_text_boxes(
+        [[10, 10, 30, 30]],
+        [[110, 20, 132, 42]],
+        [[0, 0, 100, 80]],
+    )
+
+    assert recovered == [[10, 10, 30, 30]]
