@@ -63,7 +63,7 @@ export function CanvasImageStage({
             }}
           />
 
-          {!isWaitingForImageReload && (
+          {!isWaitingForImageReload && !showDetectionOverlay && (
             <CanvasBubbleBoxOverlay
               bubbles={bubbles}
               selectedBubbleId={selectedBubbleId}
