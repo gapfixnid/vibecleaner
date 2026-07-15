@@ -128,6 +128,8 @@ export type TranslationKey =
   | "canvas.zoomOut"
   | "canvas.zoomFit"
   | "canvas.zoomActual"
+  | "canvas.showDetection"
+  | "canvas.hideDetection"
   | "dnd.dropToImport"
   | "dnd.skippedFiles"
   | "toast.bubbleDeleted"
@@ -399,6 +401,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "canvas.zoomOut": "Zoom out",
     "canvas.zoomFit": "Fit to window",
     "canvas.zoomActual": "Actual size (100%)",
+    "canvas.showDetection": "Show detection boxes",
+    "canvas.hideDetection": "Hide detection boxes",
     "dnd.dropToImport": "Drop images to import",
     "dnd.skippedFiles": "{count} unsupported file(s) skipped",
     "toast.bubbleDeleted": "Bubble deleted",
@@ -669,6 +673,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "canvas.zoomOut": "축소",
     "canvas.zoomFit": "창에 맞추기",
     "canvas.zoomActual": "실제 크기 (100%)",
+    "canvas.showDetection": "검출 박스 표시",
+    "canvas.hideDetection": "검출 박스 숨기기",
     "dnd.dropToImport": "이미지를 놓아 가져오기",
     "dnd.skippedFiles": "지원되지 않는 파일 {count}개를 건너뛰었습니다",
     "toast.bubbleDeleted": "말풍선이 삭제되었습니다",

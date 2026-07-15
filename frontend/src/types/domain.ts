@@ -37,6 +37,7 @@ export interface BubbleInfo {
   layout_confidence: number;
   layout_reasoning: string;
   lines: LineLayout[];
+  text_box?: { x: number; y: number; width: number; height: number } | null;
 }
 
 export interface BubbleUpdate {

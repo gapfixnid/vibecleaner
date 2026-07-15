@@ -87,6 +87,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - heuristic line integral-image 경계 좌표 clamp 및 invalid inpainting 결과 fail-fast 검증
 - RT-DETR ONNX detection에서 고신뢰 텍스트가 없을 때만 저신뢰 후보를 재검토하는 recall 보강
 - 일부 텍스트만 고신뢰로 검출된 경우에도 기존 말풍선 내부 저신뢰 후보를 부분 재검토
+- 캔버스에서 말풍선·텍스트 검출 영역을 확인하는 디버그 오버레이 토글 추가
 - OCR 전체 점수가 통과해도 빈 텍스트 블록만 확장 crop으로 개별 재시도
 - 자동 말풍선 렌더링의 가독성 최소 폰트 하한(`11px`) 및 overflow 표시 보강
 - Qt 자동 레이아웃·API·Pillow export의 폰트 단위를 실제 픽셀(`px`) 기준으로 통일

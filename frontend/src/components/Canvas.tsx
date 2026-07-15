@@ -1,5 +1,6 @@
 // frontend/src/components/Canvas.tsx
 import React, { useRef, useState } from "react";
+import { Bug } from "lucide-react";
 import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
 import { CanvasZoomControls } from "./canvas/CanvasZoomControls";
@@ -61,6 +62,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const imageRef = useRef<HTMLImageElement>(null);
   const [scale, setScale] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [showDetectionOverlay, setShowDetectionOverlay] = useState(false);
 
   // Tracks whether the user has manually zoomed/panned the current page, so
   // that container resizes don't reset their view.
@@ -193,6 +195,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           onImageLoad={handleImageLoad}
           onImageError={handleImageError}
           onStartBubbleDrag={startBubbleDrag}
+          showDetectionOverlay={showDetectionOverlay}
         />
       )}
 
@@ -212,6 +215,15 @@ export const Canvas: React.FC<CanvasProps> = ({
       {displayImageUrl && (
         <div className="canvas-floating-controls">
           <div className="actions-capsule">
+            <button
+              type="button"
+              className={`canvas-debug-button${showDetectionOverlay ? " active" : ""}`}
+              onClick={() => setShowDetectionOverlay((visible) => !visible)}
+              title={showDetectionOverlay ? (t?.("canvas.hideDetection") || "Hide detection boxes") : (t?.("canvas.showDetection") || "Show detection boxes")}
+              aria-label={showDetectionOverlay ? (t?.("canvas.hideDetection") || "Hide detection boxes") : (t?.("canvas.showDetection") || "Show detection boxes")}
+            >
+              <Bug size={15} />
+            </button>
             <CanvasTranslateButton
               isProcessing={isProcessing}
               isJobActive={isJobActive}
@@ -250,6 +262,24 @@ export const Canvas: React.FC<CanvasProps> = ({
           display: block;
           max-width: none;
           max-height: none;
+        }
+
+        .canvas-debug-button {
+          width: 30px;
+          height: 30px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 0;
+          border-radius: 9px;
+          color: var(--text-secondary);
+          background: transparent;
+          cursor: pointer;
+        }
+
+        .canvas-debug-button:hover, .canvas-debug-button.active {
+          color: var(--system-blue);
+          background: color-mix(in srgb, var(--system-blue) 14%, transparent);
         }
 
         .canvas-svg-overlay, .canvas-text-overlay {
