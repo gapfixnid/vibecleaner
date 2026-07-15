@@ -13,9 +13,7 @@ MODEL_LABELS: dict[ModelID, tuple[str, str]] = {
     ModelID.RTDETR_INT8_ONNX: ("Detection", "RT-DETRv2 INT8"),
     ModelID.MANGA_OCR_MOBILE_ONNX: ("OCR", "Manga OCR Mobile ONNX"),
     ModelID.PPOCR_V5_DET_MOBILE: ("OCR", "PP-OCRv5 Mobile Detector"),
-    ModelID.PPOCR_V5_REC_MOBILE: ("OCR", "PP-OCRv5 Chinese/Japanese Recognition"),
-    ModelID.PPOCR_V5_REC_EN_MOBILE: ("OCR", "PP-OCRv5 English Recognition"),
-    ModelID.PPOCR_V5_REC_KOREAN_MOBILE: ("OCR", "PP-OCRv5 Korean Recognition"),
+    ModelID.PPOCR_V6_REC_MEDIUM: ("OCR", "PP-OCRv6 Medium Recognition"),
     ModelID.LAMA_ONNX: ("Inpainting", "LaMa Manga ONNX"),
 }
 
@@ -33,10 +31,10 @@ def _append_unique(items: list[ModelID], model_ids: Iterable[ModelID]) -> None:
 def _ppocr_recognition_model(source_language: str) -> ModelID:
     lang = _normalized(source_language)
     if lang in {"english", "en"}:
-        return ModelID.PPOCR_V5_REC_EN_MOBILE
+        return ModelID.PPOCR_V6_REC_MEDIUM
     if lang in {"korean", "ko", "한국어"}:
-        return ModelID.PPOCR_V5_REC_KOREAN_MOBILE
-    return ModelID.PPOCR_V5_REC_MOBILE
+        return ModelID.PPOCR_V6_REC_MEDIUM
+    return ModelID.PPOCR_V6_REC_MEDIUM
 
 
 def get_required_model_ids(settings: AppConfig) -> list[ModelID]:

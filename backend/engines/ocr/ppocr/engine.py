@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, List, Tuple, Optional
 import numpy as np
 import onnxruntime as ort
+import yaml
 
 from ..base import OCREngine
 from ...common.textblock import TextBlock
@@ -76,22 +77,26 @@ class PPOCRv5Engine(OCREngine):
 			self.rec_threads = 6
 		else:
 			self.rec_threads = 4
-		rec_id = LANG_TO_REC_MODEL.get(lang, ModelID.PPOCR_V5_REC_LATIN_MOBILE)
+		rec_id = ModelID.PPOCR_V6_REC_MEDIUM
 		ModelDownloader.ensure([rec_id])
 
 		rec_paths = ModelDownloader.file_path_map(rec_id)
 		rec_model = [p for n, p in rec_paths.items() if n.endswith('.onnx')][0]
 		# dict file name can vary per lang
-		dict_file = [p for n, p in rec_paths.items() if n.endswith('.txt')]
-		dict_path = dict_file[0] if dict_file else None
+		config_file = [p for n, p in rec_paths.items() if n.endswith('.yml')]
+		config_path = config_file[0] if config_file else None
 
 		providers = get_providers(device)
 		sess_opt = _make_ppocr_session_options(self.rec_threads)
 		self.rec_sess = make_session(rec_model, sess_options=sess_opt, providers=providers)
 
 		# Prepare CTC decoder
-		if dict_path:
-			self.decoder = CTCLabelDecoder(dict_path=dict_path)
+		if config_path:
+			with open(config_path, 'r', encoding='utf-8') as config_handle:
+				model_config = yaml.safe_load(config_handle) or {}
+			charset = ((model_config.get('PostProcess') or {}).get('character_dict') or [])
+			if charset:
+				self.decoder = CTCLabelDecoder(charset=charset)
 		else:
 			# try pull embedded vocab from model metadata
 			meta = self.rec_sess.get_modelmeta().custom_metadata_map

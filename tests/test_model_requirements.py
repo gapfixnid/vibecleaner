@@ -38,7 +38,7 @@ class ModelRequirementsTests(unittest.TestCase):
             [
                 ModelID.RTDETR_INT8_ONNX,
                 ModelID.PPOCR_V5_DET_MOBILE,
-                ModelID.PPOCR_V5_REC_MOBILE,
+                ModelID.PPOCR_V6_REC_MEDIUM,
             ],
         )
 
@@ -55,7 +55,7 @@ class ModelRequirementsTests(unittest.TestCase):
             [
                 ModelID.RTDETR_V2_ONNX,
                 ModelID.PPOCR_V5_DET_MOBILE,
-                ModelID.PPOCR_V5_REC_KOREAN_MOBILE,
+                ModelID.PPOCR_V6_REC_MEDIUM,
                 ModelID.LAMA_ONNX,
             ],
         )
@@ -78,7 +78,7 @@ class ModelRequirementsTests(unittest.TestCase):
         self.assertEqual(status["missing_count"], 2)
         self.assertEqual(
             [item["id"] for item in status["missing"]],
-            [ModelID.PPOCR_V5_DET_MOBILE.value, ModelID.PPOCR_V5_REC_EN_MOBILE.value],
+            [ModelID.PPOCR_V5_DET_MOBILE.value, ModelID.PPOCR_V6_REC_MEDIUM.value],
         )
         self.assertEqual(is_downloaded.call_count, 3)
 
@@ -95,7 +95,7 @@ class ModelRequirementsTests(unittest.TestCase):
             [
                 ModelID.RTDETR_INT8_ONNX,
                 ModelID.PPOCR_V5_DET_MOBILE,
-                ModelID.PPOCR_V5_REC_KOREAN_MOBILE,
+                ModelID.PPOCR_V6_REC_MEDIUM,
             ],
         )
 
