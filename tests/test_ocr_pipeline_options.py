@@ -25,8 +25,9 @@ class FakeMangaEngine:
 class FakePPOCREngine:
     calls = []
 
-    def initialize(self, lang="ch"):
+    def initialize(self, lang="ch", device="cpu"):
         self.lang = lang
+        self.device = device
 
     def process_image(self, image, blocks, **kwargs):
         self.calls.append(kwargs)
@@ -46,6 +47,23 @@ class OcrPipelineOptionsTests(unittest.TestCase):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="ppocr")
 
         self.assertEqual(block.text, "ppocr:ch")
+
+    def test_local_ocr_passes_gpu_device_when_cuda_is_available(self):
+        block = TextBlock([1, 1, 10, 10])
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+
+        class GpuSettings:
+            def is_gpu_enabled(self):
+                return True
+
+        with (
+            patch("backend.engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
+        ):
+            ocr = LocalOCR(lang="English")
+            ocr.settings = GpuSettings()
+            ocr.recognize_text(image, [block], engine="ppocr")
+
+        self.assertEqual(ocr.ppocr_engines["en"].device, "cuda")
 
     def test_forced_ppocr_engine_overrides_japanese_auto_engine(self):
         block = TextBlock([1, 1, 10, 10])
