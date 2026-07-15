@@ -83,7 +83,10 @@ def run_page_translation(
         quality_scores=_telemetry_quality_scores(result.context),
         quality_replans=list(result.context.artifacts.get("quality_replans", [])),
         errors=[getattr(issue, "message", str(issue)) for issue in result.issues],
-        metadata={"pipeline": "page_translation"},
+        metadata={
+            "pipeline": "page_translation",
+            "ocr_provenance": result.context.artifacts.get("ocr_provenance", {}),
+        },
     ))
     runner.last_result = result
     if not result.succeeded:

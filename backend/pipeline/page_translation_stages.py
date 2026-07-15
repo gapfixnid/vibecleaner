@@ -162,6 +162,25 @@ class PageOcrStage:
         image = context.artifacts["image"]
         local_bubbles = context.artifacts["local_bubbles"]
 
+        diagnostics_before = self._diagnostics()
+        ocr_provenance = {
+            "language": config.source_language,
+            "engine": config.ocr_engine,
+            "preprocessing": {
+                "padding": int(getattr(config, "ocr_padding", 8)),
+                "crop_scale": float(getattr(config, "ocr_crop_scale", 1.5)),
+                "adaptive_binarization": bool(getattr(config, "adaptive_binarization", True)),
+                "adaptive_binarization_strength": float(
+                    getattr(config, "adaptive_binarization_strength", 2.0)
+                ),
+            },
+            "cache": {
+                "hits_before": diagnostics_before.get("ocr_cache_hits"),
+                "misses_before": diagnostics_before.get("ocr_cache_misses"),
+            },
+            "skipped": bool(local_bubbles),
+        }
+
         if not local_bubbles:
             if context.artifacts.pop("ocr_pending", False):
                 if self.detection_service is None or not hasattr(
@@ -257,7 +276,28 @@ class PageOcrStage:
 
         context.artifacts["local_bubbles"] = local_bubbles
         context.artifacts["ocr_result"] = local_bubbles
+        diagnostics_after = self._diagnostics()
+        ocr_provenance["cache"].update({
+            "hits_after": diagnostics_after.get("ocr_cache_hits"),
+            "misses_after": diagnostics_after.get("ocr_cache_misses"),
+        })
+        ocr_provenance["retry_count"] = sum(
+            1 for item in context.artifacts.get("quality_replans", [])
+            if item.get("stage") == "ocr"
+        )
+        context.artifacts["ocr_provenance"] = ocr_provenance
         return context
+
+    def _diagnostics(self) -> dict[str, Any]:
+        getter = getattr(self.detection_service, "get_diagnostics", None)
+        if not callable(getter):
+            return {}
+        try:
+            value = getter()
+            return value if isinstance(value, dict) else {}
+        except Exception:
+            logger.debug("Unable to capture OCR diagnostics", exc_info=True)
+            return {}
 
 
 class PageTranslationStage:
