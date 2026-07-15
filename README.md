@@ -49,6 +49,13 @@ not an accepted end state.
 See `docs/backend-dependency-contract.md` for the full import boundary,
 composition root, dependency-set, and verification contract.
 
+The v0.2 evolution guardrails are documented in
+`docs/adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md`. Persisted
+project, settings, artifact, checkpoint, and cache compatibility follows
+`docs/schema-versioning-policy.md`.
+Provider manifest, registration, and catalog rules are documented in
+`docs/provider-extension-contract.md`.
+
 ## Translation Pipeline
 
 The current page translation flow is:
@@ -121,6 +128,44 @@ For the default ONNX-backed local workflow, `requirements-runtime.txt` is enough
 ```powershell
 .\venv\Scripts\python.exe -m pip install -r requirements-torch.txt
 ```
+
+### NVIDIA CUDA acceleration
+
+The runtime requirements install the CPU build of ONNX Runtime by default so
+the app works on machines without NVIDIA hardware. To use CUDA for the ONNX
+detection, OCR, and LaMa inpainting paths on Windows, replace that package in
+the same virtual environment with the GPU build:
+
+```powershell
+.\venv\Scripts\python.exe -m pip uninstall -y onnxruntime
+.\venv\Scripts\python.exe -m pip install --upgrade "onnxruntime-gpu[cuda,cudnn]"
+```
+
+Restart the app after installation and verify that CUDA is available:
+
+```powershell
+.\venv\Scripts\python.exe -c "import onnxruntime as ort; print(ort.__version__); print(ort.get_available_providers())"
+```
+
+The output must include `CUDAExecutionProvider`. If it is absent, check that
+the NVIDIA driver is installed with `nvidia-smi`, then reinstall the GPU
+package in the repository `venv`. The application intentionally falls back to
+`CPUExecutionProvider` when CUDA is unavailable.
+
+To verify actual GPU inference with the locally downloaded detection and LaMa
+models, run:
+
+```powershell
+.\venv\Scripts\python.exe scripts\verify_gpu_runtime.py
+```
+
+The command reports each ONNX session's providers and one inference duration;
+both sessions must list `CUDAExecutionProvider`.
+
+The GPU wheel uses CUDA 12.x by default and requires compatible CUDA/cuDNN
+runtime libraries. See the [ONNX Runtime installation guide](https://onnxruntime.ai/docs/install/)
+and [CUDA Execution Provider requirements](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html)
+for compatibility details.
 
 Download local models. The minimal profile is the fastest way to get the app
 running; use the full profile only when you need every local model path.

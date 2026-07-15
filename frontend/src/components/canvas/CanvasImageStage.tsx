@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import type { BubbleInfo } from "../../types";
 import { CanvasBubbleBoxOverlay } from "./CanvasBubbleBoxOverlay";
 import { CanvasBubbleTextOverlay } from "./CanvasBubbleTextOverlay";
+import { CanvasDetectionOverlay } from "./CanvasDetectionOverlay";
 
 interface CanvasImageStageProps {
   displayImageUrl: string;
@@ -17,6 +18,7 @@ interface CanvasImageStageProps {
   onImageLoad: () => void;
   onImageError: () => void;
   onStartBubbleDrag: (event: React.MouseEvent, bubble: BubbleInfo, type: "move" | "resize") => void;
+  showDetectionOverlay?: boolean;
 }
 
 export function CanvasImageStage({
@@ -32,6 +34,7 @@ export function CanvasImageStage({
   onImageLoad,
   onImageError,
   onStartBubbleDrag,
+  showDetectionOverlay = false,
 }: CanvasImageStageProps) {
   return (
     <div
@@ -60,7 +63,7 @@ export function CanvasImageStage({
             }}
           />
 
-          {!isWaitingForImageReload && (
+          {!isWaitingForImageReload && !showDetectionOverlay && (
             <CanvasBubbleBoxOverlay
               bubbles={bubbles}
               selectedBubbleId={selectedBubbleId}
@@ -73,6 +76,10 @@ export function CanvasImageStage({
 
           {!isWaitingForImageReload && (
             <CanvasBubbleTextOverlay bubbles={bubbles} selectedBubbleId={selectedBubbleId} />
+          )}
+
+          {!isWaitingForImageReload && showDetectionOverlay && (
+            <CanvasDetectionOverlay bubbles={bubbles} scale={scale} />
           )}
         </div>
       )}

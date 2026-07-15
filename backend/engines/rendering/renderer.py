@@ -12,6 +12,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+_LINE_START_PUNCTUATION = set(",.!?;:)]}〉》」』】〕〉！？。，、：；》」』】")
+_LINE_END_PUNCTUATION = set("([{〈《「『【〔")
+
+
+def font_pixel_size(font: QFont) -> int:
+    """Return the effective font size in pixels for every render boundary."""
+    pixel_size = getattr(font, "pixelSize", lambda: -1)()
+    if pixel_size is not None and int(pixel_size) > 0:
+        return int(pixel_size)
+    point_size = getattr(font, "pointSizeF", lambda: -1.0)()
+    return max(1, int(round(float(point_size) * 96.0 / 72.0)))
+
+
+def _set_font_pixel_size(font: QFont, size: float) -> None:
+    font.setPixelSize(max(1, int(round(size))))
+
 
 @dataclass
 class TextLineLayout:
@@ -34,9 +50,17 @@ class TextLayoutResult:
 
 
 class TextRenderer:
+    # Automatic layouts should remain readable even when a translation is
+    # longer than the source text. A manually selected font size can still be
+    # smaller; this floor applies only while choosing an automatic size.
+    AUTO_READABILITY_MIN_FONT_SIZE = 11.0
+
     def __init__(self, min_font_size: float = 6.0, max_font_size: float = 48.0):
         self.min_font_size = float(min_font_size)
         self.max_font_size = float(max_font_size)
+
+    def _automatic_min_font_size(self, min_size: float, max_size: float) -> float:
+        return min(max_size, max(min_size, self.AUTO_READABILITY_MIN_FONT_SIZE))
         
     def wrap_text(self, text: str, width: float, font: QFont, allow_char_break: bool = False) -> list[str] | None:
         """Wrap text using DP for optimal line breaking; falls back to greedy."""
@@ -184,8 +208,9 @@ class TextRenderer:
             app = QApplication.instance()
             if app is None or not app.font().family():
                 font_family = "Segoe UI"
-        min_size = float(self.min_font_size if min_size is None else min_size)
         max_size = float(self.max_font_size if max_size is None else max_size)
+        configured_min_size = float(self.min_font_size if min_size is None else min_size)
+        min_size = self._automatic_min_font_size(configured_min_size, max_size)
 
         padding_x = min(8.0, rect.width() * 0.08)
         padding_y = min(6.0, rect.height() * 0.08)
@@ -204,7 +229,7 @@ class TextRenderer:
         for _ in range(8):
             mid = (low + high) / 2.0
             font = QFont(font_family)
-            font.setPointSizeF(mid)
+            _set_font_pixel_size(font, mid)
             
             lines = self.wrap_korean_text(text, width, font, allow_char_break=False)
             if lines is None:
@@ -240,7 +265,7 @@ class TextRenderer:
             for _ in range(8):
                 mid = (low + high) / 2.0
                 font = QFont(font_family)
-                font.setPointSizeF(mid)
+                _set_font_pixel_size(font, mid)
                 
                 lines = self.wrap_korean_text(text, width, font, allow_char_break=True)
                 metrics = QFontMetricsF(font)
@@ -264,7 +289,7 @@ class TextRenderer:
                     high = mid - 0.1
                     
         final_font = QFont(font_family)
-        final_font.setPointSizeF(optimal_size)
+        _set_font_pixel_size(final_font, optimal_size)
         return final_font, optimal_lines or [text], width
 
     def layout_lines_in_rect(
@@ -307,7 +332,7 @@ class TextRenderer:
             render_width=render_width,
             line_layouts=line_layouts,
             is_overflow=is_overflow,
-            reached_min_font=font.pointSizeF() <= min_size + 0.1,
+            reached_min_font=font_pixel_size(font) <= int(round(min_size)),
         )
 
     def make_ellipse_mask(self, width: int, height: int, inset: int = 0) -> np.ndarray:
@@ -336,10 +361,12 @@ class TextRenderer:
             resolved_font, chain = font_resolver.resolve(text, target_lang="Korean")
             font_family = resolved_font.name
             logger.debug(f"Font resolved (mask): {font_family} (chain: {' → '.join(chain)})")
-        min_size = float(self.min_font_size if min_size is None else min_size)
         max_size = float(self.max_font_size if max_size is None else max_size)
+        configured_min_size = float(self.min_font_size if min_size is None else min_size)
+        min_size = self._automatic_min_font_size(configured_min_size, max_size)
 
         # Preprocess mask: Erode to reserve padding away from speech bubble outlines
+        original_mask = np.asarray(mask) > 0
         if mask is not None and mask.ndim == 2 and np.any(mask):
             import cv2
             mh, mw = mask.shape[:2]
@@ -380,6 +407,23 @@ class TextRenderer:
         if best_layout is not None:
             return best_layout
 
+        # The eroded mask protects the bubble outline, but can become too
+        # restrictive for very dense text. Retry with the original mask before
+        # falling back to a rectangular layout that may overflow.
+        if not np.array_equal(original_mask, mask_bool):
+            best_layout = self._best_layout_for_font_candidates(
+                text,
+                rect,
+                original_mask,
+                font_family,
+                candidate_sizes,
+                allow_char_break=True,
+                dynamic_max=dynamic_max,
+                min_size=min_size,
+            )
+            if best_layout is not None:
+                return best_layout
+
         font, lines, render_width = self.find_optimal_font_size(text, rect, font_family, min_size, max_size)
         return self.layout_lines_in_rect(lines, rect, font, render_width, min_size=min_size)
 
@@ -412,7 +456,7 @@ class TextRenderer:
 
         for size in candidate_sizes:
             font = QFont(font_family)
-            font.setPointSizeF(size)
+            _set_font_pixel_size(font, size)
             layout = self._layout_text_in_mask(
                 text,
                 rect,
@@ -424,7 +468,10 @@ class TextRenderer:
             if layout is None:
                 continue
 
-            font_reward = (size / max(1.0, dynamic_max)) * 0.22
+            # Reward readable font sizes strongly enough that the optimizer
+            # does not prefer excessive wrapping merely to minimize unused
+            # mask area.
+            font_reward = (size / max(1.0, dynamic_max)) * 0.45
             candidate_score = layout.score - font_reward
             if candidate_score < best_score:
                 best_score = candidate_score
@@ -479,7 +526,7 @@ class TextRenderer:
                     line_layouts=line_layouts,
                     score=score,
                     is_overflow=False,
-                    reached_min_font=font.pointSizeF() <= min_size + 0.1,
+                    reached_min_font=font_pixel_size(font) <= int(round(min_size)),
                 )
 
         return best_result
@@ -701,6 +748,11 @@ class TextRenderer:
             score = unused * unused * 1.45
             if util < 0.55:
                 score += (0.55 - util) ** 2 * 1.8
+
+        if line[:1] in _LINE_START_PUNCTUATION:
+            score += 2.6
+        if line[-1:] in _LINE_END_PUNCTUATION:
+            score += 1.8
 
         if len(line.strip()) <= 1:
             score += 1.2

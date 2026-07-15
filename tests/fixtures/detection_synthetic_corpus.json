@@ -1,0 +1,32 @@
+[
+  {
+    "case_id": "exact_two_regions",
+    "category": "baseline",
+    "expected_boxes": [[10, 10, 40, 40], [60, 10, 95, 42]],
+    "predicted_boxes": [[10, 10, 40, 40], [60, 10, 95, 42]]
+  },
+  {
+    "case_id": "missed_overlapping_bubble_text",
+    "category": "overlap_long_text",
+    "expected_boxes": [[10, 10, 80, 50], [28, 20, 100, 65]],
+    "predicted_boxes": [[10, 10, 80, 50]]
+  },
+  {
+    "case_id": "low_contrast_recall",
+    "category": "low_contrast",
+    "expected_boxes": [[15, 15, 55, 70]],
+    "predicted_boxes": []
+  },
+  {
+    "case_id": "split_prediction",
+    "category": "split_merge",
+    "expected_boxes": [[10, 10, 100, 50]],
+    "predicted_boxes": [[10, 10, 55, 50], [50, 10, 100, 50]]
+  },
+  {
+    "case_id": "merged_prediction",
+    "category": "split_merge",
+    "expected_boxes": [[10, 10, 25, 50], [20, 10, 35, 50]],
+    "predicted_boxes": [[10, 10, 35, 50]]
+  }
+]

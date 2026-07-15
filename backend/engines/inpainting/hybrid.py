@@ -1,6 +1,7 @@
 # engines/inpainting/hybrid.py
 import numpy as np
 import cv2
+from threading import RLock
 
 class HybridInpainter:
     def __init__(self):
@@ -14,6 +15,7 @@ class HybridInpainter:
                     return False
         self.settings = DummySettings()
         self.lama_model = None
+        self._model_lock = RLock()
 
     def _resolve_engine_name(self, engine: str | None = None) -> str:
         requested = str(engine or "lama").strip().lower()
@@ -23,12 +25,18 @@ class HybridInpainter:
 
     def _get_deep_model(self, engine_name: str):
         device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
-        if self.lama_model is None:
-            import logging
-            logging.info("Initializing LaMa inpainting model...")
-            from .lama import LaMa
-            self.lama_model = LaMa(device=device, backend="onnx")
+        with self._model_lock:
+            if self.lama_model is None:
+                import logging
+                logging.info("Initializing LaMa inpainting model...")
+                from .lama import LaMa
+                self.lama_model = LaMa(device=device, backend="onnx")
         return self.lama_model
+
+    def prepare(self, engine: str = "lama") -> None:
+        engine_name = self._resolve_engine_name(engine)
+        if engine_name != "opencv":
+            self._get_deep_model(engine_name)
 
     def inpaint(
         self,

@@ -8,6 +8,7 @@ import numpy as np
 from typing import List, Optional, Any, Dict, cast
 from ...infrastructure.storage import get_app_data_dir
 from ...core.config import OLLAMA_API_URL
+from ...core.languages import normalize_translation_language
 from .providers import (
     OllamaTranslator,
     OpenAICompatibleTranslator,
@@ -19,6 +20,7 @@ from .providers import (
     BaiduTranslatorWrapper
 )
 from .base import BaseTranslator
+from ...core.providers.concurrency import ProviderConcurrencyGate
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,7 @@ class TranslationService:
         self._cache: Dict[str, str] = {}  # In-memory translation cache (src_text -> translated_text)
         self._cache_lock = threading.RLock()
         self._translator_lock = threading.RLock()
+        self._provider_gate = ProviderConcurrencyGate(max_concurrency=1, queue_capacity=8)
 
         # Save TM and system prompt in user's AppData directory to prevent permission issues
         app_data_dir = get_app_data_dir()
@@ -45,6 +48,11 @@ class TranslationService:
 
         # Load custom system prompt override
         self._load_system_prompt()
+
+    def configure_queue(self, *, max_concurrency: int, queue_capacity: int) -> None:
+        self._provider_gate = ProviderConcurrencyGate(
+            max_concurrency=max_concurrency, queue_capacity=queue_capacity
+        )
 
     @property
     def system_prompt(self) -> str:
@@ -203,12 +211,18 @@ class TranslationService:
         return cast(List[str], self.translator.installed_models)
 
     def translate_blocks(self, blocks: List[Any], src_lang: str, tgt_lang: str, cv_image: np.ndarray) -> None:
+        normalized_source = normalize_translation_language(src_lang)
+        normalized_target = normalize_translation_language(tgt_lang)
+        if normalized_source and normalized_source == normalized_target:
+            for block in blocks:
+                block.translation = block.text
+            return
         # Filter blocks based on translation cache
         to_translate = []
         block_cache_keys: dict[int, str] = {}
         with self._cache_lock:
             for idx, block in enumerate(blocks):
-                cache_key = self._cache_key(blocks, idx)
+                cache_key = self._cache_key(blocks, idx, src_lang, tgt_lang)
                 block_cache_keys[id(block)] = cache_key
                 if self.config.translation_cache_enabled and cache_key in self._cache:
                     block.translation = self._cache[cache_key]
@@ -217,8 +231,9 @@ class TranslationService:
 
         # Call active translator for untranslated blocks
         if to_translate:
-            with self._translator_lock:
-                self.translator.translate_blocks(to_translate, src_lang, tgt_lang, cv_image)
+            with self._provider_gate.slot():
+                with self._translator_lock:
+                    self.translator.translate_blocks(to_translate, src_lang, tgt_lang, cv_image)
 
             # Cache the newly translated text blocks and save to Translation Memory file
             with self._cache_lock:
@@ -232,7 +247,7 @@ class TranslationService:
                         self._cache.pop(old_key, None)
                 self._save_tm()
 
-    def _cache_key(self, blocks: List[Any], index: int) -> str:
+    def _cache_key(self, blocks: List[Any], index: int, src_lang: str, tgt_lang: str) -> str:
         text = cast(str, blocks[index].text).strip()
         if self.config.translation_cache_mode != "text_with_context":
             return text
@@ -247,6 +262,8 @@ class TranslationService:
         raw_key = {
             "text": text,
             "neighbors": neighbor_parts,
+            "source_language": normalize_translation_language(src_lang) or src_lang,
+            "target_language": normalize_translation_language(tgt_lang) or tgt_lang,
             "model": str(self.model),
             "prompt_hash": prompt_hash,
         }
@@ -288,6 +305,7 @@ class TranslationService:
             "cache_enabled": self.config.translation_cache_enabled,
             "cache_mode": self.config.translation_cache_mode,
             "cache_entries": len(self._cache),
+            "queue": self._provider_gate.status(),
         }
 
     def _load_tm(self) -> None:

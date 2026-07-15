@@ -16,7 +16,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
 
         self.assertEqual(payload["ui_language"], "ko")
 
-    def test_get_settings_includes_pipeline_options(self):
+    def test_get_settings_includes_processing_options(self):
         cfg = AppConfig(
             detect_model="Small (INT8)",
             ocr_engine="ppocr",
@@ -58,7 +58,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
         self.assertEqual(cfg.ui_language, "ko")
         self.assertEqual(response["ui_language"], "ko")
 
-    def test_update_settings_persists_pipeline_options(self):
+    def test_update_settings_persists_processing_options(self):
         cfg = AppConfig()
         translation_service = make_translation_service()
         current = settings_route.get_settings_payload(cfg, translation_service)

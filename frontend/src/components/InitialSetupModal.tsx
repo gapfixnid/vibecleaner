@@ -5,6 +5,7 @@ import * as api from "../services/api";
 import { createTranslator } from "../i18n";
 import type { WaitForJob } from "../hooks/useProcessingTask";
 import type { ModelStatus, Settings } from "../types";
+import { getSafeTargetLanguage, getTargetLanguageOptions, SUPPORTED_TRANSLATION_LANGUAGES } from "../languageOptions";
 
 interface InitialSetupModalProps {
   isOpen: boolean;
@@ -92,7 +93,13 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   if (!isOpen) return null;
 
   const updateLocal = <K extends keyof Settings>(key: K, value: Settings[K]) => {
-    setLocalSettings((prev) => ({ ...prev, [key]: value }));
+    setLocalSettings((prev) => key === "source_language"
+      ? {
+          ...prev,
+          source_language: value as Settings["source_language"],
+          target_language: getSafeTargetLanguage(String(value), prev.target_language),
+        }
+      : { ...prev, [key]: value });
   };
   const previewModels = getPreviewModels(localSettings, modelStatus);
   const previewReady = previewModels.length > 0 && previewModels.every((model) => model.downloaded);
@@ -177,12 +184,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               <AppleSelect
                 value={localSettings.source_language}
                 onChange={(value) => updateLocal("source_language", value)}
-                options={[
-                  { value: "Japanese", label: "Japanese" },
-                  { value: "Korean", label: "Korean" },
-                  { value: "Chinese", label: "Chinese" },
-                  { value: "English", label: "English" },
-                ]}
+                options={[...SUPPORTED_TRANSLATION_LANGUAGES]}
               />
             </div>
             <div className="setup-row">
@@ -190,12 +192,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               <AppleSelect
                 value={localSettings.target_language}
                 onChange={(value) => updateLocal("target_language", value)}
-                options={[
-                  { value: "Korean", label: "Korean" },
-                  { value: "English", label: "English" },
-                  { value: "Japanese", label: "Japanese" },
-                  { value: "Chinese", label: "Chinese" },
-                ]}
+                options={[...getTargetLanguageOptions(localSettings.source_language)]}
               />
             </div>
           </section>

@@ -42,6 +42,7 @@ class RTDetrV2ONNXDetection(DetectionEngine):
             overlap_height_ratio=0.1,
             min_slice_height_ratio=0.7
         )
+        self._text_confidences_by_box: dict[tuple[int, int, int, int], float] = {}
 
     def initialize(
         self, 
@@ -93,8 +94,10 @@ class RTDetrV2ONNXDetection(DetectionEngine):
 
         tiling_enabled = getattr(self, "tiling_enabled", True) if tiling_enabled is None else bool(tiling_enabled)
         if not tiling_enabled:
+            self._text_confidences_by_box = {}
             bubble_boxes, text_boxes = self._detect_single_image(image)
         else:
+            self._text_confidences_by_box = {}
             bubble_boxes, text_boxes = self.image_slicer.process_slices_for_detection(
                 image, self._detect_single_image
             )
@@ -106,6 +109,7 @@ class RTDetrV2ONNXDetection(DetectionEngine):
             line_merge_sensitivity=line_merge_sensitivity,
             smart_direction=smart_direction,
             text_direction_override=text_direction_override,
+            text_confidences=self._text_confidences_by_box,
         )
 
     def _detect_single_image(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -135,10 +139,114 @@ class RTDetrV2ONNXDetection(DetectionEngine):
         if isinstance(boxes, np.ndarray) and boxes.ndim == 3 and boxes.shape[0] == 1:
             boxes = boxes[0]
 
-        bubble_boxes = []
-        text_boxes = []
-        for lab, box, scr in zip(labels, boxes, scores):
-            if float(scr) < float(self.confidence_threshold):
+        candidates = list(zip(labels, boxes, scores))
+        candidate_text_scores = {
+            tuple(int(value) for value in box): float(score)
+            for label, box, score in candidates
+            if int(label) in (1, 2)
+        }
+        bubble_boxes, text_boxes = self._select_detection_boxes(
+            candidates,
+            threshold=float(self.confidence_threshold),
+        )
+
+        # Preserve recall for faint/small text without lowering the user's
+        # normal threshold globally. A low-confidence text candidate is safe
+        # to recover when it lies inside a confidently detected bubble. This
+        # also handles pages where one of several overlapping bubbles is
+        # detected normally while the text in another bubble scores lower.
+        recall_threshold = max(0.15, float(self.confidence_threshold) * 0.65)
+        if not text_boxes:
+            bubble_boxes, text_boxes = self._select_detection_boxes(
+                candidates,
+                threshold=recall_threshold,
+            )
+        else:
+            recall_bubbles, recall_text = self._select_detection_boxes(
+                candidates,
+                threshold=recall_threshold,
+            )
+            text_boxes = self._append_recall_text_boxes(
+                text_boxes,
+                recall_text,
+                bubble_boxes,
+            )
+            # A low-confidence bubble is only retained when it has a recovered
+            # text candidate inside it; otherwise it is likely background noise.
+            bubble_boxes = self._append_bubbles_with_text(
+                bubble_boxes,
+                recall_bubbles,
+                recall_text,
+            )
+
+        bubble_boxes = np.array(bubble_boxes) if bubble_boxes else np.array([])
+        text_boxes = np.array(text_boxes) if text_boxes else np.array([])
+        for box in text_boxes:
+            key = tuple(int(value) for value in box)
+            if key in candidate_text_scores:
+                self._text_confidences_by_box[key] = max(
+                    self._text_confidences_by_box.get(key, 0.0), candidate_text_scores[key]
+                )
+        return bubble_boxes, text_boxes
+
+    @classmethod
+    def _append_recall_text_boxes(
+        cls,
+        primary_text_boxes: list[list[int]],
+        recall_text_boxes: list[list[int]],
+        primary_bubble_boxes: list[list[int]],
+    ) -> list[list[int]]:
+        result = list(primary_text_boxes)
+        for candidate in recall_text_boxes:
+            if cls._contains_or_overlaps(primary_bubble_boxes, candidate) and not cls._overlaps_any(result, candidate):
+                result.append(candidate)
+        return result
+
+    @classmethod
+    def _append_bubbles_with_text(
+        cls,
+        primary_bubble_boxes: list[list[int]],
+        recall_bubble_boxes: list[list[int]],
+        recall_text_boxes: list[list[int]],
+    ) -> list[list[int]]:
+        result = list(primary_bubble_boxes)
+        for bubble in recall_bubble_boxes:
+            if cls._overlaps_any(result, bubble):
+                continue
+            if any(cls._contains_or_overlaps([bubble], text_box) for text_box in recall_text_boxes):
+                result.append(bubble)
+        return result
+
+    @staticmethod
+    def _overlaps_any(boxes: list[list[int]], candidate: list[int], threshold: float = 0.5) -> bool:
+        cx1, cy1, cx2, cy2 = candidate
+        candidate_area = max(1, (cx2 - cx1) * (cy2 - cy1))
+        for x1, y1, x2, y2 in boxes:
+            ix1, iy1 = max(x1, cx1), max(y1, cy1)
+            ix2, iy2 = min(x2, cx2), min(y2, cy2)
+            intersection = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+            if intersection / candidate_area >= threshold:
+                return True
+        return False
+
+    @classmethod
+    def _contains_or_overlaps(cls, containers: list[list[int]], candidate: list[int]) -> bool:
+        return any(
+            (box[0] <= candidate[0] and box[1] <= candidate[1] and box[2] >= candidate[2] and box[3] >= candidate[3])
+            or cls._overlaps_any([box], candidate, threshold=0.2)
+            for box in containers
+        )
+
+    @staticmethod
+    def _select_detection_boxes(
+        candidates: list[tuple[object, object, object]],
+        *,
+        threshold: float,
+    ) -> tuple[list[list[int]], list[list[int]]]:
+        bubble_boxes: list[list[int]] = []
+        text_boxes: list[list[int]] = []
+        for lab, box, scr in candidates:
+            if float(scr) < threshold:
                 continue
             x1, y1, x2, y2 = map(int, box)
             label_id = int(lab)
@@ -146,7 +254,4 @@ class RTDetrV2ONNXDetection(DetectionEngine):
                 bubble_boxes.append([x1, y1, x2, y2])
             elif label_id in [1, 2]:
                 text_boxes.append([x1, y1, x2, y2])
-
-        bubble_boxes = np.array(bubble_boxes) if bubble_boxes else np.array([])
-        text_boxes = np.array(text_boxes) if text_boxes else np.array([])
         return bubble_boxes, text_boxes

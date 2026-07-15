@@ -49,5 +49,37 @@ class BubbleAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(reading_order, "LTR")
         self.assertEqual([bubble.text for bubble in sorted_bubbles], ["left", "right"])
 
+    def test_same_parent_bubble_lines_are_grouped(self):
+        service = BubbleAnalysisService()
+        first = bubble_module.BubbleData(
+            bubble_box=(10, 10, 90, 90), text_box=(30, 20, 60, 35),
+            layout_box=(30, 20, 60, 35), text="첫 줄", direction="vertical",
+        )
+        second = bubble_module.BubbleData(
+            bubble_box=(11, 11, 89, 89), text_box=(30, 45, 60, 60),
+            layout_box=(30, 45, 60, 60), text="둘째 줄", direction="vertical",
+        )
+
+        grouped = service._group_into_bubbles(None, [first, second])
+
+        assert len(grouped) == 1
+        assert grouped[0].text == "첫 줄\n둘째 줄"
+        assert grouped[0].text_box == (30, 20, 60, 60)
+
+    def test_distinct_overlapping_bubbles_are_not_grouped(self):
+        service = BubbleAnalysisService()
+        first = bubble_module.BubbleData(
+            bubble_box=(10, 10, 60, 60), text_box=(15, 15, 30, 30),
+            layout_box=(15, 15, 30, 30), text="first",
+        )
+        second = bubble_module.BubbleData(
+            bubble_box=(45, 45, 95, 95), text_box=(65, 65, 85, 85),
+            layout_box=(65, 65, 85, 85), text="second",
+        )
+
+        grouped = service._group_into_bubbles(None, [first, second])
+
+        assert len(grouped) == 2
+
 if __name__ == "__main__":
     unittest.main()

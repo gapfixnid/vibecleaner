@@ -35,8 +35,10 @@ export interface BubbleInfo {
   layout_padding: Record<string, number>;
   layout_margin: Record<string, number>;
   layout_confidence: number;
+  detection_confidence?: number;
   layout_reasoning: string;
   lines: LineLayout[];
+  text_box?: { x: number; y: number; width: number; height: number } | null;
 }
 
 export interface BubbleUpdate {

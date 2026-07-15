@@ -10,6 +10,7 @@ class ProjectState:
     pages: list[Any] = field(default_factory=list)
     current_page_idx: int = -1
     revision: int = 0
+    project_extensions: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.lock = RLock()

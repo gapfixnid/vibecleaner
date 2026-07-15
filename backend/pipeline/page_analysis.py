@@ -123,12 +123,16 @@ def bubbles_from_analysis(
         text_bubble.layout_margin = _insets_to_dict(getattr(layout_plan, "margin", None))
         text_bubble.layout_confidence = float(getattr(layout_plan, "confidence", 0.0) or 0.0)
         text_bubble.layout_reasoning = getattr(layout_plan, "reasoning", "")
+        model_confidence = getattr(bubble_data, "model_confidence", None)
+        text_bubble.detection_confidence = float(
+            model_confidence if model_confidence is not None else getattr(bubble_data, "confidence", 0.0)
+        )
         bubbles.append(text_bubble)
 
     return bubbles
 
 
-def merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float = 0.25) -> list[TextBubble]:
+def merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float = 0.6) -> list[TextBubble]:
     if len(bubbles) < 2:
         return bubbles
 

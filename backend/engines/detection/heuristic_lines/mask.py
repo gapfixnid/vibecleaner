@@ -29,6 +29,18 @@ def _compute_integral_image(mask: np.ndarray) -> np.ndarray:
     return mask.astype(np.int32, copy=False).cumsum(axis=0).cumsum(axis=1)
 
 def _sum_box_pixels(integral_image: np.ndarray, x1: int, y1: int, x2: int, y2: int) -> int:
+    # Line geometry uses inclusive coordinates. Clamp malformed edge boxes
+    # before indexing the same-sized integral image; detector backends can
+    # legitimately produce a box ending exactly at image width/height.
+    height, width = integral_image.shape[:2]
+    if height == 0 or width == 0:
+        return 0
+    x1 = max(0, min(int(x1), width - 1))
+    y1 = max(0, min(int(y1), height - 1))
+    x2 = max(0, min(int(x2), width - 1))
+    y2 = max(0, min(int(y2), height - 1))
+    if x2 < x1 or y2 < y1:
+        return 0
     total = int(integral_image[y2, x2])
     if x1 > 0:
         total -= int(integral_image[y2, x1 - 1])

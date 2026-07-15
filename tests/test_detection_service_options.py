@@ -47,9 +47,11 @@ class FakeOcr:
     def __init__(self):
         self.lang = None
         self.calls = 0
+        self.options = []
 
-    def recognize_text(self, image, blocks, engine=None):
+    def recognize_text(self, image, blocks, engine=None, **kwargs):
         self.calls += 1
+        self.options.append({"engine": engine, **kwargs})
         for block in blocks:
             block.text = f"{engine}:text"
         return blocks
@@ -61,8 +63,9 @@ class BlockingOcr(FakeOcr):
         self.started = threading.Event()
         self.release = threading.Event()
 
-    def recognize_text(self, image, blocks, engine=None):
+    def recognize_text(self, image, blocks, engine=None, **kwargs):
         self.calls += 1
+        self.options.append({"engine": engine, **kwargs})
         self.started.set()
         if not self.release.wait(timeout=2):
             raise TimeoutError("test OCR release timed out")
@@ -115,6 +118,57 @@ def test_detection_service_passes_explicit_detection_options_from_config():
         service.shutdown()
 
 
+def test_detection_and_ocr_can_run_as_independent_operations():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        detector = FakeDetector()
+        ocr = FakeOcr()
+        service = DetectionService(
+            detector=detector,
+            ocr_engine=ocr,
+            config=SimpleNamespace(
+                detect_model="Small (INT8)", confidence_threshold=0.5,
+                tiling_enabled=False, bubbles_only=False, line_merge_sensitivity=1.2,
+                smart_direction=True, text_direction_override="auto", ocr_engine="ppocr",
+            ),
+            cache_file_path=os.path.join(tmpdir, "ocr_cache.sqlite3"),
+            cache_flush_interval=60,
+        )
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+        blocks = service.detect_only(image)
+        assert ocr.calls == 0
+        service.ocr_only(image, blocks, lang="Japanese")
+        assert ocr.calls == 1
+        assert blocks[0].text == "ppocr:text"
+        service.shutdown()
+
+
+def test_ocr_uses_language_profile_and_explicit_overrides():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ocr = FakeOcr()
+        service = DetectionService(
+            detector=FakeDetector(),
+            ocr_engine=ocr,
+            config=SimpleNamespace(ocr_engine="ppocr"),
+            cache_file_path=os.path.join(tmpdir, "ocr_cache.sqlite3"),
+        )
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+        service.ocr_only(image, [FakeBlock()], lang="English")
+        assert ocr.options[-1] == {
+            "engine": "ppocr", "padding": 6, "crop_scale": 1.25,
+            "adaptive_binarization": True, "adaptive_binarization_strength": 1.5,
+        }
+        service.ocr_only(
+            image, [FakeBlock()], lang="English", padding=12,
+            crop_scale=2.0, adaptive_binarization=False,
+            adaptive_binarization_strength=3.0,
+        )
+        assert ocr.options[-1]["padding"] == 12
+        assert ocr.options[-1]["crop_scale"] == 2.0
+        assert ocr.options[-1]["adaptive_binarization"] is False
+        assert ocr.options[-1]["adaptive_binarization_strength"] == 3.0
+        service.shutdown()
+
+
 def test_cached_single_block_ocr_does_not_wait_for_another_ocr_inference():
     with tempfile.TemporaryDirectory() as tmpdir:
         ocr = BlockingOcr()
@@ -144,6 +198,35 @@ def test_cached_single_block_ocr_does_not_wait_for_another_ocr_inference():
         ocr.release.set()
         worker.join(timeout=1)
         assert not worker.is_alive()
+        service.shutdown()
+
+
+def test_ocr_cache_key_includes_language_engine_and_preprocessing():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        service = DetectionService(
+            detector=FakeDetector(),
+            ocr_engine=FakeOcr(),
+            config=SimpleNamespace(
+                source_language="Japanese",
+                ocr_engine="manga_ocr",
+                ocr_padding=8,
+                ocr_crop_scale=1.5,
+                adaptive_binarization=True,
+                adaptive_binarization_strength=2.0,
+            ),
+            cache_file_path=os.path.join(tmpdir, "ocr-cache.sqlite3"),
+        )
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+        bbox = [2, 2, 12, 14]
+
+        base = service._get_crop_hash(image, bbox, lang="Japanese", engine="manga_ocr")
+        other_language = service._get_crop_hash(image, bbox, lang="English", engine="manga_ocr")
+        other_engine = service._get_crop_hash(image, bbox, lang="Japanese", engine="ppocr")
+        other_padding = service._get_crop_hash(
+            image, bbox, lang="Japanese", engine="manga_ocr", padding=16
+        )
+
+        assert len({base, other_language, other_engine, other_padding}) == 4
         service.shutdown()
 
 

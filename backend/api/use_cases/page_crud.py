@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 from typing import List
 
 from fastapi import HTTPException
@@ -124,6 +125,7 @@ def _clone_page(source: MangaPage) -> MangaPage:
         inpainted_image=source.inpainted_image.copy() if source.inpainted_image is not None else None,
         bubbles=[bubble.clone() for bubble in source.bubbles],
         bubble_counter=source.bubble_counter,
+        project_extensions=deepcopy(source.project_extensions),
     )
     clone._width = getattr(source, "_width", 0)
     clone._height = getattr(source, "_height", 0)

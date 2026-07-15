@@ -30,6 +30,7 @@ class DetectionPipeline:
         line_merge_sensitivity: float | None = None,
         smart_direction: bool | None = None,
         text_direction_override: str | None = None,
+        text_confidences: dict[tuple[int, int, int, int], float] | None = None,
     ) -> list[TextBlock]:
         text_boxes = filter_and_fix_bboxes(text_boxes, image.shape)
         bubble_boxes = filter_and_fix_bboxes(bubble_boxes, image.shape)
@@ -46,6 +47,7 @@ class DetectionPipeline:
             text_boxes,
             bubble_boxes,
             text_colors_per_box,
+            text_confidences=text_confidences or {},
             bubbles_only=self._resolve_option("bubbles_only", bubbles_only, False),
         )
         self._annotate_lines(
@@ -138,6 +140,7 @@ class DetectionPipeline:
         text_boxes: np.ndarray,
         bubble_boxes: np.ndarray,
         text_colors_per_box: list[tuple],
+        text_confidences: dict[tuple[int, int, int, int], float],
         bubbles_only: bool = False,
     ) -> list[TextBlock]:
         text_blocks = []
@@ -145,8 +148,12 @@ class DetectionPipeline:
 
         for txt_idx, txt_box in enumerate(text_boxes):
             text_color = text_colors_per_box[txt_idx]
+            confidence = text_confidences.get(tuple(int(value) for value in txt_box))
             if len(bubble_boxes) == 0:
-                text_blocks.append(TextBlock(text_bbox=txt_box, text_class="text_free", font_color=text_color))
+                text_blocks.append(TextBlock(
+                    text_bbox=txt_box, text_class="text_free", font_color=text_color,
+                    confidence=confidence,
+                ))
                 continue
 
             for bubble_box in bubble_boxes:
@@ -165,13 +172,17 @@ class DetectionPipeline:
                                 bubble_bbox=bubble_box,
                                 text_class="text_bubble",
                                 font_color=text_color,
+                                confidence=confidence,
                             )
                         )
                         text_matched[txt_idx] = True
                         break
 
             if not text_matched[txt_idx]:
-                text_blocks.append(TextBlock(text_bbox=txt_box, text_class="text_free", font_color=text_color))
+                text_blocks.append(TextBlock(
+                    text_bbox=txt_box, text_class="text_free", font_color=text_color,
+                    confidence=confidence,
+                ))
 
         return text_blocks
 

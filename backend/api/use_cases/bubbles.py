@@ -9,6 +9,7 @@ from ...infrastructure.image.loading import ensure_page_image, invalidate_page_c
 from ...infrastructure.job_messages import msg
 from ...core.state.review import derive_bubble_status, refresh_bubble_status, refresh_page_status
 from ...core.version import APP_NAME
+from ...engines.rendering.renderer import font_pixel_size
 from .page_crud import resolve_page, resolve_page_index
 
 import logging
@@ -102,7 +103,7 @@ def _compute_bubble_layout(bubble: TextBubble, image, render_service) -> dict:
     )
     computed_font_family = layout.font.family() if hasattr(layout.font, "family") else ""
     return {
-        "font_size": bubble.font_size if bubble.font_size > 0 else int(layout.font.pointSizeF()),
+        "font_size": bubble.font_size if bubble.font_size > 0 else font_pixel_size(layout.font),
         "font_family": computed_font_family,
         "overflow": bool(getattr(layout, "is_overflow", False)),
         "reached_min_font": bool(getattr(layout, "reached_min_font", False)),
@@ -182,6 +183,7 @@ def get_bubbles_response(state, page_id: str, render_service):
             "layout_padding": dict(bubble.layout_padding),
             "layout_margin": dict(bubble.layout_margin),
             "layout_confidence": bubble.layout_confidence,
+            "detection_confidence": bubble.detection_confidence,
             "layout_reasoning": bubble.layout_reasoning,
             "layout_overflow": bool(cached_layout.get("overflow") or cached_layout.get("reached_min_font")),
             "bold": bubble.bold,
@@ -228,6 +230,7 @@ def update_bubbles_response(state, page_id: str, bubbles: List[BubbleUpdateSchem
             layout_padding = dict(existing.layout_padding) if existing else {}
             layout_margin = dict(existing.layout_margin) if existing else {}
             layout_confidence = existing.layout_confidence if existing else 0.0
+            detection_confidence = existing.detection_confidence if existing else 0.0
             layout_reasoning = existing.layout_reasoning if existing else ""
             edited = bool(existing.edited) if existing else True
             problems = list(existing.problems) if existing else []
@@ -268,6 +271,7 @@ def update_bubbles_response(state, page_id: str, bubbles: List[BubbleUpdateSchem
                 layout_padding=layout_padding,
                 layout_margin=layout_margin,
                 layout_confidence=layout_confidence,
+                detection_confidence=detection_confidence,
                 layout_reasoning=layout_reasoning,
                 status=status,
                 problems=problems,

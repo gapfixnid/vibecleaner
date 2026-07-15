@@ -1,9 +1,67 @@
 from __future__ import annotations
 
 import os
+import logging
+import site
 from typing import Any, Mapping, Optional
 import onnxruntime as ort
 from ..storage import get_user_data_dir
+
+logger = logging.getLogger(__name__)
+_DLL_DIRECTORY_HANDLES: list[Any] = []
+
+
+def _register_nvidia_dll_directories() -> None:
+    """Register pip-installed CUDA/cuDNN DLL directories before ORT loads."""
+    if os.name != "nt":
+        return
+    site_packages = []
+    try:
+        site_packages.extend(site.getsitepackages())
+    except AttributeError:
+        pass
+    try:
+        site_packages.append(site.getusersitepackages())
+    except AttributeError:
+        pass
+    names = (
+        ("cudnn", "bin"),
+        ("cuda_runtime", "bin"),
+        ("cublas", "bin"),
+        ("cufft", "bin"),
+        ("curand", "bin"),
+        ("nvjitlink", "bin"),
+        ("cuda_nvrtc", "bin"),
+    )
+    for root in site_packages:
+        for package, subdirectory in names:
+            directory = os.path.join(root, "nvidia", package, subdirectory)
+            if not os.path.isdir(directory):
+                continue
+            os.environ["PATH"] = directory + os.pathsep + os.environ.get("PATH", "")
+            add_dll_directory = getattr(os, "add_dll_directory", None)
+            if callable(add_dll_directory):
+                try:
+                    _DLL_DIRECTORY_HANDLES.append(add_dll_directory(directory))
+                except OSError:
+                    logger.debug("Could not register NVIDIA DLL directory: %s", directory)
+
+
+def _preload_onnxruntime_dlls() -> None:
+    """Load CUDA/cuDNN DLLs installed as NVIDIA Python packages on Windows."""
+    _register_nvidia_dll_directories()
+    preload = getattr(ort, "preload_dlls", None)
+    if not callable(preload):
+        return
+    try:
+        # An empty directory asks ORT to search the NVIDIA site-packages
+        # runtime packages installed by onnxruntime-gpu[cuda,cudnn].
+        preload(directory="")
+    except Exception:
+        logger.debug("Could not preload ONNX Runtime GPU DLLs", exc_info=True)
+
+
+_preload_onnxruntime_dlls()
 
 
 def torch_available() -> bool:
@@ -152,6 +210,14 @@ def get_providers(device: Optional[str] = None) -> list[Any]:
 
     if not available:
         return ['CPUExecutionProvider']
+
+    if isinstance(device, str) and device.lower() == "cuda":
+        # The GPU wheel exposes TensorRT as an optional provider, but most
+        # installations do not have TensorRT DLLs. Prefer CUDA directly and
+        # keep CPU as the explicit fallback instead of probing TensorRT first.
+        available = [provider for provider in available if provider in {
+            "CUDAExecutionProvider", "CPUExecutionProvider"
+        }]
 
     
     # Use user data directory for cache

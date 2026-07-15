@@ -36,6 +36,9 @@ shapely>=2.0.0
 # --- Translation providers ---
 deep-translator>=1.11.0
 
+# --- Development and regression testing ---
+pytest>=8.0.0
+
 # --- Optional: PyTorch-based models (inpainting, Manga OCR, RT-DETR, font detection) ---
 torch>=2.0.0
 torchvision>=0.15.0

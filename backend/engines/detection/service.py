@@ -10,8 +10,11 @@ import time
 import numpy as np
 from typing import List, Optional, Any, Dict
 from ...core.config import config_value
+from ...core.providers.concurrency import ProviderConcurrencyGate
 from .wrapper import RTDETRv2Detector
 from ..ocr.local import LocalOCR
+from ..ocr.preprocessing_profile import resolve_ocr_preprocessing_profile
+from ...infrastructure.runtime.providers import model_session_providers
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +39,8 @@ class DetectionService:
         self._cache_lock = threading.RLock()
         self._cache_flush_lock = threading.Lock()
         self._state_lock = threading.Lock()
+        self._detection_gate = ProviderConcurrencyGate(max_concurrency=1, queue_capacity=2)
+        self._ocr_gate = ProviderConcurrencyGate(max_concurrency=1, queue_capacity=4)
         self._cache_file_path_override = cache_file_path
         self._cache_flush_interval = max(0.0, float(cache_flush_interval))
         self._cache_flush_timer: threading.Timer | None = None
@@ -50,6 +55,19 @@ class DetectionService:
 
         atexit.register(self.flush_ocr_cache)
         self._load_cache_from_disk()
+
+    def configure_queues(
+        self,
+        *,
+        detection: tuple[int, int],
+        ocr: tuple[int, int],
+    ) -> None:
+        self._detection_gate = ProviderConcurrencyGate(
+            max_concurrency=detection[0], queue_capacity=detection[1]
+        )
+        self._ocr_gate = ProviderConcurrencyGate(
+            max_concurrency=ocr[0], queue_capacity=ocr[1]
+        )
 
     def _ocr_engine_name(self, engine: str | None = None) -> str:
         return engine or config_value(self.config, "ocr_engine")
@@ -263,7 +281,18 @@ class DetectionService:
     #  LRU cache helpers
     # ------------------------------------------------------------------ #
 
-    def _get_crop_hash(self, image: np.ndarray, bbox: Any) -> Optional[str]:
+    def _get_crop_hash(
+        self,
+        image: np.ndarray,
+        bbox: Any,
+        *,
+        lang: str | None = None,
+        engine: str | None = None,
+        padding: int | None = None,
+        crop_scale: float | None = None,
+        adaptive_binarization: bool | None = None,
+        adaptive_binarization_strength: float | None = None,
+    ) -> Optional[str]:
         if bbox is None:
             return None
         try:
@@ -274,7 +303,28 @@ class DetectionService:
             if x2 <= x1 or y2 <= y1:
                 return None
             crop = image[y1:y2, x1:x2]
-            return hashlib.md5(crop.tobytes()).hexdigest()
+            crop_digest = hashlib.md5(crop.tobytes()).hexdigest()
+            cache_context = {
+                "version": 2,
+                "crop": crop_digest,
+                "lang": lang or config_value(self.config, "source_language"),
+                "engine": engine or self._ocr_engine_name(),
+                "padding": int(padding if padding is not None else config_value(self.config, "ocr_padding")),
+                "crop_scale": float(crop_scale if crop_scale is not None else config_value(self.config, "ocr_crop_scale")),
+                "adaptive_binarization": bool(
+                    adaptive_binarization
+                    if adaptive_binarization is not None
+                    else config_value(self.config, "adaptive_binarization")
+                ),
+                "adaptive_binarization_strength": float(
+                    adaptive_binarization_strength
+                    if adaptive_binarization_strength is not None
+                    else config_value(self.config, "adaptive_binarization_strength")
+                ),
+            }
+            return hashlib.sha256(
+                json.dumps(cache_context, ensure_ascii=False, sort_keys=True).encode("utf-8")
+            ).hexdigest()
         except Exception:
             logger.exception("Failed to hash OCR crop for bbox=%s", bbox)
             return None
@@ -322,6 +372,102 @@ class DetectionService:
     #  Public API
     # ------------------------------------------------------------------ #
 
+    def detect_only(
+        self,
+        image: np.ndarray,
+        *,
+        model_name: str | None = None,
+        confidence_threshold: float | None = None,
+        tiling_enabled: bool | None = None,
+        bubbles_only: bool | None = None,
+        line_merge_sensitivity: float | None = None,
+        smart_direction: bool | None = None,
+        text_direction_override: str | None = None,
+    ) -> List[Any]:
+        """Detect text blocks without running OCR."""
+        try:
+            with self._detection_gate.slot():
+                with self._detector_lock:
+                    blocks = self.detector.detect_bubbles(
+                    image,
+                    model_name=self._detect_model_name(model_name),
+                    confidence_threshold=self._confidence_threshold(confidence_threshold),
+                    tiling_enabled=self._tiling_enabled(tiling_enabled),
+                    bubbles_only=self._bubbles_only(bubbles_only),
+                    line_merge_sensitivity=self._line_merge_sensitivity(line_merge_sensitivity),
+                    smart_direction=self._smart_direction(smart_direction),
+                    text_direction_override=self._text_direction_override(text_direction_override),
+                )
+        except Exception as exc:
+            self._set_last_error(str(exc))
+            logger.exception("Detection failed")
+            raise
+        self._set_last_error(None)
+        return blocks
+
+    def ocr_only(
+        self,
+        image: np.ndarray,
+        blocks: List[Any],
+        *,
+        lang: str = "Japanese",
+        engine: str | None = None,
+        padding: int | None = None,
+        crop_scale: float | None = None,
+        adaptive_binarization: bool | None = None,
+        adaptive_binarization_strength: float | None = None,
+        use_cache: bool = True,
+    ) -> List[Any]:
+        """Run OCR for previously detected blocks, preserving the legacy cache."""
+        profile = resolve_ocr_preprocessing_profile(
+            lang,
+            self._ocr_engine_name(engine),
+            padding=padding,
+            crop_scale=crop_scale,
+            adaptive_binarization=adaptive_binarization,
+            adaptive_binarization_strength=adaptive_binarization_strength,
+        )
+        uncached_blocks = []
+        block_hashes = {}
+        for block in blocks:
+            crop_hash = self._get_crop_hash(
+                image, block.xyxy, lang=lang, engine=self._ocr_engine_name(engine),
+                padding=profile.padding, crop_scale=profile.crop_scale,
+                adaptive_binarization=profile.adaptive_binarization,
+                adaptive_binarization_strength=profile.adaptive_binarization_strength,
+            )
+            cached_text = self._get_cached_ocr(crop_hash) if use_cache else None
+            if cached_text is not None:
+                block.text = cached_text
+            else:
+                uncached_blocks.append(block)
+                if crop_hash:
+                    block_hashes[block] = crop_hash
+        self._record_ocr_misses(len(uncached_blocks))
+        if uncached_blocks:
+            try:
+                with self._ocr_gate.slot():
+                    with self._ocr_engine_lock:
+                        self.ocr_engine.lang = lang
+                        ocr_options = {"engine": self._ocr_engine_name(engine)}
+                        ocr_options.update({
+                            "padding": profile.padding,
+                            "crop_scale": profile.crop_scale,
+                            "adaptive_binarization": profile.adaptive_binarization,
+                            "adaptive_binarization_strength": profile.adaptive_binarization_strength,
+                        })
+                        self.ocr_engine.recognize_text(image, uncached_blocks, **ocr_options)
+            except Exception as exc:
+                self._set_last_error(str(exc))
+                logger.exception("OCR failed. lang=%s block_count=%s", lang, len(uncached_blocks))
+                raise
+            for block in uncached_blocks:
+                crop_hash = block_hashes.get(block)
+                if crop_hash:
+                    self._remember_ocr(crop_hash, block.text)
+        self._set_last_error(None)
+        return blocks
+
     def detect_and_ocr(
         self,
         image: np.ndarray,
@@ -338,59 +484,25 @@ class DetectionService:
         """Detect text blocks and run OCR on them, utilizing OCR cache."""
         t0 = time.perf_counter()
         t_detect = time.perf_counter()
-        try:
-            with self._detector_lock:
-                blocks = self.detector.detect_bubbles(
-                    image,
-                    model_name=self._detect_model_name(model_name),
-                    confidence_threshold=self._confidence_threshold(confidence_threshold),
-                    tiling_enabled=self._tiling_enabled(tiling_enabled),
-                    bubbles_only=self._bubbles_only(bubbles_only),
-                    line_merge_sensitivity=self._line_merge_sensitivity(line_merge_sensitivity),
-                    smart_direction=self._smart_direction(smart_direction),
-                    text_direction_override=self._text_direction_override(text_direction_override),
-                )
-        except Exception as exc:
-            self._set_last_error(str(exc))
-            logger.exception("Detection failed. lang=%s", lang)
-            raise
+        blocks = self.detect_only(
+            image,
+            model_name=model_name,
+            confidence_threshold=confidence_threshold,
+            tiling_enabled=tiling_enabled,
+            bubbles_only=bubbles_only,
+            line_merge_sensitivity=line_merge_sensitivity,
+            smart_direction=smart_direction,
+            text_direction_override=text_direction_override,
+        )
         detect_ms = (time.perf_counter() - t_detect) * 1000
-
-        uncached_blocks = []
-        block_hashes = {}
-        cached_count = 0
-        for block in blocks:
-            crop_hash = self._get_crop_hash(image, block.xyxy)
-            cached_text = self._get_cached_ocr(crop_hash)
-            if cached_text is not None:
-                block.text = cached_text
-                cached_count += 1
-            else:
-                uncached_blocks.append(block)
-                if crop_hash:
-                    block_hashes[block] = crop_hash
-        self._record_ocr_misses(len(uncached_blocks))
-
         t_ocr = time.perf_counter()
-        if uncached_blocks:
-            try:
-                with self._ocr_engine_lock:
-                    self.ocr_engine.lang = lang
-                    self.ocr_engine.recognize_text(image, uncached_blocks, engine=self._ocr_engine_name(engine))
-            except Exception as exc:
-                self._set_last_error(str(exc))
-                logger.exception("OCR failed. lang=%s block_count=%s", lang, len(uncached_blocks))
-                raise
-            for block in uncached_blocks:
-                crop_hash = block_hashes.get(block)
-                if crop_hash:
-                    self._remember_ocr(crop_hash, block.text)
+        self.ocr_only(image, blocks, lang=lang, engine=engine)
         ocr_ms = (time.perf_counter() - t_ocr) * 1000
 
         total_ms = (time.perf_counter() - t0) * 1000
         logger.debug(
-            "detect: %.0fms, ocr: %.0fms, total: %.0fms (bubbles=%d, cached=%d, uncached=%d)",
-            detect_ms, ocr_ms, total_ms, len(blocks), cached_count, len(uncached_blocks)
+            "detect: %.0fms, ocr: %.0fms, total: %.0fms (bubbles=%d, cache_hits=%d, cache_misses=%d)",
+            detect_ms, ocr_ms, total_ms, len(blocks), self._ocr_hits, self._ocr_misses
         )
 
         self._set_last_error(None)
@@ -404,7 +516,13 @@ class DetectionService:
         engine: str | None = None,
     ) -> None:
         """Run OCR on a single block without blocking cache hits on model inference."""
-        crop_hash = self._get_crop_hash(image, block.xyxy)
+        profile = resolve_ocr_preprocessing_profile(lang, self._ocr_engine_name(engine))
+        crop_hash = self._get_crop_hash(
+            image, block.xyxy, lang=lang, engine=self._ocr_engine_name(engine),
+            padding=profile.padding, crop_scale=profile.crop_scale,
+            adaptive_binarization=profile.adaptive_binarization,
+            adaptive_binarization_strength=profile.adaptive_binarization_strength,
+        )
         cached_text = self._get_cached_ocr(crop_hash)
         if cached_text is not None:
             block.text = cached_text
@@ -412,9 +530,15 @@ class DetectionService:
         self._record_ocr_misses(1)
 
         try:
-            with self._ocr_engine_lock:
-                self.ocr_engine.lang = lang
-                self.ocr_engine.recognize_text(image, [block], engine=self._ocr_engine_name(engine))
+            with self._ocr_gate.slot():
+                with self._ocr_engine_lock:
+                    self.ocr_engine.lang = lang
+                    self.ocr_engine.recognize_text(
+                        image, [block], engine=self._ocr_engine_name(engine),
+                        padding=profile.padding, crop_scale=profile.crop_scale,
+                        adaptive_binarization=profile.adaptive_binarization,
+                        adaptive_binarization_strength=profile.adaptive_binarization_strength,
+                    )
         except Exception as exc:
             self._set_last_error(str(exc))
             logger.exception("Single-block OCR failed. lang=%s bbox=%s", lang, getattr(block, "xyxy", None))
@@ -450,18 +574,28 @@ class DetectionService:
         hit_rate = (cache_hits / total * 100) if total > 0 else 0.0
         detector_available = bool(getattr(self.detector, "available", True))
         detector_error = getattr(self.detector, "engine_error", None)
+        detector_model = getattr(self.detector, "engine", None)
         with self._state_lock:
             last_error = self.last_error
         return {
             "detector": self.detector.__class__.__name__,
             "detector_available": detector_available,
             "detector_error": detector_error,
+            "detector_execution_providers": model_session_providers(detector_model),
             "ocr_engine": self.ocr_engine.__class__.__name__,
+            "ocr_execution_providers": sorted({
+                provider
+                for engine in list(getattr(self.ocr_engine, "ppocr_engines", {}).values())
+                + [getattr(self.ocr_engine, "japanese_engine", None)]
+                for provider in model_session_providers(engine)
+            }),
             "ocr_cache_entries": cache_entries,
             "ocr_cache_max": self._OCR_CACHE_MAX,
             "ocr_cache_hits": cache_hits,
             "ocr_cache_misses": cache_misses,
             "ocr_cache_hit_rate": f"{hit_rate:.1f}%",
             "ocr_cache_dirty": cache_dirty,
+            "detection_queue": self._detection_gate.status(),
+            "ocr_queue": self._ocr_gate.status(),
             "last_error": last_error,
         }

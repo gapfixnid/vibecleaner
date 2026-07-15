@@ -51,6 +51,7 @@ class BubbleData:
 
     # Analysis
     confidence: float = 1.0
+    model_confidence: float | None = None
     reading_order: int = 0
     direction: str = "horizontal"  # "horizontal" or "vertical"
 
@@ -172,6 +173,11 @@ class BubbleAnalysisService:
             text_class=text_class,
             font_color=font_color,
             confidence=1.0,
+            model_confidence=(
+                float(block.confidence)
+                if getattr(block, "confidence", None) is not None
+                else None
+            ),
             reading_order=idx,
             direction=getattr(block, 'direction', 'horizontal'),
             original_id=getattr(block, 'id', idx),
@@ -190,9 +196,62 @@ class BubbleAnalysisService:
         if not bubbles:
             return bubbles
 
-        # Simple grouping: bubbles with same bubble_box are already grouped
-        # This is a placeholder for more advanced grouping if needed
-        return bubbles
+        groups: List[List[BubbleData]] = []
+        for bubble in bubbles:
+            matching_group = next(
+                (group for group in groups if self._bubble_iou(group[0], bubble) >= 0.8),
+                None,
+            )
+            if matching_group is None:
+                groups.append([bubble])
+            else:
+                matching_group.append(bubble)
+
+        grouped: List[BubbleData] = []
+        for group in groups:
+            if len(group) == 1:
+                grouped.append(group[0])
+                continue
+            group.sort(key=lambda item: (item.text_box[1], item.text_box[0]))
+            first = group[0]
+            for item in group[1:]:
+                first.bubble_box = self._union_box(first.bubble_box, item.bubble_box)
+                first.text_box = self._union_box(first.text_box, item.text_box)
+                first.text = self._join_text([first.text, item.text], first.direction)
+                first.confidence = max(first.confidence, item.confidence)
+                if item.model_confidence is not None:
+                    first.model_confidence = max(
+                        first.model_confidence or 0.0, item.model_confidence
+                    )
+            first.layout_box = first.text_box
+            grouped.append(first)
+        return grouped
+
+    @staticmethod
+    def _bubble_iou(first: BubbleData, second: BubbleData) -> float:
+        ax1, ay1, ax2, ay2 = first.bubble_box
+        bx1, by1, bx2, by2 = second.bubble_box
+        intersection = max(0, min(ax2, bx2) - max(ax1, bx1)) * max(0, min(ay2, by2) - max(ay1, by1))
+        first_area = max(0, ax2 - ax1) * max(0, ay2 - ay1)
+        second_area = max(0, bx2 - bx1) * max(0, by2 - by1)
+        union = first_area + second_area - intersection
+        return intersection / union if union else 0.0
+
+    @staticmethod
+    def _union_box(first: Tuple[int, int, int, int], second: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+        return (
+            min(first[0], second[0]), min(first[1], second[1]),
+            max(first[2], second[2]), max(first[3], second[3]),
+        )
+
+    @staticmethod
+    def _join_text(parts: List[str], direction: str) -> str:
+        cleaned = [part.strip() for part in parts if part and part.strip()]
+        if not cleaned:
+            return ""
+        if direction == "vertical" or any(any("\u3040" <= char <= "\u30ff" or "\u4e00" <= char <= "\u9fff" for char in part) for part in cleaned):
+            return "\n".join(cleaned)
+        return " ".join(cleaned)
 
     def _calculate_layout_box(
         self,

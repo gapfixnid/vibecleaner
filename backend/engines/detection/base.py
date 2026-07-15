@@ -50,6 +50,7 @@ class DetectionEngine(ABC):
         line_merge_sensitivity: float | None = None,
         smart_direction: bool | None = None,
         text_direction_override: str | None = None,
+        text_confidences: dict[tuple[int, int, int, int], float] | None = None,
     ) -> list[TextBlock]:
         return self.pipeline.build_text_blocks(
             image,
@@ -59,4 +60,5 @@ class DetectionEngine(ABC):
             line_merge_sensitivity=line_merge_sensitivity,
             smart_direction=smart_direction,
             text_direction_override=text_direction_override,
+            text_confidences=text_confidences,
         )
