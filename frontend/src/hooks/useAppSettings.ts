@@ -5,8 +5,6 @@ import { DEFAULT_TRANSLATION_OPTIONS } from "../translationSettings";
 import type { Settings } from "../types";
 
 const DEFAULT_SETTINGS: Settings = {
-  pipeline_v2_enabled: true,
-  pipeline_v2_shadow: false,
   translation_model: "",
   translation_provider: "google",
   translation_api_base_url: "",

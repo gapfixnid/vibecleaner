@@ -6,32 +6,6 @@ from pathlib import Path
 from backend.core.config import AppConfig, SETTINGS_FORMAT, SETTINGS_SCHEMA_VERSION
 
 class ConfigMigrationTests(unittest.TestCase):
-    def test_new_install_defaults_to_v2_without_shadow(self):
-        cfg = AppConfig()
-
-        self.assertTrue(cfg.pipeline_v2_enabled)
-        self.assertFalse(cfg.pipeline_v2_shadow)
-
-    def test_pipeline_v2_flags_and_schema_version_round_trip(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            settings_path = Path(tmpdir) / "settings.json"
-            cfg = AppConfig(
-                pipeline_v2_enabled=True,
-                pipeline_v2_shadow=True,
-                settings_path=str(settings_path),
-            )
-
-            self.assertTrue(cfg.save())
-            saved = json.loads(settings_path.read_text(encoding="utf-8"))
-            loaded = AppConfig(settings_path=str(settings_path))
-            loaded.load()
-
-        self.assertEqual(saved["format"], SETTINGS_FORMAT)
-        self.assertEqual(saved["schema_version"], SETTINGS_SCHEMA_VERSION)
-        self.assertEqual(saved["app_version"], "0.1.0")
-        self.assertTrue(loaded.pipeline_v2_enabled)
-        self.assertTrue(loaded.pipeline_v2_shadow)
-
     def test_unversioned_settings_migrate_with_safe_pipeline_defaults(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings_path = Path(tmpdir) / "settings.json"
@@ -42,15 +16,13 @@ class ConfigMigrationTests(unittest.TestCase):
             cfg = AppConfig(settings_path=str(settings_path))
 
             cfg.load()
-            self.assertFalse(cfg.pipeline_v2_enabled)
-            self.assertFalse(cfg.pipeline_v2_shadow)
             self.assertTrue(cfg.save())
             migrated = json.loads(settings_path.read_text(encoding="utf-8"))
 
         self.assertEqual(migrated["format"], SETTINGS_FORMAT)
         self.assertEqual(migrated["schema_version"], SETTINGS_SCHEMA_VERSION)
-        self.assertFalse(migrated["pipeline_v2_enabled"])
-        self.assertFalse(migrated["pipeline_v2_shadow"])
+        self.assertNotIn("pipeline_v2_enabled", migrated)
+        self.assertNotIn("pipeline_v2_shadow", migrated)
 
     def test_newer_settings_schema_is_not_loaded_or_overwritten(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -59,7 +31,7 @@ class ConfigMigrationTests(unittest.TestCase):
                 "format": SETTINGS_FORMAT,
                 "schema_version": SETTINGS_SCHEMA_VERSION + 1,
                 "source_language": "Future language",
-                "pipeline_v2_enabled": True,
+                "obsolete_pipeline_flag": True,
             }
             settings_path.write_text(json.dumps(original), encoding="utf-8")
             cfg = AppConfig(source_language="Existing value", settings_path=str(settings_path))
@@ -67,7 +39,7 @@ class ConfigMigrationTests(unittest.TestCase):
             cfg.load()
 
             self.assertEqual(cfg.source_language, "Existing value")
-            self.assertTrue(cfg.pipeline_v2_enabled)
+            self.assertEqual(cfg.source_language, "Existing value")
             self.assertFalse(cfg.save())
             self.assertEqual(json.loads(settings_path.read_text(encoding="utf-8")), original)
 

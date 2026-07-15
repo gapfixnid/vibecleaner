@@ -16,7 +16,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - 도메인 로직은 FastAPI/React/Tauri에 의존하지 않는다.
 - 엔진은 안정된 port/interface와 provider manifest 뒤에 둔다.
 - 프로젝트 파일/API는 버전과 migration 정책을 갖는다.
-- v1을 유지한 채 v2를 shadow 검증하고, feature flag·benchmark·fallback을 거쳐 v2를 기본화한다.
+- 검증 완료 후 v2를 유일한 페이지 번역 파이프라인으로 운영한다.
 
 ## 2. 유지 영역과 교체 영역
 
@@ -26,11 +26,11 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - React 작업 공간 및 Canvas/Inspector
 - 프로젝트·페이지·말풍선 도메인 모델
 - 기존 저장·내보내기 흐름
-- 기존 엔진 구현체와 legacy adapter
+- 기존 엔진 구현체와 필요한 provider adapter
 
 ### v2 교체·신규 구현
 
-- Pipeline v1/v2 rollout coordinator
+- Pipeline v2 DAG executor
 - dependency DAG executor
 - CPU/GPU/I/O/Network resource admission
 - detection/OCR 독립 실행 port
@@ -45,7 +45,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - 전체 재작성 금지 및 Strangler migration 원칙 문서화
 - settings/project schema version 및 migration/rejection 정책 추가
 - atomic settings/project save와 unknown field 보존
-- 기존 v1 characterization fixture 및 회귀 테스트 추가
+- v2 characterization 및 회귀 테스트 추가
 - 기존 API·프로젝트 파일 호환성을 깨지 않는 v2 opt-in 경로 확보
 
 ### Provider 확장 계약
@@ -58,7 +58,7 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 
 ### Pipeline v2 실행
 
-- `PipelineRollout`으로 v1/v2 primary 및 shadow 선택
+- v2 DAG executor를 페이지 번역의 단일 실행 경로로 고정
 - dependency cycle/missing dependency 검증
 - v2 DAG stage resource 및 retry 정책
 - OCR 이후 translation과 inpainting 병렬 실행
@@ -72,9 +72,8 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 
 ### Detection/OCR 분리
 
-- legacy `detect_and_ocr` 유지
 - v2에서 `detect_only → ocr_only` 실행
-- legacy detection/OCR adapter와 DTO 경계 추가
+- detection/OCR provider adapter와 DTO 경계 유지
 - detection confidence 부족 시 high precision model로 1회 replan
 - OCR quality score 및 detection quality score 기록
 - OCR quality 미달 시 cache를 우회한 enhanced preprocessing으로 1회 자동 retry
@@ -93,24 +92,17 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - 긴 문장 typesetting에서 구두점 고아 줄 억제 및 원본 bubble mask 재시도 경로 추가
 - detection/OCR/inpainting/translation provider queue
 - provider runtime metrics API
-- rollout telemetry JSONL 저장 및 v2 primary failure/fallback 성공률 집계
+- v2 telemetry JSONL 저장 및 primary 성공률 집계
 - `/api/pipeline/telemetry` 운영 요약 endpoint 추가
 - shadow context snapshot에서 `RLock` 등 runtime lock 제외
-- shadow 실패가 primary 작업을 중단하지 않도록 보호
-- v2 primary 실패 시 깨끗한 context에서 v1 fallback
 
 ### Benchmark·Rollout
 
-- shadow JSONL benchmark 저장
-- primary/shadow duration 및 stage duration 기록
-- bubble count, OCR match, translation match, quality score 기록
-- execution order 교대(primary-first/shadow-first)
 - deterministic parallel scheduler speedup benchmark 추가
 - rollout quality gate 스크립트 추가
 - 장기 benchmark JSONL 집계 및 self-contained HTML dashboard 생성
 - CI에서 benchmark summary/dashboard artifact 업로드 workflow 추가
-- 신규 설치 기본값은 v2, 기존 명시 설정은 보존
-- Advanced 설정 UI에서 v2/shadow 토글 제공
+- 모든 설치에서 v2 DAG executor를 사용
 
 ## 4. 검증 현황
 
@@ -121,54 +113,20 @@ Issue #1의 방향은 다음 원칙을 전제로 했다.
 - frontend Node 테스트: 통과
 - parallel scheduler smoke benchmark: 약 `1.96x` speedup 확인
 - 실제 shadow rollout gate: 10 sample, success/equivalence/OCR/translation 모두 `1.0`
-- 실제 페이지 benchmark에서 v1/v2 artifact·bubble·OCR·translation 결과 일치 확인
+- 실제 페이지 benchmark에서 v2 artifact·bubble·OCR·translation 결과 확인
 - NVIDIA CUDA 환경에서 detection·LaMa ONNX 실추론 및 `CUDAExecutionProvider` 사용 확인
 - CUDA 실추론 시 GPU 전력 사용량이 약 `48W`에서 `77W`로 증가하는 것을 확인
-- 긴 번역문·좁은 말풍선 자동 배치 회귀 테스트 포함, 전체 `182 passed`
+- 긴 번역문·좁은 말풍선 자동 배치 회귀 테스트 포함, 전체 `159 passed`
 
 ## 5. 남은 작업
 
-현재 사용자가 없는 개발 단계이므로 v1 제거는 보류한다. v1 fallback과
-backward compatibility 테스트는 유지하고, 실제 운영 기간이 생긴 뒤 다시 판단한다.
-
-향후 운영 단계에서 재검토할 항목:
-
-- 충분한 운영 기간 후 v1 제거 여부 결정 및 migration 공지
-- v1 제거 전 프로젝트 파일/API backward compatibility 최종 검증
+v1 페이지 번역 파이프라인과 rollout/shadow/fallback 코드는 제거했다. 프로젝트
+파일·API 스키마와 일반 엔진 fallback은 별도 호환성 정책으로 유지한다.
 
 ## 6. 현재 운영 권장 설정
 
-일반 사용:
-
-```json
-{
-  "pipeline_v2_enabled": true,
-  "pipeline_v2_shadow": false
-}
-```
-
-추가 검증:
-
-```json
-{
-  "pipeline_v2_enabled": true,
-  "pipeline_v2_shadow": true
-}
-```
-
-shadow는 v1과 v2를 모두 실행하므로 검증 기간에만 사용한다. 결과는 Windows 기준 다음 파일에 저장된다.
-
-```text
-%APPDATA%\vibecleaner\pipeline_shadow_benchmark.jsonl
-```
-
-rollout gate 실행:
-
-```powershell
-.\venv\Scripts\python.exe scripts\evaluate_pipeline_rollout.py `
-  "$env:APPDATA\vibecleaner\pipeline_shadow_benchmark.jsonl" `
-  --minimum-samples 10
-```
+페이지 번역은 항상 v2 DAG executor를 사용한다. 별도의 rollout 플래그나
+shadow 실행 설정은 더 이상 필요하지 않다.
 
 ## 7. 최근 주요 커밋
 
@@ -179,7 +137,7 @@ rollout gate 실행:
 
 - `220ee05` low-confidence detection replan
 - `6434760` adaptive stage quality scoring
-- `6e1dc4a` new install v2 default and v1 fallback
+- `7a48311` supported language scope and same-language validation
 - `0da6430` parallel stage timing correction
 - `599e379` parallel scheduler regression benchmark
 - `133c6c8` independent v2 stage parallel execution

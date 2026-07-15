@@ -24,8 +24,6 @@ LEGACY_SETTINGS_SCHEMA_VERSION_KEY = "settings_schema_version"
 
 @dataclass(frozen=True)
 class AppConfigSnapshot:
-    pipeline_v2_enabled: bool = True
-    pipeline_v2_shadow: bool = False
     translation_model: str = ""
     translation_provider: str = "google"
     translation_api_base_url: str = ""
@@ -92,12 +90,6 @@ def config_value(config: Any, name: str) -> Any:
 
 @dataclass
 class AppConfig:
-    # -- Pipeline rollout ---------------------------------------------------
-    # Pipeline v2 is the default for new installs after the Phase C rollout gate.
-    # Existing files keep their explicitly migrated value.
-    pipeline_v2_enabled: bool = True
-    pipeline_v2_shadow: bool = False
-
     # -- Translation --------------------------------------------------------
     translation_model: str = ""
     translation_provider: str = "google"
@@ -232,8 +224,6 @@ class AppConfig:
         repr=False,
         compare=False,
         default_factory=lambda: {
-            "pipeline_v2_enabled": "pipeline_v2_enabled",
-            "pipeline_v2_shadow": "pipeline_v2_shadow",
             "translation_model": "translation_model",
             "translation_provider": "translation_provider",
             "translation_api_base_url": "translation_api_base_url",
@@ -344,9 +334,6 @@ class AppConfig:
             value = data.get(json_key)
             if value is None:
                 continue
-            if field_name in {"pipeline_v2_enabled", "pipeline_v2_shadow"} and not isinstance(value, bool):
-                logger.warning("Ignoring non-boolean pipeline rollout setting %s=%r", json_key, value)
-                continue
             setattr(self, field_name, value)
 
         logger.info("Settings loaded from %s", self.settings_path)
@@ -360,9 +347,9 @@ class AppConfig:
         rewritten when the normal settings save path runs.
         """
         migrated = dict(data)
+        migrated.pop("pipeline_v2_enabled", None)
+        migrated.pop("pipeline_v2_shadow", None)
         if schema_version == 0:
-            migrated.setdefault("pipeline_v2_enabled", False)
-            migrated.setdefault("pipeline_v2_shadow", False)
             migrated.setdefault("setup_completed", True)
             if migrated.get("translation_provider") == "argos":
                 migrated["translation_provider"] = "google"

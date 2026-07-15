@@ -137,5 +137,5 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
 
 
 def start_pipeline_warmup(container: AppContainer) -> None:
-    if container.config.pipeline_v2_enabled and container.config.inpaint_engine != "opencv":
+    if container.config.inpaint_engine != "opencv":
         container.cache_tasks.submit(container.inpainting_service.prepare)

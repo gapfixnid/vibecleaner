@@ -163,7 +163,6 @@ export type TranslationKey =
   | "settings.translation"
   | "settings.detection"
   | "settings.inpainting"
-  | "settings.advanced"
   | "settings.generalTitle"
   | "settings.generalDesc"
   | "settings.translationTitle"
@@ -172,12 +171,6 @@ export type TranslationKey =
   | "settings.detectionDesc"
   | "settings.inpaintingTitle"
   | "settings.inpaintingDesc"
-  | "settings.advancedTitle"
-  | "settings.advancedDesc"
-  | "settings.pipelineRollout"
-  | "settings.pipelineV2Enabled"
-  | "settings.pipelineV2Shadow"
-  | "settings.pipelineV2ShadowHelp"
   | "settings.appearance"
   | "settings.theme"
   | "settings.uiLanguage"
@@ -441,7 +434,6 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.translation": "Translation",
     "settings.detection": "Detection",
     "settings.inpainting": "Inpainting",
-    "settings.advanced": "Advanced",
     "settings.generalTitle": "General Settings",
     "settings.generalDesc": "Manage general preferences, font size boundaries, and timeouts.",
     "settings.translationTitle": "Translation Engine",
@@ -450,12 +442,6 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.detectionDesc": "Configure bubble detection models, threshold tolerances, and tiling settings.",
     "settings.inpaintingTitle": "Inpainting & Cleaning",
     "settings.inpaintingDesc": "Tweak background LaMa inpainting mask boundaries and dilation.",
-    "settings.advancedTitle": "Advanced Pipeline",
-    "settings.advancedDesc": "Control the gradual rollout and validation of Pipeline v2.",
-    "settings.pipelineRollout": "Pipeline Rollout",
-    "settings.pipelineV2Enabled": "Use Pipeline v2",
-    "settings.pipelineV2Shadow": "Run shadow comparison",
-    "settings.pipelineV2ShadowHelp": "Runs v1 and v2 for comparison and uses roughly twice the processing resources.",
     "settings.appearance": "Appearance",
     "settings.theme": "Theme",
     "settings.uiLanguage": "UI Language",
@@ -718,7 +704,6 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.translation": "번역",
     "settings.detection": "감지",
     "settings.inpainting": "인페인팅",
-    "settings.advanced": "고급",
     "settings.generalTitle": "일반 설정",
     "settings.generalDesc": "기본 표시, 글꼴 크기 범위, 요청 시간 제한을 설정합니다.",
     "settings.translationTitle": "번역 엔진",
@@ -727,12 +712,6 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.detectionDesc": "말풍선 감지 모델, 신뢰도 기준, 타일링 설정을 조정합니다.",
     "settings.inpaintingTitle": "인페인팅 및 정리",
     "settings.inpaintingDesc": "LaMa 인페인팅 마스크 경계와 확장 값을 조정합니다.",
-    "settings.advancedTitle": "고급 파이프라인",
-    "settings.advancedDesc": "Pipeline v2의 점진적 전환과 검증 설정을 관리합니다.",
-    "settings.pipelineRollout": "파이프라인 전환",
-    "settings.pipelineV2Enabled": "Pipeline v2 사용",
-    "settings.pipelineV2Shadow": "Shadow 비교 실행",
-    "settings.pipelineV2ShadowHelp": "v1과 v2를 함께 실행하므로 처리 시간과 자원을 약 두 배 사용합니다.",
     "settings.appearance": "표시",
     "settings.theme": "테마",
     "settings.uiLanguage": "UI 언어",

@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import os
+from time import perf_counter
 from typing import Any
 
 from ..core.models.image import ImageData
 from ..infrastructure.storage.paths import get_app_data_dir
-from .benchmark import JsonlBenchmarkSink
 from .context import PipelineContext
 from .dag import DagPipelineExecutor
-from .rollout import PipelineExecutionCoordinator, PipelineRollout
 from .telemetry import JsonlTelemetrySink
-from .shadow import clone_page_translation_context, clone_page_translation_fallback_context
+from .telemetry import PipelineTelemetryRecord
 
 
 def run_page_translation(
@@ -39,29 +38,32 @@ def run_page_translation(
             "job_manager": job_manager,
         },
     )
-    plan = planner.translate_page_plan()
-    rollout = PipelineRollout.from_settings(config)
-    benchmark_sink = None
     telemetry_path = getattr(config, "pipeline_telemetry_path", None)
     if not telemetry_path:
         telemetry_path = os.path.join(get_app_data_dir(), "pipeline_rollout_telemetry.jsonl")
     telemetry_sink = JsonlTelemetrySink(telemetry_path)
-    if rollout.shadow:
-        benchmark_path = getattr(config, "pipeline_benchmark_path", None)
-        if not benchmark_path:
-            benchmark_path = os.path.join(get_app_data_dir(), "pipeline_shadow_benchmark.jsonl")
-        benchmark_sink = JsonlBenchmarkSink(benchmark_path)
-    coordinator = PipelineExecutionCoordinator(
-        v1_runner=lambda item: runner.run(item, plan),
-        v2_runner=lambda item: DagPipelineExecutor(
-            runner.registry, checkpoint_store=checkpoint_store
-        ).run(item, planner.translate_page_dag_plan(), resume_manifest=resume_manifest),
-        benchmark_sink=benchmark_sink,
-        telemetry_sink=telemetry_sink,
-        shadow_context_factory=clone_page_translation_context,
-        fallback_context_factory=clone_page_translation_fallback_context,
-    )
-    result = coordinator.run(context, rollout)
+    context.pipeline_variant = "v2"
+    started = perf_counter()
+    result = DagPipelineExecutor(
+        runner.registry, checkpoint_store=checkpoint_store
+    ).run(context, planner.translate_page_dag_plan(), resume_manifest=resume_manifest)
+    telemetry_sink.record(PipelineTelemetryRecord(
+        run_id=str(result.context.provenance.run_id),
+        page_id=page_id,
+        primary="v2",
+        primary_succeeded=bool(result.succeeded),
+        returned_variant="v2",
+        fallback_attempted=False,
+        fallback_used=False,
+        fallback_succeeded=None,
+        shadow_enabled=False,
+        shadow_succeeded=None,
+        primary_error=(
+            getattr(result.issues[0], "message", str(result.issues[0]))
+            if result.issues else None
+        ),
+        primary_duration_ms=(perf_counter() - started) * 1000,
+    ))
     runner.last_result = result
     if not result.succeeded:
         message = result.issues[0].message if result.issues else "Page translation pipeline failed"
