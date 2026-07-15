@@ -95,8 +95,9 @@ class DagPipelineExecutor:
                 entry, started_at = context.provenance.start_stage(
                     spec.name, input_summary={"artifact_count": len(context.artifacts)}
                 )
+                entry.options.update({"resource": spec.resource.value, "retry_count": 0})
                 try:
-                    context = self._run_with_retry(stage, spec, context)
+                    context = self._run_with_retry(stage, spec, context, entry=entry)
                 except PipelineValidationError as exc:
                     context.provenance.finish_stage(
                         entry, started_at,
@@ -136,7 +137,8 @@ class DagPipelineExecutor:
                 entry, started_at = context.provenance.start_stage(
                     spec.name, input_summary={"artifact_count": len(context.artifacts)}
                 )
-                records[pool.submit(self._run_parallel_timed, stage, spec, context)] = (
+                entry.options.update({"resource": spec.resource.value, "retry_count": 0})
+                records[pool.submit(self._run_parallel_timed, stage, spec, context, entry)] = (
                     spec, entry, started_at
                 )
             issues: list[ValidationIssue] = []
@@ -175,13 +177,14 @@ class DagPipelineExecutor:
         stage: Any,
         spec: DagStage,
         context: PipelineContext,
+        entry: Any,
     ) -> tuple[PipelineContext | None, float, Exception | None]:
         try:
-            return self._run_with_retry(stage, spec, context), perf_counter(), None
+            return self._run_with_retry(stage, spec, context, entry=entry), perf_counter(), None
         except Exception as exc:
             return None, perf_counter(), exc
 
-    def _run_with_retry(self, stage: Any, spec: DagStage, context: PipelineContext) -> PipelineContext:
+    def _run_with_retry(self, stage: Any, spec: DagStage, context: PipelineContext, *, entry: Any) -> PipelineContext:
         attempts = max(0, spec.max_retries) + 1
         for attempt in range(attempts):
             try:
@@ -192,6 +195,7 @@ class DagPipelineExecutor:
             except Exception:
                 if attempt + 1 >= attempts:
                     raise
+                entry.options["retry_count"] = attempt + 1
                 if self.retry_backoff_seconds:
                     sleep(self.retry_backoff_seconds * (attempt + 1))
         raise RuntimeError("unreachable")

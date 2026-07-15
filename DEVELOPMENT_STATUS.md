@@ -15,7 +15,7 @@ telemetry schema를 개선하는 데 필요하면 기존 형식을 깨고 바로
 
 ## 현재 기준선
 
-- Python 전체 테스트: 로컬 `180 passed`
+- Python 전체 테스트: 로컬 `185 passed`
 - 최신 CI 재실행: 통과
 - 오류가 발생했던 다중 페이지 이미지 재번역: 통과
 - CUDA 환경에서 detection·LaMa ONNX의 `CUDAExecutionProvider` 실추론 확인
@@ -62,8 +62,9 @@ v1 제거 후에도 `pipeline_rollout_telemetry.jsonl`과 fallback/shadow 필드
 - [완료] 기존 rollout telemetry JSONL 호환 reader는 추가하지 않고 새 파일로 시작
 - [완료] 파일명과 API 응답을 일반적인 pipeline telemetry 명칭으로 정리
 - [완료] stage별 duration, quality score, replan, 오류를 집계
-- [남음] 파일 크기 제한·기간별 보관·손상 행 처리 정책 추가
-- [남음] stage retry·cache hit/miss·실제 GPU provider 집계 추가
+- [완료] 파일 크기 제한·기간별 보관·손상 행 처리 정책 추가
+- [완료] stage retry·cache hit/miss 집계 추가
+- 실제 GPU provider 집계는 runtime health 정보와 연결하는 후속 작업으로 남김
 
 완료 기준: `/api/pipeline/telemetry`가 현재 v2 실행 의미만 반환하고, 오래된
 telemetry 파일을 읽어도 앱 시작이나 endpoint가 실패하지 않는다.

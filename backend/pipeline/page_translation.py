@@ -14,12 +14,28 @@ from .telemetry import PipelineTelemetryRecord
 
 
 def _telemetry_stages(context: PipelineContext) -> dict[str, dict[str, Any]]:
+    quality_replans = context.artifacts.get("quality_replans", [])
+    ocr_provenance = context.artifacts.get("ocr_provenance", {})
+    ocr_cache = ocr_provenance.get("cache", {}) if isinstance(ocr_provenance, dict) else {}
     return {
         entry.stage: {
             "engine": entry.engine,
             "duration_ms": entry.duration_ms,
             "warning_count": len(entry.warnings),
             "error_count": len(entry.errors),
+            "retry_count": int(entry.options.get("retry_count", 0)),
+            "resource": entry.options.get("resource"),
+            "cache_hits": (
+                int(ocr_cache.get("hits_after", 0)) - int(ocr_cache.get("hits_before", 0))
+                if entry.stage == "ocr" and ocr_cache.get("hits_before") is not None
+                and ocr_cache.get("hits_after") is not None else None
+            ),
+            "cache_misses": (
+                int(ocr_cache.get("misses_after", 0)) - int(ocr_cache.get("misses_before", 0))
+                if entry.stage == "ocr" and ocr_cache.get("misses_before") is not None
+                and ocr_cache.get("misses_after") is not None else None
+            ),
+            "replan_count": sum(1 for item in quality_replans if item.get("stage") == entry.stage),
         }
         for entry in context.provenance.stages
     }

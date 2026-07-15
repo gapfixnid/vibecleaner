@@ -43,7 +43,7 @@ def test_telemetry_summary_reports_v2_execution_metrics():
             "succeeded": True,
             "duration_ms": 100,
             "quality_replans": [],
-            "stages": {"ocr": {"duration_ms": 40}},
+            "stages": {"ocr": {"duration_ms": 40, "retry_count": 1, "cache_hits": 2, "cache_misses": 3}},
             "quality_scores": {"ocr": {"score": 1.0, "passed": True}},
         },
         {
@@ -52,7 +52,7 @@ def test_telemetry_summary_reports_v2_execution_metrics():
             "succeeded": False,
             "duration_ms": 200,
             "quality_replans": [{"stage": "ocr"}],
-            "stages": {"ocr": {"duration_ms": 80}},
+            "stages": {"ocr": {"duration_ms": 80, "retry_count": 2, "cache_hits": 4, "cache_misses": 1}},
             "quality_scores": {"ocr": {"score": 0.5, "passed": False}},
         },
     ]
@@ -66,6 +66,9 @@ def test_telemetry_summary_reports_v2_execution_metrics():
     assert summary["duration_ms_mean"] == 150.0
     assert summary["replan_count"] == 1
     assert summary["stage_duration_ms_mean"]["ocr"] == 60.0
+    assert summary["stage_retry_count"]["ocr"] == 3
+    assert summary["stage_cache_hits"]["ocr"] == 6
+    assert summary["stage_cache_misses"]["ocr"] == 4
     assert summary["quality_score_mean"]["ocr"] == 0.75
     assert summary["quality_pass_rate"]["ocr"] == 0.5
     assert summary["by_date"]["2026-07-15"]["sample_count"] == 2
@@ -86,3 +89,25 @@ def test_telemetry_sink_writes_one_json_record_per_line(tmp_path):
     lines = path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     assert json.loads(lines[0])["run_id"] == "run-1"
+
+
+def test_corrupt_telemetry_rows_are_skipped(tmp_path):
+    path = tmp_path / "telemetry.jsonl"
+    path.write_text('{"run_id":"good"}\nnot-json\n', encoding="utf-8")
+
+    assert load_telemetry(path) == [{"run_id": "good"}]
+
+
+def test_telemetry_sink_prunes_oldest_rows_when_size_limit_is_reached(tmp_path):
+    path = tmp_path / "telemetry.jsonl"
+    sink = JsonlTelemetrySink(path, max_bytes=1024, retention_days=3650)
+    for index in range(20):
+        sink.record(PipelineTelemetryRecord(
+            schema_version=2, run_id=f"run-{index}", page_id="page", succeeded=True,
+            metadata={"padding": "x" * 100},
+        ))
+
+    assert path.stat().st_size <= 1024
+    rows = load_telemetry(path)
+    assert rows
+    assert rows[-1]["run_id"] == "run-19"
