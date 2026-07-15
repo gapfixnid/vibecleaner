@@ -183,6 +183,7 @@ def get_bubbles_response(state, page_id: str, render_service):
             "layout_padding": dict(bubble.layout_padding),
             "layout_margin": dict(bubble.layout_margin),
             "layout_confidence": bubble.layout_confidence,
+            "detection_confidence": bubble.detection_confidence,
             "layout_reasoning": bubble.layout_reasoning,
             "layout_overflow": bool(cached_layout.get("overflow") or cached_layout.get("reached_min_font")),
             "bold": bubble.bold,
@@ -229,6 +230,7 @@ def update_bubbles_response(state, page_id: str, bubbles: List[BubbleUpdateSchem
             layout_padding = dict(existing.layout_padding) if existing else {}
             layout_margin = dict(existing.layout_margin) if existing else {}
             layout_confidence = existing.layout_confidence if existing else 0.0
+            detection_confidence = existing.detection_confidence if existing else 0.0
             layout_reasoning = existing.layout_reasoning if existing else ""
             edited = bool(existing.edited) if existing else True
             problems = list(existing.problems) if existing else []
@@ -269,6 +271,7 @@ def update_bubbles_response(state, page_id: str, bubbles: List[BubbleUpdateSchem
                 layout_padding=layout_padding,
                 layout_margin=layout_margin,
                 layout_confidence=layout_confidence,
+                detection_confidence=detection_confidence,
                 layout_reasoning=layout_reasoning,
                 status=status,
                 problems=problems,

@@ -22,6 +22,8 @@ export function CanvasDetectionOverlay({ bubbles, scale }: CanvasDetectionOverla
     >
       {bubbles.map((bubble) => {
         const textBox = bubble.text_box;
+        const confidence = bubble.detection_confidence;
+        const label = `${bubble.text_class || "text"} · ${typeof confidence === "number" && confidence > 0 ? confidence.toFixed(2) : "—"}`;
         return (
           <g key={`detection-${bubble.id}`}>
             <rect
@@ -34,6 +36,18 @@ export function CanvasDetectionOverlay({ bubbles, scale }: CanvasDetectionOverla
               strokeWidth={1.5 / scale}
               strokeDasharray={`${4 / scale} ${3 / scale}`}
             />
+            <text
+              x={bubble.x}
+              y={Math.max(12 / scale, bubble.y - 4 / scale)}
+              fontSize={12 / scale}
+              fill="#16a34a"
+              stroke="white"
+              strokeWidth={3 / scale}
+              paintOrder="stroke"
+              fontFamily="sans-serif"
+            >
+              {`#${bubble.id} ${label}`}
+            </text>
             {textBox && (
               <rect
                 x={textBox.x}

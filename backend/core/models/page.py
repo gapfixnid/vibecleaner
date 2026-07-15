@@ -39,6 +39,7 @@ class TextBubble:
     layout_padding: Dict[str, float] = field(default_factory=dict)
     layout_margin: Dict[str, float] = field(default_factory=dict)
     layout_confidence: float = 0.0
+    detection_confidence: float = 0.0
     layout_reasoning: str = ""
     status: str = "idle"
     problems: List[str] = field(default_factory=list)
@@ -96,6 +97,7 @@ class TextBubble:
             "edited": self.edited,
             "style": style,
             "layout_plan": layout_plan,
+            "detection_confidence": self.detection_confidence,
         })
         text_box = self._rect_to_project_list(self.text_box)
         if text_box is not None:
@@ -117,6 +119,7 @@ class TextBubble:
             "status", "problems", "edited", "style", "layout_plan", "font_family", "font_size",
             "bold", "italic", "color", "alignment", "writing_mode", "text_direction",
             "justification", "layout_padding", "layout_margin", "layout_confidence", "layout_reasoning",
+            "detection_confidence",
         }
         extensions = {key: deepcopy(value) for key, value in data.items() if key not in known_keys}
         unknown_style = {
@@ -154,6 +157,7 @@ class TextBubble:
             layout_margin=dict(layout_plan.get("margin", data.get("layout_margin", {}))),
             layout_confidence=float(layout_plan.get("confidence", data.get("layout_confidence", 0.0)) or 0.0),
             layout_reasoning=layout_plan.get("reasoning", data.get("layout_reasoning", "")),
+            detection_confidence=float(data.get("detection_confidence", 0.0) or 0.0),
             status=data.get("status", "idle"),
             problems=list(data.get("problems", [])),
             edited=bool(data.get("edited", False)),
@@ -182,6 +186,7 @@ class TextBubble:
             layout_padding=dict(self.layout_padding),
             layout_margin=dict(self.layout_margin),
             layout_confidence=self.layout_confidence,
+            detection_confidence=self.detection_confidence,
             layout_reasoning=self.layout_reasoning,
             status=self.status,
             problems=list(self.problems),
