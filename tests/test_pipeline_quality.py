@@ -42,6 +42,25 @@ def test_ocr_quality_accepts_non_empty_blocks():
     assert score.score == 1.0
 
 
+def test_ocr_quality_uses_language_threshold_and_raw_confidence():
+    router = AdaptiveQualityRouter()
+    blocks = [
+        SimpleNamespace(text="hello", ocr_confidence=0.91),
+        SimpleNamespace(text="world", ocr_confidence=0.81),
+        SimpleNamespace(text="again", ocr_confidence=0.71),
+        SimpleNamespace(text="", ocr_confidence=0.22),
+    ]
+
+    english = router.evaluate_ocr(blocks, "English")
+    japanese = router.evaluate_ocr(blocks, "Japanese")
+
+    assert english.passed
+    assert not japanese.passed
+    assert english.signals["threshold"] == 0.75
+    assert english.signals["raw_confidence_available_ratio"] == 1.0
+    assert english.signals["raw_confidence_mean"] == 0.6625
+
+
 def test_empty_ocr_result_is_valid_empty_page_signal():
     score = AdaptiveQualityRouter().evaluate_ocr([])
     assert score.passed is True

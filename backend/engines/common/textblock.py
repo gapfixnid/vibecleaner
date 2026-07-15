@@ -29,7 +29,8 @@ class TextBlock(object):
                  max_font_size: int = 0,
                  font_color: str | tuple = (),
                  direction: str = "",
-                 confidence: float | None = None) -> None:
+                 confidence: float | None = None,
+                 ocr_confidence: float | None = None) -> None:
         
         self.xyxy = text_bbox
         self.segm_pts = text_segm_points
@@ -54,6 +55,7 @@ class TextBlock(object):
         self.font_color = font_color
         self.direction = direction
         self.confidence = confidence
+        self.ocr_confidence = ocr_confidence
 
     @property
     def xywh(self):
@@ -103,6 +105,7 @@ class TextBlock(object):
         new_block.max_font_size = self.max_font_size
         new_block.font_color = self.font_color
         new_block.confidence = self.confidence
+        new_block.ocr_confidence = self.ocr_confidence
         
         return new_block
 

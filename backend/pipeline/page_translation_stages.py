@@ -192,7 +192,9 @@ class PageOcrStage:
                     context.artifacts["blocks"],
                     lang=config.source_language,
                 )
-                ocr_score = self.quality_router.evaluate_ocr(context.artifacts["blocks"])
+                ocr_score = self.quality_router.evaluate_ocr(
+                    context.artifacts["blocks"], config.source_language
+                )
                 suspicious_blocks = [
                     block for block in context.artifacts["blocks"]
                     if _is_suspicious_ocr_text(getattr(block, "text", ""))
@@ -224,7 +226,9 @@ class PageOcrStage:
                             recovered_blocks += 1
                         else:
                             block.text = original
-                    ocr_score = self.quality_router.evaluate_ocr(context.artifacts["blocks"])
+                    ocr_score = self.quality_router.evaluate_ocr(
+                        context.artifacts["blocks"], config.source_language
+                    )
                     context.artifacts.setdefault("quality_replans", []).append({
                         "stage": "ocr", "model": retry_engine,
                         "profile": "suspicious_text_recovery", "recovered_blocks": recovered_blocks,
@@ -250,7 +254,9 @@ class PageOcrStage:
                         ),
                         use_cache=False,
                     )
-                    ocr_score = self.quality_router.evaluate_ocr(context.artifacts["blocks"])
+                    ocr_score = self.quality_router.evaluate_ocr(
+                        context.artifacts["blocks"], config.source_language
+                    )
                     context.artifacts.setdefault("quality_replans", []).append({
                         "stage": "ocr", "model": retry_engine,
                         "profile": "enhanced_preprocessing", "passed": ocr_score.passed
@@ -281,6 +287,15 @@ class PageOcrStage:
             "hits_after": diagnostics_after.get("ocr_cache_hits"),
             "misses_after": diagnostics_after.get("ocr_cache_misses"),
         })
+        raw_confidences = [
+            float(value) for block in context.artifacts.get("blocks", [])
+            if (value := getattr(block, "ocr_confidence", None)) is not None
+        ]
+        ocr_provenance["raw_confidence"] = {
+            "available_count": len(raw_confidences),
+            "mean": round(sum(raw_confidences) / len(raw_confidences), 4)
+            if raw_confidences else None,
+        }
         ocr_provenance["retry_count"] = sum(
             1 for item in context.artifacts.get("quality_replans", [])
             if item.get("stage") == "ocr"

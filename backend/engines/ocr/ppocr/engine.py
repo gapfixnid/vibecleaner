@@ -164,9 +164,9 @@ class PPOCRv5Engine(OCREngine):
 	) -> List[TextBlock]:
 		if self.rec_sess is None or self.decoder is None:
 			return blk_list
-		if self.use_text_lines and any(getattr(blk, 'lines', None) for blk in blk_list):
+		if self.use_text_lines and any(getattr(blk, "lines", None) for blk in blk_list):
 			for blk in blk_list:
-				lines = getattr(blk, 'lines', None) or [blk.xyxy]
+				lines = getattr(blk, "lines", None) or [blk.xyxy]
 				crops = [
 					_crop_line(
 						img,
@@ -178,15 +178,31 @@ class PPOCRv5Engine(OCREngine):
 					)
 					for line in lines
 				]
-				texts, _ = self._rec_infer([crop for crop in crops if crop is not None and crop.size > 0])
+				valid_crops = [crop for crop in crops if crop is not None and crop.size > 0]
+				texts, confidences = self._rec_infer(valid_crops)
+				valid_confidences = [
+					float(confidence)
+					for text, confidence in zip(texts, confidences)
+					if text and text.strip()
+				]
 				texts = [text.strip() for text in texts if text and text.strip()]
 				blk.texts = texts
-				blk.text = ''.join(texts) if is_no_space_lang(getattr(blk, 'source_lang', '')) else ' '.join(texts)
+				blk.text = (
+					"".join(texts)
+					if is_no_space_lang(getattr(blk, "source_lang", ""))
+					else " ".join(texts)
+				)
+				blk.ocr_confidence = (
+					sum(valid_confidences) / len(valid_confidences)
+					if valid_confidences
+					else None
+				)
 			return blk_list
+
 		boxes, _ = self._det_infer(img)
 		if boxes is None or len(boxes) == 0:
 			return blk_list
-		
+
 		adaptive_bin = True if adaptive_binarization is None else bool(adaptive_binarization)
 		strength = 2.0 if adaptive_binarization_strength is None else float(adaptive_binarization_strength)
 		crops = []
@@ -195,8 +211,8 @@ class PPOCRv5Engine(OCREngine):
 			if crop is not None and adaptive_bin:
 				crop = apply_adaptive_binarization(crop, strength=strength)
 			crops.append(crop)
-			
-		texts, _ = self._rec_infer(crops)
+
+		texts, confidences = self._rec_infer(crops)
 		# map quads -> axis-aligned boxes
 		bboxes = []
 		for quad in boxes:
@@ -204,7 +220,15 @@ class PPOCRv5Engine(OCREngine):
 			ys = quad[:, 1]
 			x1, y1, x2, y2 = int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())
 			bboxes.append((x1, y1, x2, y2))
-		return lists_to_blk_list(blk_list, bboxes, texts)
+		result = lists_to_blk_list(blk_list, bboxes, texts)
+		average_confidence = (
+			sum(float(value) for value in confidences) / len(confidences)
+			if confidences
+			else None
+		)
+		for block in result:
+			block.ocr_confidence = average_confidence
+		return result
 
 
 def _crop_line(

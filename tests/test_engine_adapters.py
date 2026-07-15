@@ -100,6 +100,7 @@ class FakeRecognizeTextOcr:
         )
         for block in blocks:
             block.text = f"{engine}:{block.xyxy[0]}"
+            block.ocr_confidence = 0.88
         return blocks
 
 
@@ -247,6 +248,7 @@ def test_ocr_adapter_wraps_recognize_text_legacy_engine():
     assert ocr.calls[0]["engine"] == "ppocr"
     assert ocr.calls[0]["blocks"][0].xyxy == [1, 2, 11, 12]
     assert result.regions[0].text == "ppocr:1"
+    assert result.regions[0].ocr_confidence == 0.88
 
 
 def test_ocr_adapter_matches_reordered_results_by_coordinates():

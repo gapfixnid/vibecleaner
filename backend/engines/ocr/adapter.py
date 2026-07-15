@@ -35,7 +35,11 @@ class OcrEngineAdapter:
             # back to the original regions even if the OCR engine reorders them.
             texts = recognized_blocks
         recognized = [
-            replace(region, text=self._text_for_region(region, texts, index))
+            replace(
+                region,
+                text=self._text_for_region(region, texts, index),
+                ocr_confidence=self._confidence_for_region(region, texts, index),
+            )
             for index, region in enumerate(regions)
         ]
         return OcrResult(regions=recognized, engine=self.engine_name)
@@ -65,3 +69,18 @@ class OcrEngineAdapter:
             result = results[index]
             return str(getattr(result, "text", result) or "")
         return region.text
+
+    @classmethod
+    def _confidence_for_region(cls, region: TextRegion, results: Any, index: int) -> float | None:
+        if not isinstance(results, (list, tuple)):
+            return None
+        target_key = cls._region_key(region)
+        candidates = results
+        if target_key is not None:
+            candidates = [result for result in results if cls._region_key(result) == target_key]
+        if not candidates and index < len(results):
+            candidates = [results[index]]
+        if not candidates:
+            return None
+        value = getattr(candidates[0], "ocr_confidence", None)
+        return float(value) if value is not None else None

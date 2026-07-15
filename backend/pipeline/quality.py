@@ -18,6 +18,22 @@ class QualityThresholds:
     detection: float = 0.75
     ocr: float = 0.80
     inpainting: float = 0.70
+    ocr_by_language: dict[str, float] = field(default_factory=lambda: {
+        "Japanese": 0.80,
+        "English": 0.75,
+        "Korean": 0.78,
+    })
+
+    def ocr_threshold(self, language: str | None = None) -> float:
+        if not language:
+            return self.ocr
+        normalized = str(language).strip().lower()
+        aliases = {
+            "japanese": "Japanese", "日本語": "Japanese", "ja": "Japanese",
+            "english": "English", "영어": "English", "en": "English",
+            "korean": "Korean", "한국어": "Korean", "ko": "Korean",
+        }
+        return self.ocr_by_language.get(aliases.get(normalized, str(language)), self.ocr)
 
 
 class AdaptiveQualityRouter:
@@ -50,17 +66,30 @@ class AdaptiveQualityRouter:
             recommended_action="accept" if passed else "upgrade_model",
         )
 
-    def evaluate_ocr(self, blocks: list[Any]) -> QualityScore:
+    def evaluate_ocr(self, blocks: list[Any], language: str | None = None) -> QualityScore:
+        threshold = self.thresholds.ocr_threshold(language)
         if not blocks:
-            return QualityScore("ocr", 1.0, True, {"non_empty_ratio": 1.0})
+            return QualityScore("ocr", 1.0, True, {"non_empty_ratio": 1.0, "threshold": threshold})
         non_empty = sum(bool(str(getattr(block, "text", "")).strip()) for block in blocks)
         ratio = non_empty / len(blocks)
-        passed = ratio >= self.thresholds.ocr
+        raw_confidences = [
+            float(value) for block in blocks
+            if (value := getattr(block, "ocr_confidence", None)) is not None
+        ]
+        passed = ratio >= threshold
+        signals = {
+            "non_empty_ratio": round(ratio, 4),
+            "block_count": float(len(blocks)),
+            "threshold": threshold,
+            "raw_confidence_available_ratio": round(len(raw_confidences) / len(blocks), 4),
+        }
+        if raw_confidences:
+            signals["raw_confidence_mean"] = round(sum(raw_confidences) / len(raw_confidences), 4)
         return QualityScore(
             stage="ocr",
             score=round(ratio, 4),
             passed=passed,
-            signals={"non_empty_ratio": round(ratio, 4), "block_count": float(len(blocks))},
+            signals=signals,
             recommended_action="accept" if passed else "retry_ocr",
         )
 

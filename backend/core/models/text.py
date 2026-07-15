@@ -10,4 +10,5 @@ class TextRegion:
     box: Box
     text: str = ""
     confidence: float | None = None
+    ocr_confidence: float | None = None
     bubble_id: str | None = None
