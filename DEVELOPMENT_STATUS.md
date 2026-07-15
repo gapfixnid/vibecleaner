@@ -15,7 +15,7 @@ telemetry schema를 개선하는 데 필요하면 기존 형식을 깨고 바로
 
 ## 현재 기준선
 
-- Python 전체 테스트: 로컬 `173 passed`
+- Python 전체 테스트: 로컬 `176 passed`
 - 최신 CI 재실행: 통과
 - 오류가 발생했던 다중 페이지 이미지 재번역: 통과
 - CUDA 환경에서 detection·LaMa ONNX의 `CUDAExecutionProvider` 실추론 확인
@@ -43,7 +43,8 @@ telemetry schema를 개선하는 데 필요하면 기존 형식을 깨고 바로
   - 효과음, 패널 경계, 인물 윤곽을 텍스트로 잘못 잡는 경우
 - [완료] bubble recall/precision, split/merge 오류를 benchmark로 집계
 - text-region recall, OCR 비어 있음 비율과 실제 모델 prediction 수집을 benchmark에 연결
-- 모델 원시 confidence와 heuristic/layout confidence를 분리해 저장
+- [완료] RT-DETR 모델 원시 confidence를 TextBlock·BubbleAnalysis·API `detection_confidence`까지 전달
+- heuristic/layout confidence와 모델 confidence를 분리
 - 기존 debug overlay를 평가 corpus 결과와 연결해 누락·오검출 원인을 확인
 
 완료 기준: 샘플 그룹별 지표와 대표 실패 이미지가 자동으로 남고, 수정 전후

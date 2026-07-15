@@ -51,6 +51,7 @@ class BubbleData:
 
     # Analysis
     confidence: float = 1.0
+    model_confidence: float | None = None
     reading_order: int = 0
     direction: str = "horizontal"  # "horizontal" or "vertical"
 
@@ -172,6 +173,11 @@ class BubbleAnalysisService:
             text_class=text_class,
             font_color=font_color,
             confidence=1.0,
+            model_confidence=(
+                float(block.confidence)
+                if getattr(block, "confidence", None) is not None
+                else None
+            ),
             reading_order=idx,
             direction=getattr(block, 'direction', 'horizontal'),
             original_id=getattr(block, 'id', idx),
@@ -213,6 +219,10 @@ class BubbleAnalysisService:
                 first.text_box = self._union_box(first.text_box, item.text_box)
                 first.text = self._join_text([first.text, item.text], first.direction)
                 first.confidence = max(first.confidence, item.confidence)
+                if item.model_confidence is not None:
+                    first.model_confidence = max(
+                        first.model_confidence or 0.0, item.model_confidence
+                    )
             first.layout_box = first.text_box
             grouped.append(first)
         return grouped

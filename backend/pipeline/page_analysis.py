@@ -123,7 +123,10 @@ def bubbles_from_analysis(
         text_bubble.layout_margin = _insets_to_dict(getattr(layout_plan, "margin", None))
         text_bubble.layout_confidence = float(getattr(layout_plan, "confidence", 0.0) or 0.0)
         text_bubble.layout_reasoning = getattr(layout_plan, "reasoning", "")
-        text_bubble.detection_confidence = float(getattr(bubble_data, "confidence", 0.0) or 0.0)
+        model_confidence = getattr(bubble_data, "model_confidence", None)
+        text_bubble.detection_confidence = float(
+            model_confidence if model_confidence is not None else getattr(bubble_data, "confidence", 0.0)
+        )
         bubbles.append(text_bubble)
 
     return bubbles

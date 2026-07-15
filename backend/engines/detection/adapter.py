@@ -57,4 +57,9 @@ class DetectionEngineAdapter:
         if coords is None:
             coords = [0, 0, 0, 0]
         x1, y1, x2, y2 = [int(value) for value in coords]
-        return TextRegion(box=Box(x1=x1, y1=y1, x2=x2, y2=y2), text=str(getattr(block, "text", "") or ""))
+        confidence = getattr(block, "confidence", None)
+        return TextRegion(
+            box=Box(x1=x1, y1=y1, x2=x2, y2=y2),
+            text=str(getattr(block, "text", "") or ""),
+            confidence=float(confidence) if confidence is not None else None,
+        )

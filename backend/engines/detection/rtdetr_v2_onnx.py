@@ -42,6 +42,7 @@ class RTDetrV2ONNXDetection(DetectionEngine):
             overlap_height_ratio=0.1,
             min_slice_height_ratio=0.7
         )
+        self._text_confidences_by_box: dict[tuple[int, int, int, int], float] = {}
 
     def initialize(
         self, 
@@ -93,8 +94,10 @@ class RTDetrV2ONNXDetection(DetectionEngine):
 
         tiling_enabled = getattr(self, "tiling_enabled", True) if tiling_enabled is None else bool(tiling_enabled)
         if not tiling_enabled:
+            self._text_confidences_by_box = {}
             bubble_boxes, text_boxes = self._detect_single_image(image)
         else:
+            self._text_confidences_by_box = {}
             bubble_boxes, text_boxes = self.image_slicer.process_slices_for_detection(
                 image, self._detect_single_image
             )
@@ -106,6 +109,7 @@ class RTDetrV2ONNXDetection(DetectionEngine):
             line_merge_sensitivity=line_merge_sensitivity,
             smart_direction=smart_direction,
             text_direction_override=text_direction_override,
+            text_confidences=self._text_confidences_by_box,
         )
 
     def _detect_single_image(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -136,6 +140,11 @@ class RTDetrV2ONNXDetection(DetectionEngine):
             boxes = boxes[0]
 
         candidates = list(zip(labels, boxes, scores))
+        candidate_text_scores = {
+            tuple(int(value) for value in box): float(score)
+            for label, box, score in candidates
+            if int(label) in (1, 2)
+        }
         bubble_boxes, text_boxes = self._select_detection_boxes(
             candidates,
             threshold=float(self.confidence_threshold),
@@ -172,6 +181,12 @@ class RTDetrV2ONNXDetection(DetectionEngine):
 
         bubble_boxes = np.array(bubble_boxes) if bubble_boxes else np.array([])
         text_boxes = np.array(text_boxes) if text_boxes else np.array([])
+        for box in text_boxes:
+            key = tuple(int(value) for value in box)
+            if key in candidate_text_scores:
+                self._text_confidences_by_box[key] = max(
+                    self._text_confidences_by_box.get(key, 0.0), candidate_text_scores[key]
+                )
         return bubble_boxes, text_boxes
 
     @classmethod
