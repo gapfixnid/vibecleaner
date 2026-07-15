@@ -15,7 +15,7 @@ telemetry schema를 개선하는 데 필요하면 기존 형식을 깨고 바로
 
 ## 현재 기준선
 
-- Python 전체 테스트: 로컬 `176 passed`
+- Python 전체 테스트: 로컬 `177 passed`
 - 최신 CI 재실행: 통과
 - 오류가 발생했던 다중 페이지 이미지 재번역: 통과
 - CUDA 환경에서 detection·LaMa ONNX의 `CUDAExecutionProvider` 실추론 확인
@@ -35,6 +35,7 @@ telemetry schema를 개선하는 데 필요하면 기존 형식을 깨고 바로
 
 - [완료] 이미지 없이도 실행되는 box-only detection evaluator와 IoU one-to-one matching 구현
 - [완료] baseline·miss·false positive·split·merge를 포함한 합성 corpus와 benchmark 명령 추가
+- [완료] 로컬 이미지 corpus에서 RT-DETR box·raw confidence를 수집하는 capture 명령 추가
 - 합법적으로 사용할 수 있는 샘플과 합성 이미지로 실제 모델 검출 평가 corpus 확장
 - 다음 유형을 별도 그룹으로 관리
   - 겹친 말풍선과 긴 문장
@@ -42,7 +43,7 @@ telemetry schema를 개선하는 데 필요하면 기존 형식을 깨고 바로
   - 세로쓰기·작은 글자·저대비 글자
   - 효과음, 패널 경계, 인물 윤곽을 텍스트로 잘못 잡는 경우
 - [완료] bubble recall/precision, split/merge 오류를 benchmark로 집계
-- text-region recall, OCR 비어 있음 비율과 실제 모델 prediction 수집을 benchmark에 연결
+- text-region recall, OCR 비어 있음 비율과 실제 licensed 모델 prediction 수집을 benchmark에 연결
 - [완료] RT-DETR 모델 원시 confidence를 TextBlock·BubbleAnalysis·API `detection_confidence`까지 전달
 - heuristic/layout confidence와 모델 confidence를 분리
 - 기존 debug overlay를 평가 corpus 결과와 연결해 누락·오검출 원인을 확인

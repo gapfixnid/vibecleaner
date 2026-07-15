@@ -42,3 +42,18 @@ python scripts/benchmark_detection_recall.py `
 The detection corpus stores boxes rather than source images, so it can be used
 with synthetic data, licensed annotations, or predictions captured from a
 local model run without adding image assets to the repository.
+
+For a local licensed-image corpus, add `image_path` to each case and capture
+RT-DETR predictions before evaluation:
+
+```powershell
+python scripts/capture_detection_predictions.py `
+  path/to/detection-corpus.json `
+  --output benchmarks/results/detection-rtdetr.json
+
+python scripts/benchmark_detection_recall.py `
+  benchmarks/results/detection-rtdetr.json
+```
+
+The capture output includes the model, threshold, tiling setting, predicted
+boxes, and raw model confidence values used for the run.
