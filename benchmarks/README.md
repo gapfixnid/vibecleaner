@@ -1,13 +1,12 @@
 # Benchmarks
 
-Phase A freezes two different baselines before Pipeline v2 work starts:
+The current benchmark set measures scheduler behavior and detection quality.
+The v2 pipeline is the only page translation runtime; legacy fixtures are kept
+only where a test explicitly covers a data or adapter boundary.
 
-1. `tests/fixtures/pipeline_v1/contract.json` is the behavioral contract for
-   the current user-facing page pipeline. Tests must keep it green while v2 is
-   developed beside v1.
-2. `scripts/benchmark_pipeline_scheduler.py` is a dependency-free scheduler
-   smoke benchmark. It measures orchestration overhead only; it is not a claim
-   about OCR, translation, inpainting, or end-to-end product performance.
+`scripts/benchmark_pipeline_scheduler.py` is a dependency-free scheduler smoke
+benchmark. It measures orchestration overhead only; it is not a claim about OCR,
+translation, inpainting, or end-to-end product performance.
 
 Generate a local scheduler baseline from the repository root:
 
@@ -32,13 +31,14 @@ python scripts/benchmark_pipeline_parallel.py `
 The corresponding CI test uses deterministic delay stages and requires at
 least a 1.5x wall-clock speedup over the equivalent sequential dependency chain.
 
-Evaluate real shadow records before changing the default rollout flag:
+Evaluate detection recall and split/merge errors with a box-only corpus:
 
 ```powershell
-python scripts/evaluate_pipeline_rollout.py `
-  "$env:APPDATA/vibecleaner/pipeline_shadow_benchmark.jsonl" `
-  --minimum-samples 10
+python scripts/benchmark_detection_recall.py `
+  tests/fixtures/detection_synthetic_corpus.json `
+  --output benchmarks/results/detection-synthetic.json
 ```
 
-The command exits non-zero unless sample count, execution success, structural
-equivalence, OCR text, and translation match thresholds all pass.
+The detection corpus stores boxes rather than source images, so it can be used
+with synthetic data, licensed annotations, or predictions captured from a
+local model run without adding image assets to the repository.

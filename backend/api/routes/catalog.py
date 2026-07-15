@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 
 from ...core.container import AppContainer
 from ..dependencies import get_container
-from ...pipeline.telemetry import load_telemetry, summarize_telemetry
+from ...pipeline.telemetry import DEFAULT_TELEMETRY_FILENAME, load_telemetry, summarize_telemetry
 from ...infrastructure.storage import get_app_data_dir
 import os
 
@@ -29,5 +29,5 @@ def get_provider_runtime(container: AppContainer = Depends(get_container)):
 def get_pipeline_telemetry(container: AppContainer = Depends(get_container)):
     path = getattr(container.config, "pipeline_telemetry_path", None)
     if not path:
-        path = os.path.join(get_app_data_dir(), "pipeline_rollout_telemetry.jsonl")
+        path = os.path.join(get_app_data_dir(), DEFAULT_TELEMETRY_FILENAME)
     return summarize_telemetry(load_telemetry(path))

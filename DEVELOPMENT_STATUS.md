@@ -1,153 +1,228 @@
-# VibeCleaner v0.2 개발 현황
+# VibeCleaner v0.2 개발 backlog
 
-최종 갱신: 2026-07-13  
-워크트리: `vibecleaner-v0.2`  
+최종 갱신: 2026-07-15
 브랜치: `codex/v0.2-phase-a`
 
-이 문서는 Issue #1 보강 계획과 v0.2 작업에서 실제로 구현·검증된 항목을 기록한다. 완료로 표시된 내용은 코드와 테스트로 확인된 범위만 포함한다.
+이 문서는 완료 이력 대신, 현재 기준으로 품질을 더 높일 수 있는 작업만 관리한다.
+v2 페이지 번역 파이프라인은 현재 유일한 실행 경로이며, 아래 항목은 기능 장애를
+고치는 필수 작업이라기보다 정확도·가시성·사용성·운영성을 높이기 위한 개선 과제다.
 
-## 1. 최초 계획
+현재는 외부 배포 사용자와 보존해야 할 운영 데이터가 없는 개발 단계다. 따라서
+backward compatibility는 기본 요구사항으로 취급하지 않는다. 프로젝트·설정·API·
+telemetry schema를 개선하는 데 필요하면 기존 형식을 깨고 바로 변경할 수 있으며,
+기존 데이터 migration이나 호환 adapter를 추가하는 작업은 하지 않는다. 로컬 개발
+데이터는 schema 변경 시 초기화·재생성할 수 있다.
 
-Issue #1의 방향은 다음 원칙을 전제로 했다.
+## 현재 기준선
 
-- 기존 제품의 약 70~80%는 유지하고, 성능·품질을 결정하는 pipeline core 20~30%만 교체한다.
-- Tauri 셸, React workspace, Canvas/Inspector, 프로젝트·페이지·말풍선 모델, 저장·내보내기 기능은 유지한다.
-- Pipeline Scheduler v2, 분리된 detection/OCR stage, resource-aware DAG executor, adaptive quality router, checkpoint/cache, 품질 검증은 신규 core로 구현한다.
-- 도메인 로직은 FastAPI/React/Tauri에 의존하지 않는다.
-- 엔진은 안정된 port/interface와 provider manifest 뒤에 둔다.
-- 프로젝트 파일/API는 버전과 migration 정책을 갖는다.
-- 검증 완료 후 v2를 유일한 페이지 번역 파이프라인으로 운영한다.
+- Python 전체 테스트: 로컬 `173 passed`
+- 최신 CI 재실행: 통과
+- 오류가 발생했던 다중 페이지 이미지 재번역: 통과
+- CUDA 환경에서 detection·LaMa ONNX의 `CUDAExecutionProvider` 실추론 확인
+- v1 페이지 번역 runtime, rollout, shadow, fallback 경로: 제거 완료
+- 프로젝트/API/일반 엔진 호환성 adapter: 개발 편의를 위해 남아 있으나 제거 가능
 
-## 2. 유지 영역과 교체 영역
+우선순위는 `P0`가 다음 작업, `P1`이 그 다음 품질 개선, `P2`가 구조 정리와
+장기 개선이다. 한 번에 모든 항목을 구현하지 않고 각 항목의 완료 기준을 통과한
+뒤 다음 항목으로 넘어간다.
 
-### 유지
+## 1. 백엔드 개선 과제
 
-- Tauri 데스크톱 셸
-- React 작업 공간 및 Canvas/Inspector
-- 프로젝트·페이지·말풍선 도메인 모델
-- 기존 저장·내보내기 흐름
-- 기존 엔진 구현체와 필요한 provider adapter
+### P0 — 검출 누락 평가 체계와 recall 개선
 
-### v2 교체·신규 구현
+현재 실제 이미지에서 검출 누락을 보완하는 로직은 있지만, 재현 가능한 평가
+기준이 부족하다.
 
-- Pipeline v2 DAG executor
-- dependency DAG executor
-- CPU/GPU/I/O/Network resource admission
-- detection/OCR 독립 실행 port
-- provider manifest/catalog 및 동시성 제한
-- adaptive quality scoring/replan
-- checkpoint, resume, retry, shadow benchmark
+- [완료] 이미지 없이도 실행되는 box-only detection evaluator와 IoU one-to-one matching 구현
+- [완료] baseline·miss·false positive·split·merge를 포함한 합성 corpus와 benchmark 명령 추가
+- 합법적으로 사용할 수 있는 샘플과 합성 이미지로 실제 모델 검출 평가 corpus 확장
+- 다음 유형을 별도 그룹으로 관리
+  - 겹친 말풍선과 긴 문장
+  - 말풍선 안에 일부만 고신뢰로 검출된 경우
+  - 세로쓰기·작은 글자·저대비 글자
+  - 효과음, 패널 경계, 인물 윤곽을 텍스트로 잘못 잡는 경우
+- [완료] bubble recall/precision, split/merge 오류를 benchmark로 집계
+- text-region recall, OCR 비어 있음 비율과 실제 모델 prediction 수집을 benchmark에 연결
+- 모델 원시 confidence와 heuristic/layout confidence를 분리해 저장
+- 기존 debug overlay를 평가 corpus 결과와 연결해 누락·오검출 원인을 확인
 
-## 3. 완료된 구현
+완료 기준: 샘플 그룹별 지표와 대표 실패 이미지가 자동으로 남고, 수정 전후
+recall 변화가 한 명령으로 비교된다.
 
-### 아키텍처·호환성
+### P0 — telemetry를 v2 운영 정보로 정리 (진행 중)
 
-- 전체 재작성 금지 및 Strangler migration 원칙 문서화
-- settings/project schema version 및 migration/rejection 정책 추가
-- atomic settings/project save와 unknown field 보존
-- v2 characterization 및 회귀 테스트 추가
-- 기존 API·프로젝트 파일 호환성을 깨지 않는 v2 opt-in 경로 확보
+v1 제거 후에도 `pipeline_rollout_telemetry.jsonl`과 fallback/shadow 필드가 남아
+있어 현재 runtime 의미와 문서가 어긋난다.
 
-### Provider 확장 계약
+- [완료] telemetry schema를 v2 실행 정보에 맞게 재정의
+- [완료] primary/fallback/shadow 명칭과 사용하지 않는 집계 필드 정리
+- [완료] 기존 rollout telemetry JSONL 호환 reader는 추가하지 않고 새 파일로 시작
+- [완료] 파일명과 API 응답을 일반적인 pipeline telemetry 명칭으로 정리
+- [완료] stage별 duration, quality score, replan, 오류를 집계
+- [남음] 파일 크기 제한·기간별 보관·손상 행 처리 정책 추가
+- [남음] stage retry·cache hit/miss·실제 GPU provider 집계 추가
 
-- typed `ProviderManifest`, `ProviderRegistry`, lifecycle adapter 추가
-- detection/OCR/translation/inpainting catalog 등록
-- provider config field를 manifest에서 동적으로 렌더링
-- 모델·enum·secret·조건부 field를 UI hardcoding 없이 처리
-- manifest에 capability, resource class, max concurrency, queue capacity 선언
+완료 기준: `/api/pipeline/telemetry`가 현재 v2 실행 의미만 반환하고, 오래된
+telemetry 파일을 읽어도 앱 시작이나 endpoint가 실패하지 않는다.
 
-### Pipeline v2 실행
+### P1 — OCR 품질과 provenance 강화
 
-- v2 DAG executor를 페이지 번역의 단일 실행 경로로 고정
-- dependency cycle/missing dependency 검증
-- v2 DAG stage resource 및 retry 정책
-- OCR 이후 translation과 inpainting 병렬 실행
-- provider별 bounded queue 및 resource semaphore
-- provider manifest에 model profile별 quality/latency/resource metadata 추가
-- quality score 미달 시 catalog 기반 compatible model 자동 선택
-- checkpoint manifest 저장과 hydrated artifact resume
-- page-level checkpoint payload 저장·복원 및 quality replan 상태 통합
-- page translation 완료 시 checkpoint manifest/payload 자동 정리
-- stage별 partial retry 및 backoff
+- OCR 엔진이 제공하는 원시 confidence를 블록 단위로 보존하고 분석 confidence와
+  구분
+- 문자 영역을 읽기 순서와 줄 단위로 안정적으로 그룹핑
+- 원본 언어·엔진·전처리·retry 여부를 결과 provenance에 기록
+- 언어별 전처리 profile을 분리해 일본어/영어/한국어에서 같은 threshold를
+  무조건 사용하지 않도록 개선
+- OCR cache hit/miss와 cache 용량을 확인할 수 있는 진단 정보 추가
+- 오래된 cache, 손상된 SQLite, 설정 변경 cache의 정리·복구 테스트 추가
 
-### Detection/OCR 분리
+완료 기준: 사용자가 특정 말풍선의 OCR 결과가 왜 채택됐는지 엔진·confidence·retry
+정보로 설명할 수 있고, cache 오염이 전체 번역을 중단시키지 않는다.
 
-- v2에서 `detect_only → ocr_only` 실행
-- detection/OCR provider adapter와 DTO 경계 유지
-- detection confidence 부족 시 high precision model로 1회 replan
-- OCR quality score 및 detection quality score 기록
-- OCR quality 미달 시 cache를 우회한 enhanced preprocessing으로 1회 자동 retry
+### P1 — 렌더링·인페인팅 최종 품질 검증 강화
 
-### 성능·안정성
+- 최종 raster를 기준으로 텍스트 clipping, bubble 밖 침범, 최소 폰트, 줄 겹침,
+  원본 글자 잔여를 자동 검사
+- overflow가 남으면 자동 재배치·폰트 조정 후에도 실패한 항목만 `needs_review`로 표시
+- 좁거나 비정형인 말풍선에서 padding, 줄 간격, 세로쓰기 방향을 shape mask에 맞춰 조정
+- 인페인팅 결과의 경계 이음새와 원본 보존 영역을 정량 검사
+- 번역문이 지나치게 길어졌을 때 렌더링 실패와 번역 품질 문제를 구분해 기록
 
-- LaMa inpainting background warm-up
-- inpainting bounded LRU result cache
-- inpainting 결과 shape/dtype·target change·outside preservation 품질 검증
-- inpainting 품질 미달 시 대체 engine과 확장 dilation profile로 1회 자동 replan
-- heuristic line integral-image 경계 좌표 clamp 및 invalid inpainting 결과 fail-fast 검증
-- RT-DETR ONNX detection에서 고신뢰 텍스트가 없을 때만 저신뢰 후보를 재검토하는 recall 보강
-- 일부 텍스트만 고신뢰로 검출된 경우에도 기존 말풍선 내부 저신뢰 후보를 부분 재검토
-- 캔버스에서 말풍선·텍스트 검출 영역을 확인하는 디버그 오버레이 토글 추가
-- 디버그 오버레이에 검출 유형과 분석 confidence 라벨 표시
-- 디버그 오버레이에서 빈 OCR·짧은 OCR을 주황색 경고로 표시
-- 2자 이하 OCR 결과의 확대·강화 전처리 자동 재시도 및 개선 결과만 교체
-- 겹친 말풍선 후처리 IoU 기준 강화 및 동일 말풍선 텍스트 그룹핑 보강
-- OCR 엔진 결과 순서가 바뀌어도 텍스트 영역 좌표로 원본 박스에 안정적으로 재매칭
-- OCR 전체 점수가 통과해도 빈 텍스트 블록만 확장 crop으로 개별 재시도
-- OCR 캐시 키에 원본 언어·엔진·padding·crop scale·adaptive binarization 설정 포함
-- 자동 말풍선 렌더링의 가독성 최소 폰트 하한(`11px`) 및 overflow 표시 보강
-- Qt 자동 레이아웃·API·Pillow export의 폰트 단위를 실제 픽셀(`px`) 기준으로 통일
-- 긴 문장 typesetting에서 구두점 고아 줄 억제 및 원본 bubble mask 재시도 경로 추가
-- detection/OCR/inpainting/translation provider queue
-- provider runtime metrics API
-- v2 telemetry JSONL 저장 및 primary 성공률 집계
-- `/api/pipeline/telemetry` 운영 요약 endpoint 추가
-- shadow context snapshot에서 `RLock` 등 runtime lock 제외
+완료 기준: export 직전에 사람이 확인해야 하는 bubble 목록이 생성되고, 정상
+항목은 기존 결과와 시각적으로 동일하게 유지된다.
 
-### Benchmark·Rollout
+### P1 — GPU/CPU runtime 진단과 설치 안정성
 
-- deterministic parallel scheduler speedup benchmark 추가
-- rollout quality gate 스크립트 추가
-- 장기 benchmark JSONL 집계 및 self-contained HTML dashboard 생성
-- CI에서 benchmark summary/dashboard artifact 업로드 workflow 추가
-- 모든 설치에서 v2 DAG executor를 사용
+- detection, OCR, inpainting별 실제 execution provider를 startup health 정보로 노출
+- CUDA/cuDNN DLL 누락, 버전 불일치, GPU 미지원의 원인을 사용자용 메시지로 변환
+- CUDA 초기화 실패 시 CPU fallback을 명시적으로 기록하되 반복되는 ONNX 경고는 정리
+- CPU/GPU별 대표 이미지 처리 시간과 메모리 사용량 benchmark 추가
+- 모델 다운로드 상태, checksum, 필요한 runtime 버전을 한 번에 점검하는 진단 명령 제공
 
-## 4. 검증 현황
+완료 기준: 사용자가 로그를 해석하지 않아도 현재 각 stage가 CPU인지 GPU인지와
+설치 문제의 다음 조치를 확인할 수 있다.
 
-현재 마지막 검증 기준:
+### P1 — job/API lifecycle 안정화
 
-- Python 전체 테스트: `177 passed`
-- frontend build: 통과
-- frontend Node 테스트: 통과
-- parallel scheduler smoke benchmark: 약 `1.96x` speedup 확인
-- 실제 shadow rollout gate: 10 sample, success/equivalence/OCR/translation 모두 `1.0`
-- 실제 페이지 benchmark에서 v2 artifact·bubble·OCR·translation 결과 확인
-- NVIDIA CUDA 환경에서 detection·LaMa ONNX 실추론 및 `CUDAExecutionProvider` 사용 확인
-- CUDA 실추론 시 GPU 전력 사용량이 약 `48W`에서 `77W`로 증가하는 것을 확인
-- 긴 번역문·좁은 말풍선 자동 배치 회귀 테스트 포함, 전체 `159 passed`
+- job 상태·오류·취소 응답을 공통 schema로 통일
+- 앱 재시작·backend 재연결·중복 요청 중에도 stale job이 UI를 잠그지 않도록 정리
+- 페이지별 batch 결과를 API에서 성공/실패/취소/미실행으로 구분
+- 취소가 현재 stage와 provider queue에 실제로 전파되는지 검증
+- 완료된 job과 오래된 artifact/checkpoint의 보관 기간 및 정리 정책 추가
 
-## 5. 남은 작업
+완료 기준: 중단·재시작·부분 실패 후에도 재실행 대상과 결과가 일관되며, 같은
+요청을 실수로 두 번 보내도 결과가 중복 생성되지 않는다.
 
-v1 페이지 번역 파이프라인과 rollout/shadow/fallback 코드는 제거했다. 프로젝트
-파일·API 스키마와 일반 엔진 fallback은 별도 호환성 정책으로 유지한다.
+### P2 — 불필요한 adapter와 provider 구조 정리
 
-## 6. 현재 운영 권장 설정
+- `legacy_adapter`로 표시된 provider를 목록화하고 실제 의존 관계 확인
+- typed port로 직접 이전 가능한 adapter부터 단계적으로 제거
+- 프로젝트/API/엔진의 구형 형식을 위한 adapter를 우선 제거
+- schema 변경이 필요하면 모델·API·frontend 타입·fixture를 한 번에 갱신
+- adapter 제거 후 contract fixture와 sidecar packaging 검증을 통과
 
-페이지 번역은 항상 v2 DAG executor를 사용한다. 별도의 rollout 플래그나
-shadow 실행 설정은 더 이상 필요하지 않다.
+이 작업은 v1 페이지 번역 runtime을 다시 도입하지 않는다. 호환성을 위해 남겨 둔
+구형 wrapper를 유지하는 것보다 현재 v2 구조를 단순하게 만드는 것을 우선한다.
 
-## 7. 최근 주요 커밋
+## 2. 프론트엔드 개선 과제
 
-- `d282fd8` GPU runtime verification benchmark
-- `5b510f9` NVIDIA package DLL directory registration
-- `994c5f9` ONNX Runtime CUDA DLL preload
-- `4848a55` NVIDIA CUDA runtime setup documentation
+### P0 — 검토 대상 작업 큐
 
-- `220ee05` low-confidence detection replan
-- `6434760` adaptive stage quality scoring
-- `7a48311` supported language scope and same-language validation
-- `0da6430` parallel stage timing correction
-- `599e379` parallel scheduler regression benchmark
-- `133c6c8` independent v2 stage parallel execution
-- `03c3ab0` manifest-driven provider queue policy
-- `4a311cc` actual detection/OCR split in v2
+현재는 canvas overlay와 선택된 bubble inspector를 통해 문제를 확인한다. 이를
+페이지 전체 검토 흐름으로 확장한다.
+
+- 빈 OCR, 짧은 OCR, 낮은 detection confidence, translation warning, layout overflow를
+  한 목록으로 집계
+- 항목을 클릭하면 해당 페이지와 bubble로 이동
+- `다음 문제`, `이전 문제`, `이 항목만 재검출`, `이 항목만 재번역` 제공
+- overlay 색상·confidence·상태의 범례를 표시
+- 사용자가 확인한 항목은 reviewed 상태로 기록
+
+완료 기준: 전체 페이지를 확대해 하나씩 찾지 않아도 문제가 있는 bubble만 순서대로
+검토할 수 있다.
+
+### P0 — 다중 페이지 진행 상태와 부분 재시도 UI
+
+- batch 작업에서 페이지별 queued/running/succeeded/failed/cancelled 상태 표시
+- 전체 진행률과 현재 처리 페이지를 분리해 표시
+- 실패한 페이지만 다시 번역하는 action 제공
+- 취소 후 이미 완료된 페이지와 미실행 페이지를 명확히 구분
+- backend 재연결 시 현재 job을 재조회하고 stale progress를 초기화
+
+완료 기준: 다중 페이지 작업이 중간에 멈춰도 사용자가 어느 페이지가 완료됐고
+어느 페이지만 재실행하면 되는지 즉시 알 수 있다.
+
+### P1 — 자동 typesetting 조정 UI
+
+- 자동 배치 결과의 실제 font size, 줄 수, overflow, layout confidence 표시
+- 최소 폰트 이하로 축소된 경우 경고하고 사람이 직접 조정할 수 있게 함
+- 자동 맞춤 잠금/해제, padding, 줄 간격, writing mode override 제공
+- 변경 전후 canvas preview를 유지하고 export 전 overflow 항목을 다시 알림
+- 긴 문장을 무조건 작은 글씨로 줄이는 대신 줄바꿈·배치·문장 축약 선택지를 분리
+
+완료 기준: 사용자가 숫자만 보지 않고 canvas에서 읽기 어려운 결과를 즉시 식별하고,
+자동 layout을 보정할 수 있다.
+
+### P1 — canvas 편집 생산성
+
+- bubble 이동·크기·텍스트·스타일 변경에 대한 undo/redo history 확장
+- 다중 선택 bubble의 공통 스타일·정렬·padding 일괄 적용
+- 고배율에서 좌표 정밀도를 높이는 snapping과 선택 핸들 개선
+- zoom/pan/selection/삭제/다음 문제 이동의 keyboard shortcut 안내
+- 페이지 전환 시 선택 상태와 viewport 복원 정책 정리
+
+완료 기준: 반복적인 수동 보정이 키보드와 일괄 조작으로 가능하고, 실수한 편집을
+안전하게 되돌릴 수 있다.
+
+### P1 — Settings 정보 구조와 runtime 상태 표시
+
+- 기본 설정과 고급 provider/runtime 설정을 분리
+- 선택한 provider에 필요한 field만 노출하고 사용하지 않는 설정은 접기
+- 원본 언어와 번역 언어의 허용 조합을 선택창에서 일관되게 제한
+- GPU provider, 모델 다운로드, 현재 engine 상태를 설정 화면에서 확인
+- 설정 저장 실패·provider 연결 실패·모델 누락을 field 단위로 표시
+
+완료 기준: 사용자가 설정 파일이나 backend 로그를 직접 열지 않고도 현재 번역
+구성을 이해하고 문제를 수정할 수 있다.
+
+### P1 — 오류 복구·접근성·국제화
+
+- backend 재시작·이미지 로드 실패·export 실패에 재시도와 복구 경로 제공
+- modal, select, canvas toolbar, inspector의 focus 이동과 Escape 동작 통일
+- 모든 버튼·tooltip·상태 메시지에 한국어/영어 번역 키 적용
+- 오류 메시지에 내부 예외 대신 사용자 행동 중심의 설명 제공
+- 작은 창, 고배율 DPI, 긴 번역문에서도 sidebar/inspector가 잘리지 않도록 visual regression 추가
+
+완료 기준: 마우스만 사용하지 않아도 주요 작업이 가능하고, 한국어·영어 UI에서
+번역되지 않은 내부 key나 잘린 핵심 컨트롤이 없다.
+
+### P2 — 테스트와 시각 회귀 자동화
+
+- 현재 Node mapper/i18n 테스트를 실제 주요 사용자 흐름 테스트로 확장
+- import → detect → OCR → translate → edit → export의 최소 smoke flow 자동화
+- 저신뢰 검토 큐, 부분 실패 batch, backend 재연결, overflow layout을 fixture로 고정
+- 주요 canvas/inspector/settings 화면의 light/dark 및 DPI visual regression 추가
+
+완료 기준: UI 리팩터링 후에도 핵심 작업 흐름과 문제 표시가 자동으로 검증된다.
+
+## 3. 권장 진행 순서
+
+1. Backend P0: telemetry 정리와 검출 평가 corpus 구축
+2. Backend P1: OCR provenance·cache 진단 및 최종 raster 품질 검증
+3. Frontend P0: 검토 대상 큐와 다중 페이지 부분 재시도 UI
+4. Frontend P1: typesetting 조정 UI와 canvas 편집 history
+5. GPU 진단, job lifecycle, 설정 구조, visual regression 순서로 확장
+
+검출 평가 corpus와 검토 큐를 먼저 만드는 이유는 이후 OCR·렌더링 개선이 실제로
+누락률과 수동 수정 시간을 줄였는지 측정할 수 있게 하기 위해서다.
+
+## 4. 변경 시 지켜야 할 기준
+
+- v1 페이지 번역 runtime을 다시 도입하지 않는다.
+- 프로젝트/API/schema 호환성은 release blocker가 아니다. 형식을 바꿀 때는 관련 코드·
+  타입·fixture를 함께 갱신하고 필요하면 로컬 개발 데이터를 초기화한다.
+- 개선은 합법적으로 사용할 수 있는 샘플 또는 합성 fixture로 재현 가능해야 한다.
+- backend stage 변경에는 Python 회귀 테스트와 최소 한 개의 실제 흐름 검증을 추가한다.
+- frontend 변경에는 Node 테스트 또는 visual/smoke 테스트를 추가한다.
+- CUDA는 선택 기능으로 유지하고 CPU 환경에서도 기본 workflow가 동작해야 한다.
+- 품질 개선이 처리 시간을 크게 늘릴 경우 CPU/GPU benchmark와 함께 판단한다.

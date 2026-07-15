@@ -8,22 +8,21 @@ from pathlib import Path
 from typing import Any
 
 
+TELEMETRY_SCHEMA_VERSION = 2
+DEFAULT_TELEMETRY_FILENAME = "pipeline_telemetry.jsonl"
+
+
 @dataclass(frozen=True)
 class PipelineTelemetryRecord:
+    schema_version: int
     run_id: str
     page_id: str
-    primary: str
-    primary_succeeded: bool
-    returned_variant: str
-    fallback_attempted: bool
-    fallback_used: bool
-    fallback_succeeded: bool | None = None
-    shadow_enabled: bool = False
-    shadow_succeeded: bool | None = None
-    primary_error: str | None = None
-    shadow_error: str | None = None
-    primary_duration_ms: float | None = None
-    shadow_duration_ms: float | None = None
+    succeeded: bool
+    duration_ms: float | None = None
+    stages: dict[str, dict[str, Any]] = field(default_factory=dict)
+    quality_scores: dict[str, dict[str, Any]] = field(default_factory=dict)
+    quality_replans: list[dict[str, Any]] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     recorded_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -54,27 +53,39 @@ def load_telemetry(path: str | Path) -> list[dict[str, Any]]:
 
 
 def summarize_telemetry(records: list[dict[str, Any]]) -> dict[str, Any]:
-    def rate(values: list[Any]) -> float:
-        return round(sum(bool(value) for value in values) / len(values), 4) if values else 0.0
-
-    def mean(key: str, values: list[dict[str, Any]]) -> float | None:
-        numbers = [float(row[key]) for row in values if row.get(key) is not None]
+    def mean(values: list[Any]) -> float | None:
+        numbers = [float(value) for value in values if value is not None]
         return round(sum(numbers) / len(numbers), 4) if numbers else None
 
     def summarize_group(group: list[dict[str, Any]]) -> dict[str, Any]:
-        v2 = [row for row in group if row.get("primary") == "v2"]
-        fallback_attempts = [row for row in v2 if row.get("fallback_attempted")]
-        fallback_successes = [row for row in fallback_attempts if row.get("fallback_succeeded")]
+        stage_durations: dict[str, list[float]] = defaultdict(list)
+        quality_values: dict[str, list[float]] = defaultdict(list)
+        quality_passes: dict[str, list[bool]] = defaultdict(list)
+        for row in group:
+            for stage, details in (row.get("stages") or {}).items():
+                if details.get("duration_ms") is not None:
+                    stage_durations[stage].append(float(details["duration_ms"]))
+            for stage, score in (row.get("quality_scores") or {}).items():
+                if score.get("score") is not None:
+                    quality_values[stage].append(float(score["score"]))
+                if score.get("passed") is not None:
+                    quality_passes[stage].append(bool(score["passed"]))
         return {
             "sample_count": len(group),
-            "v2_sample_count": len(v2),
-            "primary_failure_rate": round(1 - rate([row.get("primary_succeeded") for row in v2]), 4) if v2 else 0.0,
-            "fallback_attempt_rate": round(len(fallback_attempts) / len(v2), 4) if v2 else 0.0,
-            "fallback_success_rate": round(len(fallback_successes) / len(fallback_attempts), 4) if fallback_attempts else 0.0,
-            "shadow_rate": rate([row.get("shadow_enabled") for row in group]),
-            "primary_duration_ms_mean": mean("primary_duration_ms", v2),
-            "fallback_attempt_count": len(fallback_attempts),
-            "fallback_success_count": len(fallback_successes),
+            "success_rate": round(sum(bool(row.get("succeeded")) for row in group) / len(group), 4) if group else 0.0,
+            "failure_count": sum(not bool(row.get("succeeded")) for row in group),
+            "duration_ms_mean": mean([row.get("duration_ms") for row in group]),
+            "replan_count": sum(len(row.get("quality_replans") or []) for row in group),
+            "stage_duration_ms_mean": {
+                stage: mean(values) for stage, values in sorted(stage_durations.items())
+            },
+            "quality_score_mean": {
+                stage: mean(values) for stage, values in sorted(quality_values.items())
+            },
+            "quality_pass_rate": {
+                stage: round(sum(values) / len(values), 4) if values else 0.0
+                for stage, values in sorted(quality_passes.items())
+            },
         }
 
     by_date: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -87,7 +98,7 @@ def summarize_telemetry(records: list[dict[str, Any]]) -> dict[str, Any]:
         by_date[date].append(row)
 
     result = {
-        "schema_version": 1,
+        "schema_version": TELEMETRY_SCHEMA_VERSION,
         **summarize_group(records),
         "by_date": {date: summarize_group(rows) for date, rows in sorted(by_date.items())},
     }
