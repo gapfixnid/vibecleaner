@@ -25,7 +25,9 @@ export function CanvasDetectionOverlay({ bubbles, scale }: CanvasDetectionOverla
         const confidence = bubble.detection_confidence && bubble.detection_confidence > 0
           ? bubble.detection_confidence
           : bubble.layout_confidence;
-        const label = `${bubble.text_class || "text"} · ${confidence > 0 ? confidence.toFixed(2) : "—"}`;
+        const ocrText = (bubble.text || "").trim();
+        const ocrWarning = !ocrText ? "OCR empty" : ocrText.length <= 2 ? "OCR short" : "";
+        const label = `${bubble.text_class || "text"} · ${confidence > 0 ? confidence.toFixed(2) : "—"}${ocrWarning ? ` · ${ocrWarning}` : ""}`;
         return (
           <g key={`detection-${bubble.id}`}>
             <rect
@@ -57,7 +59,7 @@ export function CanvasDetectionOverlay({ bubbles, scale }: CanvasDetectionOverla
                 width={textBox.width}
                 height={textBox.height}
                 fill="rgba(239, 68, 68, 0.08)"
-                stroke="#ef4444"
+                stroke={ocrWarning ? "#f59e0b" : "#ef4444"}
                 strokeWidth={1.5 / scale}
               />
             )}
