@@ -14,6 +14,7 @@ from ...core.providers.concurrency import ProviderConcurrencyGate
 from .wrapper import RTDETRv2Detector
 from ..ocr.local import LocalOCR
 from ..ocr.preprocessing_profile import resolve_ocr_preprocessing_profile
+from ...infrastructure.runtime.providers import model_session_providers
 
 logger = logging.getLogger(__name__)
 
@@ -573,13 +574,20 @@ class DetectionService:
         hit_rate = (cache_hits / total * 100) if total > 0 else 0.0
         detector_available = bool(getattr(self.detector, "available", True))
         detector_error = getattr(self.detector, "engine_error", None)
+        detector_model = getattr(self.detector, "engine", None)
         with self._state_lock:
             last_error = self.last_error
         return {
             "detector": self.detector.__class__.__name__,
             "detector_available": detector_available,
             "detector_error": detector_error,
+            "detector_execution_providers": model_session_providers(detector_model),
             "ocr_engine": self.ocr_engine.__class__.__name__,
+            "ocr_execution_providers": sorted({
+                provider
+                for engine in getattr(self.ocr_engine, "ppocr_engines", {}).values()
+                for provider in model_session_providers(engine)
+            }),
             "ocr_cache_entries": cache_entries,
             "ocr_cache_max": self._OCR_CACHE_MAX,
             "ocr_cache_hits": cache_hits,

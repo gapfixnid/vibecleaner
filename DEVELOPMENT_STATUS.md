@@ -64,7 +64,7 @@ v1 제거 후에도 `pipeline_rollout_telemetry.jsonl`과 fallback/shadow 필드
 - [완료] stage별 duration, quality score, replan, 오류를 집계
 - [완료] 파일 크기 제한·기간별 보관·손상 행 처리 정책 추가
 - [완료] stage retry·cache hit/miss 집계 추가
-- 실제 GPU provider 집계는 runtime health 정보와 연결하는 후속 작업으로 남김
+- [완료] detection·OCR·inpainting 세션의 실제 execution provider를 runtime health와 telemetry에 기록
 
 완료 기준: `/api/pipeline/telemetry`가 현재 v2 실행 의미만 반환하고, 오래된
 telemetry 파일을 읽어도 앱 시작이나 endpoint가 실패하지 않는다.

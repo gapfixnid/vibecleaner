@@ -54,6 +54,39 @@ def _telemetry_quality_scores(context: PipelineContext) -> dict[str, dict[str, A
     }
 
 
+def _telemetry_runtime_providers(context: PipelineContext) -> dict[str, list[str]]:
+    diagnostics = context.artifacts.get("runtime_provider_diagnostics", {})
+    if not isinstance(diagnostics, dict):
+        return {}
+    return {
+        stage: list(values)
+        for stage, values in diagnostics.items()
+        if isinstance(values, (list, tuple))
+    }
+
+
+def _runtime_provider_diagnostics(runner: Any) -> dict[str, list[str]]:
+    mapping = {
+        "detection": ("detection", "detection_service", "get_diagnostics"),
+        "ocr": ("ocr", "detection_service", "get_diagnostics"),
+        "inpainting": ("inpainting", "inpainting_service", "runtime_status"),
+    }
+    result: dict[str, list[str]] = {}
+    for label, (stage_name, service_attr, method_name) in mapping.items():
+        try:
+            service = getattr(runner.registry.get(stage_name), service_attr)
+            diagnostics = getattr(service, method_name)()
+            key = "detector_execution_providers" if label == "detection" else (
+                "ocr_execution_providers" if label == "ocr" else "execution_providers"
+            )
+            providers = diagnostics.get(key, []) if isinstance(diagnostics, dict) else []
+            if providers:
+                result[label] = [str(provider) for provider in providers]
+        except Exception:
+            continue
+    return result
+
+
 def run_page_translation(
     *,
     job: dict,
@@ -78,6 +111,7 @@ def run_page_translation(
             "state": state,
             "config": config,
             "job_manager": job_manager,
+            "runtime_provider_diagnostics": _runtime_provider_diagnostics(runner),
         },
     )
     telemetry_path = getattr(config, "pipeline_telemetry_path", None)
@@ -102,6 +136,7 @@ def run_page_translation(
         metadata={
             "pipeline": "page_translation",
             "ocr_provenance": result.context.artifacts.get("ocr_provenance", {}),
+            "runtime_providers": _telemetry_runtime_providers(result.context),
         },
     ))
     runner.last_result = result

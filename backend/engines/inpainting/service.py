@@ -9,6 +9,7 @@ from typing import Any, List, Optional
 
 from ...core.config import config_value
 from ...core.providers.concurrency import ProviderConcurrencyGate
+from ...infrastructure.runtime.providers import model_session_providers
 from .hybrid import HybridInpainter
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,9 @@ class InpaintingService:
                 "cache_misses": self._cache_misses,
                 "cache_entries": len(self._cache),
                 "queue": self._provider_gate.status(),
+                "execution_providers": model_session_providers(
+                    getattr(self.inpainter, "lama_model", None)
+                ),
             }
 
     def clean_background(
