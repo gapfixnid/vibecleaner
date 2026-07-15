@@ -21,6 +21,20 @@ from .quality import AdaptiveQualityRouter
 logger = logging.getLogger(__name__)
 
 
+def _is_suspicious_ocr_text(text: object) -> bool:
+    return len(str(text or "").strip()) <= 2
+
+
+def _is_better_ocr_text(original: object, candidate: object) -> bool:
+    original_text = str(original or "").strip()
+    candidate_text = str(candidate or "").strip()
+    if not candidate_text:
+        return False
+    if not original_text:
+        return True
+    return len(candidate_text) > len(original_text)
+
+
 def _resolve_page_index(state: Any, page_id: str) -> int:
     if page_id.isdigit():
         idx = int(page_id)
@@ -160,17 +174,20 @@ class PageOcrStage:
                     lang=config.source_language,
                 )
                 ocr_score = self.quality_router.evaluate_ocr(context.artifacts["blocks"])
-                empty_blocks = [
+                suspicious_blocks = [
                     block for block in context.artifacts["blocks"]
-                    if not str(getattr(block, "text", "") or "").strip()
+                    if _is_suspicious_ocr_text(getattr(block, "text", ""))
                 ]
-                if empty_blocks:
+                if suspicious_blocks:
+                    original_texts = {
+                        id(block): getattr(block, "text", "") for block in suspicious_blocks
+                    }
                     retry_padding = max(1, int(getattr(config, "ocr_padding", 8)) * 2)
                     retry_scale = max(1.0, float(getattr(config, "ocr_crop_scale", 1.5)) * 1.25)
                     retry_engine = config.ocr_engine
                     self.detection_service.ocr_only(
                         image,
-                        empty_blocks,
+                        suspicious_blocks,
                         lang=config.source_language,
                         engine=retry_engine,
                         padding=retry_padding,
@@ -181,10 +198,18 @@ class PageOcrStage:
                         ),
                         use_cache=False,
                     )
+                    recovered_blocks = 0
+                    for block in suspicious_blocks:
+                        original = original_texts[id(block)]
+                        if _is_better_ocr_text(original, getattr(block, "text", "")):
+                            recovered_blocks += 1
+                        else:
+                            block.text = original
                     ocr_score = self.quality_router.evaluate_ocr(context.artifacts["blocks"])
                     context.artifacts.setdefault("quality_replans", []).append({
                         "stage": "ocr", "model": retry_engine,
-                        "profile": "empty_block_recovery", "recovered_blocks": len(empty_blocks),
+                        "profile": "suspicious_text_recovery", "recovered_blocks": recovered_blocks,
+                        "candidate_blocks": len(suspicious_blocks),
                         "passed": ocr_score.passed,
                     })
                 if not ocr_score.passed:
