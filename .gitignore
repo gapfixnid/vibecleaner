@@ -26,6 +26,10 @@ settings.json
 system_prompt.txt
 translation_memory.json
 
+# Local assistant/development notes
+.claude/
+DEVELOPMENT_STATUS.md
+
 # PyInstaller
 build/
 dist/
