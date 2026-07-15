@@ -129,7 +129,7 @@ def bubbles_from_analysis(
     return bubbles
 
 
-def merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float = 0.25) -> list[TextBubble]:
+def merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float = 0.6) -> list[TextBubble]:
     if len(bubbles) < 2:
         return bubbles
 
