@@ -472,11 +472,6 @@ class GoogleTranslatorWrapper(BaseTranslator):
         }
         from_code = lang_map.get(source_lang.lower(), "ja")
         to_code = lang_map.get(target_lang.lower(), "ko")
-        def _clean_japanese_ocr(text: str) -> str:
-            import re
-            text = text.replace("는", "は")
-            hangul_pattern = re.compile(r'[\uac00-\ud7a3\u1100-\u11ff\u3130-\u318f]+')
-            return hangul_pattern.sub('', text).strip()
 
         try:
             from deep_translator import GoogleTranslator
@@ -486,8 +481,6 @@ class GoogleTranslatorWrapper(BaseTranslator):
                 if not block.text.strip():
                     return index, "", None
                 cleaned_text = block.text.replace("\n", " ").strip()
-                if from_code == "ja":
-                    cleaned_text = _clean_japanese_ocr(cleaned_text)
                 if not cleaned_text:
                     return index, "", None
 

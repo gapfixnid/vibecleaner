@@ -3,9 +3,13 @@ from unittest.mock import patch
 
 import numpy as np
 
-from backend.engines.inpainting.hybrid import HybridInpainter, build_oriented_target_mask
+from backend.engines.inpainting.hybrid import HybridInpainter, build_oriented_target_mask, _polygon_is_slanted
 
 class InpaintingEngineOptionsTests(unittest.TestCase):
+    def test_only_rotated_polygons_enable_diagonal_mask_expansion(self):
+        self.assertTrue(_polygon_is_slanted([[10, 20], [80, 45], [76, 58], [6, 33]]))
+        self.assertFalse(_polygon_is_slanted([[10, 20], [80, 20], [80, 40], [10, 40]]))
+
     def test_oriented_target_mask_does_not_fill_axis_aligned_corners(self):
         mask = build_oriented_target_mask(
             [[[20, 8], [32, 20], [20, 32], [8, 20]]],

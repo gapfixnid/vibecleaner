@@ -1,2 +1,2 @@
-from .engine import PPOCRv5Engine
+from .engine import PPOCRv6Engine
 

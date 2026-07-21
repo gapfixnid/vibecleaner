@@ -50,9 +50,6 @@ def calculate_md5_checksum(file_path: str) -> str:
 
 
 class ModelID(Enum):
-    MANGA_OCR_BASE = "manga-ocr-base"
-    MANGA_OCR_MOBILE_ONNX = "manga-ocr-mobile-onnx"
-    MANGA_OCR_INT8_ONNX = "manga-ocr-int8-onnx"
     PORORO = "pororo"
     PORORO_ONNX = "pororo-onnx"
     LAMA_ONNX = "lama-manga-dynamic"
@@ -66,32 +63,23 @@ class ModelID(Enum):
     RTDETR_V2_ONNX = "rtdetr-v2-onnx"
     RTDETR_INT8_ONNX = "rtdetr-int8-onnx"
     
-    # PPOCRv5 Detection Models
-    PPOCR_V5_DET_MOBILE = "ppocr-v5-det-mobile"
-    PPOCR_V5_DET_SERVER = "ppocr-v5-det-server"
-    PPOCR_V5_DET_MOBILE_TORCH = "ppocr-v5-det-mobile-torch"
-    
-    # PPOCRv5 Recognition Models - Chinese
+    # PP-OCRv6 multilingual detection and recognition models
+    PPOCR_V6_DET_MEDIUM = "ppocr-v6-det-medium"
+    PPOCR_V6_REC_MEDIUM = "ppocr-v6-rec-medium"
+
+    # Legacy registry IDs kept for compatibility with existing model caches.
+    # The application runtime and setup flow use only the PP-OCRv6 models above.
     PPOCR_V5_REC_MOBILE = "ppocr-v5-rec-ch-mobile"
     PPOCR_V5_REC_SERVER = "ppocr-v5-rec-ch-server"
     PPOCR_V5_REC_MOBILE_TORCH = "ppocr-v5-rec-ch-mobile-torch"
-    
-    # PPOCRv5 Recognition Models - Other Languages
     PPOCR_V5_REC_EN_MOBILE = "ppocr-v5-rec-en-mobile"
     PPOCR_V5_REC_KOREAN_MOBILE = "ppocr-v5-rec-korean-mobile"
     PPOCR_V5_REC_LATIN_MOBILE = "ppocr-v5-rec-latin-mobile"
     PPOCR_V5_REC_ESLAV_MOBILE = "ppocr-v5-rec-eslav-mobile"
-
-    # PP-OCRv6 multilingual ONNX recognition model
-    PPOCR_V6_REC_MEDIUM = "ppocr-v6-rec-medium"
-
-    # PPOCRv5 Recognition Models - Torch versions (if needed)
     PPOCR_V5_REC_EN_MOBILE_TORCH = "ppocr-v5-rec-en-mobile-torch"
     PPOCR_V5_REC_KOREAN_MOBILE_TORCH = "ppocr-v5-rec-korean-mobile-torch"
     PPOCR_V5_REC_LATIN_MOBILE_TORCH = "ppocr-v5-rec-latin-mobile-torch"
     PPOCR_V5_REC_ESLAV_MOBILE_TORCH = "ppocr-v5-rec-eslav-mobile-torch"
-
-    # PPOCRv4 Classifier
     PPOCR_V4_CLS = "ppocr-v4-cls"
 
     # Font Detection
@@ -324,50 +312,6 @@ def _download_spec(spec: ModelSpec):
 # Registry population
 def _register_defaults():
     ModelDownloader.register(ModelSpec(
-        id=ModelID.MANGA_OCR_BASE,
-        url='https://huggingface.co/kha-white/manga-ocr-base/resolve/main/',
-        files=[
-            'pytorch_model.bin', 'config.json', 'preprocessor_config.json',
-            'README.md', 'special_tokens_map.json', 'tokenizer_config.json', 'vocab.txt'
-        ],
-        sha256=[
-            'c63e0bb5b3ff798c5991de18a8e0956c7ee6d1563aca6729029815eda6f5c2eb',
-            '8c0e395de8fa699daaac21aee33a4ba9bd1309cfbff03147813d2a025f39f349',
-            'af4eb4d79cf61b47010fc0bc9352ee967579c417423b4917188d809b7e048948',
-            '32f413afcc4295151e77d25202c5c5d81ef621b46f947da1c3bde13256dc0d5f',
-            '303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3',
-            'd775ad1deac162dc56b84e9b8638f95ed8a1f263d0f56f4f40834e26e205e266',
-            '344fbb6b8bf18c57839e924e2c9365434697e0227fac00b88bb4899b78aa594d'
-        ],
-        save_dir=os.path.join(models_base_dir, 'ocr', 'manga-ocr-base')
-    ))
-
-    ModelDownloader.register(ModelSpec(
-        id=ModelID.MANGA_OCR_MOBILE_ONNX,
-        url='https://huggingface.co/ogkalu/manga-ocr-mobile/resolve/main/',
-        files=['encoder.onnx', 'decoder_init.onnx', 'decoder_step.onnx', 'vocab.txt'],
-        sha256=[
-            'd1fb455a07c1508cc56a4f4e15e2ed74aca9a4d78fd220ecc0ff39625d67e1b3',
-            '612f97e22848620fb36fcac611467689cb4213d91f2d84f6a19042ad57d475f1',
-            'a244b814a3a669190f9eae737960997633597cfa055fa186347e872bee834bc9',
-            '879d9a69df070dbdf143f64bb3daf73d367741980f18a2f6d08a12e68a598a11',
-        ],
-        save_dir=os.path.join(models_base_dir, 'ocr', 'manga-ocr-mobile-onnx')
-    ))
-
-    ModelDownloader.register(ModelSpec(
-        id=ModelID.MANGA_OCR_INT8_ONNX,
-        url='https://huggingface.co/ogkalu/manga-ocr-onnx/resolve/main/',
-        files=['encoder_model_int8.onnx', 'decoder_model_int8.onnx', 'vocab.txt'],
-        sha256=[
-            '0eaf2b867292a44700ce38ef028b90639a2e36fc4c18c2bcdd1de7409488adb3',
-            '3ff0d4c34c4a66613d98ff93e0b17f22a7b09dfbeec195c3e4d6f595af3a6b6c',
-            '5cb5c5586d98a2f331d9f8828e4586479b0611bfba5d8c3b6dadffc84d6a36a3',
-        ],
-        save_dir=os.path.join(models_base_dir, 'ocr', 'manga-ocr-base-onnx')
-    ))
-
-    ModelDownloader.register(ModelSpec(
         id=ModelID.PORORO,
         url='https://huggingface.co/ogkalu/pororo/resolve/main/',
         files=['craft.pt', 'brainocr.pt', 'ocr-opt.txt'],
@@ -478,13 +422,13 @@ def _register_defaults():
         save_dir=os.path.join(models_base_dir, 'detection')
     ))
 
-    # PPOCRv5 Detection Models
+    # PP-OCRv6 Detection Model
     ModelDownloader.register(ModelSpec(
-        id=ModelID.PPOCR_V5_DET_MOBILE,
-        url='https://huggingface.co/ogkalu/ppocr-v5-onnx/resolve/main/',
-        files=['ch_PP-OCRv5_mobile_det.onnx'],
-        sha256=['4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae'],
-        save_dir=os.path.join(models_base_dir, 'ocr', 'ppocr-v5-onnx')
+        id=ModelID.PPOCR_V6_DET_MEDIUM,
+        url='https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det_onnx/resolve/main/',
+        files=['inference.onnx', 'inference.yml'],
+        sha256=[None, None],
+        save_dir=os.path.join(models_base_dir, 'ocr', 'ppocr-v6-det-medium-onnx')
     ))
 
     ModelDownloader.register(ModelSpec(
@@ -493,23 +437,6 @@ def _register_defaults():
         files=['inference.onnx', 'inference.yml'],
         sha256=[None, None],
         save_dir=os.path.join(models_base_dir, 'ocr', 'ppocr-v6-onnx')
-    ))
-
-    # PPOCRv5 Detection/Recognition Models - Torch
-    ModelDownloader.register(ModelSpec(
-        id=ModelID.PPOCR_V5_DET_MOBILE_TORCH,
-        url='https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/torch/PP-OCRv5/det/',
-        files=['ch_PP-OCRv5_det_mobile.pth'],
-        sha256=['df848ed5060bac4d0f6e58572aea97d92e909a8a87cf292849237b0e84f6ffdb'],
-        save_dir=os.path.join(models_base_dir, 'ocr', 'ppocr-v5-torch'),
-    ))
-
-    ModelDownloader.register(ModelSpec(
-        id=ModelID.PPOCR_V5_DET_SERVER,
-        url='https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.4.0/onnx/PP-OCRv5/det/',
-        files=['ch_PP-OCRv5_server_det.onnx'],
-        sha256=['0f8846b1d4bba223a2a2f9d9b44022fbc22cc019051a602b41a7fda9667e4cad'],
-        save_dir=os.path.join(models_base_dir, 'ocr', 'ppocr-v5-onnx')
     ))
 
     # PPOCRv5 Recognition Models - Chinese

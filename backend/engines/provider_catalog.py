@@ -302,8 +302,6 @@ def register_builtin_providers(
             ),
             resource_classes={"cpu", "gpu", "io"},
             model_catalog=(
-                ProviderModelProfile("balanced", "Automatic OCR", 0.90, 0.70, frozenset({"cpu", "gpu", "io"})),
-                ProviderModelProfile("manga_ocr", "Manga OCR Mobile ONNX", 0.92, 0.55, frozenset({"cpu", "gpu", "io"})),
                 ProviderModelProfile("ppocr", "PP-OCRv6 Medium Recognition ONNX", 0.88, 0.85, frozenset({"cpu", "gpu", "io"})),
             ),
             queue_capacity=4,
@@ -312,11 +310,9 @@ def register_builtin_providers(
                     key="ocr_engine",
                     value_type="enum",
                     label="settings.ocrEngine",
-                    default="balanced",
-                    choices=("balanced", "manga_ocr", "ppocr"),
+                    default="ppocr",
+                    choices=("ppocr",),
                     choice_labels=(
-                        "settings.ocrEngineBalanced",
-                        "settings.ocrEngineManga",
                         "settings.ocrEnginePpocr",
                     ),
                 ),

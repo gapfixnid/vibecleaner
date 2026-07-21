@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from typing import Any
 
 
@@ -78,15 +79,29 @@ class AdaptiveQualityRouter:
             float(value) for block in blocks
             if (value := getattr(block, "ocr_confidence", None)) is not None
         ]
-        passed = ratio >= threshold
+        confidence_mean = (
+            sum(raw_confidences) / len(raw_confidences)
+            if raw_confidences else None
+        )
+        suspicious = sum(
+            _is_suspicious_language_result(str(getattr(block, "text", "")), language)
+            for block in blocks
+        )
+        suspicious_ratio = suspicious / len(blocks)
+        passed = (
+            ratio >= threshold
+            and suspicious_ratio <= 0.20
+            and (confidence_mean is None or confidence_mean >= 0.40)
+        )
         signals = {
             "non_empty_ratio": round(ratio, 4),
             "block_count": float(len(blocks)),
             "threshold": threshold,
             "raw_confidence_available_ratio": round(len(raw_confidences) / len(blocks), 4),
+            "suspicious_text_ratio": round(suspicious_ratio, 4),
         }
-        if raw_confidences:
-            signals["raw_confidence_mean"] = round(sum(raw_confidences) / len(raw_confidences), 4)
+        if confidence_mean is not None:
+            signals["raw_confidence_mean"] = round(confidence_mean, 4)
         return QualityScore(
             stage="ocr",
             score=round(ratio, 4),
@@ -94,7 +109,6 @@ class AdaptiveQualityRouter:
             signals=signals,
             recommended_action="accept" if passed else "retry_ocr",
         )
-
     def evaluate_inpainting(self, original: Any, result: Any, boxes: list[Any]) -> QualityScore:
         """Score output validity, target change, and preservation outside masks."""
         try:
@@ -163,7 +177,7 @@ class AdaptiveQualityRouter:
         if not profiles:
             defaults = {
                 "detection": ("High Precision (FP32)",),
-                "ocr": ("balanced",),
+                "ocr": ("ppocr",),
                 "inpainting": ("opencv",),
             }
             return next((value for value in defaults.get(stage, ()) if value != current_model), current_model)
@@ -190,3 +204,22 @@ class AdaptiveQualityRouter:
         if not candidates:
             return current_model
         return max(candidates, key=lambda profile: (profile.quality_score, profile.latency_score)).selection_value
+
+
+def _is_suspicious_language_result(text: str, language: str | None) -> bool:
+    value = str(text or "").strip()
+    if not value:
+        return False
+    normalized_language = str(language or "").strip().lower()
+    if normalized_language not in {"japanese", "日本語", "ja"}:
+        return bool(re.search(r"(.)\1{8,}", value))
+
+    meaningful = [char for char in value if char.isalnum()]
+    if len(meaningful) < 12:
+        return bool(re.search(r"(.)\1{8,}", value))
+    japanese = sum(
+        "\u3040" <= char <= "\u30ff" or "\u3400" <= char <= "\u9fff"
+        for char in meaningful
+    )
+    japanese_ratio = japanese / len(meaningful)
+    return japanese_ratio < 0.25 or bool(re.search(r"(.)\1{8,}", value))

@@ -32,8 +32,6 @@ function getPreviewModels(settings: Settings, status: ModelStatus | null): Previ
   const installed = new Set(status?.required.filter((model) => model.downloaded).map((model) => model.id) || []);
   const items: PreviewModel[] = [];
   const detectModel = settings.detect_model.toLowerCase();
-  const ocrEngine = settings.ocr_engine.toLowerCase();
-  const sourceLanguage = settings.source_language.toLowerCase();
   const inpaintEngine = settings.inpaint_engine.toLowerCase();
 
   appendUnique(
@@ -50,21 +48,8 @@ function getPreviewModels(settings: Settings, status: ModelStatus | null): Previ
     label: "PP-OCRv6 Medium Recognition",
   };
 
-  if (ocrEngine === "fast" || ocrEngine === "ppocr") {
-    appendUnique(items, { id: "ppocr-v5-det-mobile", category: "OCR", label: "PP-OCRv5 Mobile Detector" }, installed);
-    appendUnique(items, ppocrRecognition, installed);
-  } else if (
-    ocrEngine === "manga_ocr"
-    || ocrEngine === "manga-ocr"
-    || sourceLanguage === "japanese"
-    || sourceLanguage === "ja"
-    || sourceLanguage === "日本語"
-  ) {
-    appendUnique(items, { id: "manga-ocr-mobile-onnx", category: "OCR", label: "Manga OCR Mobile ONNX" }, installed);
-  } else {
-    appendUnique(items, { id: "ppocr-v5-det-mobile", category: "OCR", label: "PP-OCRv5 Mobile Detector" }, installed);
-    appendUnique(items, ppocrRecognition, installed);
-  }
+  appendUnique(items, { id: "ppocr-v6-det-medium", category: "OCR", label: "PP-OCRv6 Medium Detection" }, installed);
+  appendUnique(items, ppocrRecognition, installed);
 
   if (inpaintEngine !== "opencv") {
     appendUnique(items, { id: "lama-manga-dynamic", category: "Inpainting", label: "LaMa Manga ONNX" }, installed);
@@ -223,18 +208,6 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 options={[
                   { value: "High Precision (FP32)", label: uiT("settings.modelHighPrecision") },
                   { value: "Small (INT8)", label: uiT("settings.modelSmall") },
-                ]}
-              />
-            </div>
-            <div className="setup-row">
-              <label>{uiT("settings.ocrEngine")}</label>
-              <AppleSelect
-                value={localSettings.ocr_engine}
-                onChange={(value) => updateLocal("ocr_engine", value)}
-                options={[
-                  { value: "balanced", label: uiT("settings.ocrEngineBalanced") },
-                  { value: "manga_ocr", label: uiT("settings.ocrEngineManga") },
-                  { value: "ppocr", label: uiT("settings.ocrEnginePpocr") },
                 ]}
               />
             </div>

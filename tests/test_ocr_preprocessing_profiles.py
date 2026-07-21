@@ -2,7 +2,9 @@ from backend.engines.ocr.preprocessing_profile import resolve_ocr_preprocessing_
 
 
 def test_profiles_choose_language_and_engine_defaults():
-    assert resolve_ocr_preprocessing_profile("Japanese", "manga_ocr").padding == 8
+    profile = resolve_ocr_preprocessing_profile("Japanese", "manga_ocr")
+    assert profile.padding == 8
+    assert profile.adaptive_binarization is False
     assert resolve_ocr_preprocessing_profile("English", "ppocr") == (
         resolve_ocr_preprocessing_profile("영어", "fast")
     )

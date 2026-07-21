@@ -8,7 +8,7 @@ from backend.api.routes import settings as settings_route
 from download_models import get_model_ids
 
 class ModelRequirementsTests(unittest.TestCase):
-    def test_balanced_japanese_uses_fp32_detection_manga_ocr_and_lama(self):
+    def test_legacy_balanced_japanese_uses_ppocr_v6_and_lama(self):
         cfg = AppConfig(
             detect_model="High Precision (FP32)",
             source_language="Japanese",
@@ -20,7 +20,8 @@ class ModelRequirementsTests(unittest.TestCase):
             get_required_model_ids(cfg),
             [
                 ModelID.RTDETR_V2_ONNX,
-                ModelID.MANGA_OCR_MOBILE_ONNX,
+                ModelID.PPOCR_V6_DET_MEDIUM,
+                ModelID.PPOCR_V6_REC_MEDIUM,
                 ModelID.LAMA_ONNX,
             ],
         )
@@ -37,7 +38,7 @@ class ModelRequirementsTests(unittest.TestCase):
             get_required_model_ids(cfg),
             [
                 ModelID.RTDETR_INT8_ONNX,
-                ModelID.PPOCR_V5_DET_MOBILE,
+                ModelID.PPOCR_V6_DET_MEDIUM,
                 ModelID.PPOCR_V6_REC_MEDIUM,
             ],
         )
@@ -54,13 +55,13 @@ class ModelRequirementsTests(unittest.TestCase):
             get_required_model_ids(cfg),
             [
                 ModelID.RTDETR_V2_ONNX,
-                ModelID.PPOCR_V5_DET_MOBILE,
+                ModelID.PPOCR_V6_DET_MEDIUM,
                 ModelID.PPOCR_V6_REC_MEDIUM,
                 ModelID.LAMA_ONNX,
             ],
         )
 
-    def test_explicit_manga_ocr_uses_manga_model_regardless_of_language(self):
+    def test_legacy_manga_ocr_setting_uses_ppocr_v6(self):
         cfg = AppConfig(
             detect_model="High Precision (FP32)",
             source_language="Korean",
@@ -70,7 +71,7 @@ class ModelRequirementsTests(unittest.TestCase):
 
         self.assertEqual(
             get_required_model_ids(cfg),
-            [ModelID.RTDETR_V2_ONNX, ModelID.MANGA_OCR_MOBILE_ONNX],
+            [ModelID.RTDETR_V2_ONNX, ModelID.PPOCR_V6_DET_MEDIUM, ModelID.PPOCR_V6_REC_MEDIUM],
         )
 
     def test_status_marks_missing_models_without_downloading(self):
@@ -91,7 +92,7 @@ class ModelRequirementsTests(unittest.TestCase):
         self.assertEqual(status["missing_count"], 2)
         self.assertEqual(
             [item["id"] for item in status["missing"]],
-            [ModelID.PPOCR_V5_DET_MOBILE.value, ModelID.PPOCR_V6_REC_MEDIUM.value],
+            [ModelID.PPOCR_V6_DET_MEDIUM.value, ModelID.PPOCR_V6_REC_MEDIUM.value],
         )
         self.assertEqual(is_downloaded.call_count, 3)
 
@@ -107,7 +108,7 @@ class ModelRequirementsTests(unittest.TestCase):
             get_model_ids("current", cfg),
             [
                 ModelID.RTDETR_INT8_ONNX,
-                ModelID.PPOCR_V5_DET_MOBILE,
+                ModelID.PPOCR_V6_DET_MEDIUM,
                 ModelID.PPOCR_V6_REC_MEDIUM,
             ],
         )
@@ -128,7 +129,7 @@ class ModelRequirementsTests(unittest.TestCase):
         self.assertTrue(status["all_ready"])
         self.assertEqual(
             [item["id"] for item in status["required"]],
-            [ModelID.RTDETR_V2_ONNX.value, ModelID.MANGA_OCR_MOBILE_ONNX.value],
+            [ModelID.RTDETR_V2_ONNX.value, ModelID.PPOCR_V6_DET_MEDIUM.value, ModelID.PPOCR_V6_REC_MEDIUM.value],
         )
 
 if __name__ == "__main__":

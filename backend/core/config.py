@@ -46,7 +46,7 @@ class AppConfigSnapshot:
     tiling_enabled: bool = True
     bubbles_only: bool = False
     show_detection_overlay: bool = False
-    ocr_engine: str = "balanced"
+    ocr_engine: str = "ppocr"
     ocr_padding: int = 8
     ocr_crop_scale: float = 1.5
     line_merge_sensitivity: float = 1.2
@@ -120,7 +120,7 @@ class AppConfig:
     show_detection_overlay: bool = False
 
     # -- OCR ----------------------------------------------------------------
-    ocr_engine: str = "balanced"
+    ocr_engine: str = "ppocr"
     ocr_padding: int = 8
     ocr_crop_scale: float = 1.5
     line_merge_sensitivity: float = 1.2
@@ -358,21 +358,15 @@ class AppConfig:
                 migrated["translation_provider"] = "google"
             if migrated.get("detect_model") == "Small (INT8) [기본값]":
                 migrated["detect_model"] = "High Precision (FP32)"
-            if migrated.get("ocr_engine") in {
-                "auto", "high_precision", "high-quality", "high_quality", "quality"
-            }:
-                migrated["ocr_engine"] = "balanced"
             if migrated.get("inpaint_engine") in {
                 "aot", "high_precision", "high-quality", "high_quality", "quality"
             }:
                 migrated["inpaint_engine"] = "lama"
             if migrated.get("confidence_threshold") == 0.30:
                 migrated["confidence_threshold"] = 0.45
-        if schema_version < 2:
-            if str(migrated.get("ocr_engine", "")).strip().lower() in {
-                "fast", "speed", "paddleocr", "paddle_ocr"
-            }:
-                migrated["ocr_engine"] = "ppocr"
+        # PP-OCR is the only supported local OCR engine. This deliberately
+        # normalizes every historical profile, including Manga OCR projects.
+        migrated["ocr_engine"] = "ppocr"
         migrated["format"] = SETTINGS_FORMAT
         migrated[SETTINGS_SCHEMA_VERSION_KEY] = SETTINGS_SCHEMA_VERSION
         migrated.setdefault("app_version", "unknown")

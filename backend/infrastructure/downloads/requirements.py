@@ -11,8 +11,7 @@ from . import ModelDownloader, ModelID
 MODEL_LABELS: dict[ModelID, tuple[str, str]] = {
     ModelID.RTDETR_V2_ONNX: ("Detection", "RT-DETRv2 FP32"),
     ModelID.RTDETR_INT8_ONNX: ("Detection", "RT-DETRv2 INT8"),
-    ModelID.MANGA_OCR_MOBILE_ONNX: ("OCR", "Manga OCR Mobile ONNX"),
-    ModelID.PPOCR_V5_DET_MOBILE: ("OCR", "PP-OCRv5 Mobile Detector"),
+    ModelID.PPOCR_V6_DET_MEDIUM: ("OCR", "PP-OCRv6 Medium Detection"),
     ModelID.PPOCR_V6_REC_MEDIUM: ("OCR", "PP-OCRv6 Medium Recognition"),
     ModelID.LAMA_ONNX: ("Inpainting", "LaMa Manga ONNX"),
 }
@@ -47,17 +46,8 @@ def get_required_model_ids(settings: AppConfig) -> list[ModelID]:
     else:
         _append_unique(required, [ModelID.RTDETR_V2_ONNX])
 
-    ocr_engine = _normalized(cfg.ocr_engine)
     source_language = cfg.source_language
-    source_lang = _normalized(source_language)
-    if ocr_engine in {"fast", "speed", "ppocr", "paddleocr", "paddle_ocr"}:
-        _append_unique(required, [ModelID.PPOCR_V5_DET_MOBILE, _ppocr_recognition_model(source_language)])
-    elif ocr_engine in {"manga_ocr", "manga-ocr", "manga", "manga_ocr_mobile"}:
-        _append_unique(required, [ModelID.MANGA_OCR_MOBILE_ONNX])
-    elif source_lang in {"japanese", "日本語", "ja"}:
-        _append_unique(required, [ModelID.MANGA_OCR_MOBILE_ONNX])
-    else:
-        _append_unique(required, [ModelID.PPOCR_V5_DET_MOBILE, _ppocr_recognition_model(source_language)])
+    _append_unique(required, [ModelID.PPOCR_V6_DET_MEDIUM, _ppocr_recognition_model(source_language)])
 
     inpaint_engine = _normalized(cfg.inpaint_engine)
     if inpaint_engine not in {"opencv", "fast", "speed", "telea"}:

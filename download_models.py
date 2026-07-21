@@ -15,18 +15,15 @@ logger = logging.getLogger(__name__)
 
 MINIMAL_MODEL_IDS = [
     ModelID.RTDETR_INT8_ONNX,
-    ModelID.MANGA_OCR_MOBILE_ONNX,
+    ModelID.PPOCR_V6_DET_MEDIUM,
+    ModelID.PPOCR_V6_REC_MEDIUM,
 ]
 
 ALL_CORE_MODEL_IDS = [
     ModelID.RTDETR_V2_ONNX,
     ModelID.RTDETR_INT8_ONNX,
-    ModelID.MANGA_OCR_MOBILE_ONNX,
-    ModelID.PPOCR_V5_DET_MOBILE,
-    ModelID.PPOCR_V5_REC_MOBILE,
-    ModelID.PPOCR_V5_REC_EN_MOBILE,
-    ModelID.PPOCR_V5_REC_KOREAN_MOBILE,
-    ModelID.PPOCR_V4_CLS,
+    ModelID.PPOCR_V6_DET_MEDIUM,
+    ModelID.PPOCR_V6_REC_MEDIUM,
     ModelID.LAMA_ONNX,
 ]
 
@@ -136,8 +133,8 @@ def main():
         print("If automatic download fails, please download the models manually")
         print("from their respective Hugging Face repositories:")
         print(" - RT-DETR: https://huggingface.co/ogkalu/comic-text-and-bubble-detector")
-        print(" - Manga OCR: https://huggingface.co/ogkalu/manga-ocr-mobile")
-        print(" - PaddleOCR v5: https://huggingface.co/ogkalu/ppocr-v5-onnx")
+        print(" - PP-OCRv6 Detection: https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det_onnx")
+        print(" - PP-OCRv6 Recognition: https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx")
         sys.exit(1)
     else:
         print(" - All core AI models are ready!")

@@ -13,8 +13,9 @@ class OcrPreprocessingProfile:
 
 _BASE_PROFILE = OcrPreprocessingProfile(8, 1.5, True, 2.0)
 _PROFILES = {
-    ("japanese", "manga_ocr"): _BASE_PROFILE,
-    ("japanese", "ppocr"): _BASE_PROFILE,
+    # Preserve colour information for Japanese dialogue by default. The PP-OCR
+    # engine can still compare an explicitly requested binarized candidate.
+    ("japanese", "ppocr"): OcrPreprocessingProfile(8, 1.5, False, 2.0),
     ("english", "ppocr"): OcrPreprocessingProfile(6, 1.25, True, 1.5),
     ("korean", "ppocr"): OcrPreprocessingProfile(8, 1.4, True, 2.0),
 }
@@ -32,14 +33,7 @@ def normalize_language(language: str | None) -> str:
 
 
 def normalize_engine(engine: str | None, language: str | None = None) -> str:
-    value = str(engine or "auto").strip().lower()
-    if value in {"manga_ocr", "manga-ocr", "manga", "manga_ocr_mobile"}:
-        return "manga_ocr"
-    if value in {"ppocr", "paddleocr", "paddle_ocr", "fast", "speed"}:
-        return "ppocr"
-    if value in {"balanced", "standard", "auto"}:
-        return "manga_ocr" if normalize_language(language) == "japanese" else "ppocr"
-    return "manga_ocr" if normalize_language(language) == "japanese" else "ppocr"
+    return "ppocr"
 
 
 def resolve_ocr_preprocessing_profile(

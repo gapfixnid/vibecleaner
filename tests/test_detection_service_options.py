@@ -183,7 +183,16 @@ def test_cached_single_block_ocr_does_not_wait_for_another_ocr_inference():
         uncached = FakeBlock()
         cached = FakeBlock()
         cached.xyxy = [2, 2, 12, 14]
-        crop_hash = service._get_crop_hash(image, cached.xyxy)
+        crop_hash = service._get_crop_hash(
+            image,
+            cached.xyxy,
+            lang="Japanese",
+            engine="ppocr",
+            padding=8,
+            crop_scale=1.5,
+            adaptive_binarization=False,
+            adaptive_binarization_strength=2.0,
+        )
         assert crop_hash is not None
         service._remember_ocr(crop_hash, "cached text")
 

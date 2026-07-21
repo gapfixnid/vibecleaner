@@ -985,20 +985,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="section-title-label">{t("settings.ocrOptions")}</div>
                   <div className="settings-card">
                     <div className="form-row-group">
-                      <label className="pref-label">{t("settings.ocrEngine")}</label>
-                      <div className="pref-control-right">
-                        <AppleSelect
-                          value={localSettings.ocr_engine}
-                          onChange={(v) => handleAutoSave("ocr_engine", v)}
-                          options={[
-                            { value: "balanced", label: t("settings.ocrEngineBalanced") },
-                            { value: "manga_ocr", label: t("settings.ocrEngineManga") },
-                            { value: "ppocr", label: t("settings.ocrEnginePpocr") },
-                          ]}
-                        />
-                      </div>
-                    </div>
-                    <div className="form-row-group">
                       <label className="pref-label">{t("settings.ocrPadding")}</label>
                       <div className="pref-control-right">
                         <NumberStepper

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, List, Tuple, Optional
+import re
 import numpy as np
 import onnxruntime as ort
 import yaml
@@ -16,16 +17,6 @@ from .preprocessing import apply_adaptive_binarization, crop_text_line, det_prep
 from .postprocessing import DBPostProcessor, CTCLabelDecoder
 
 
-LANG_TO_REC_MODEL: dict[str, ModelID] = {
-	'ch': ModelID.PPOCR_V5_REC_MOBILE,
-	'en': ModelID.PPOCR_V5_REC_EN_MOBILE,
-	'ko': ModelID.PPOCR_V5_REC_KOREAN_MOBILE,
-	'latin': ModelID.PPOCR_V5_REC_LATIN_MOBILE,
-	'ru': ModelID.PPOCR_V5_REC_ESLAV_MOBILE,
-	'eslav': ModelID.PPOCR_V5_REC_ESLAV_MOBILE,
-}
-
-
 def _make_ppocr_session_options(threads: int = 4):
 	opts = ort.SessionOptions()
 	opts.log_severity_level = 3
@@ -38,8 +29,8 @@ def _make_ppocr_session_options(threads: int = 4):
 	return opts
 
 
-class PPOCRv5Engine(OCREngine):
-	"""Lightweight PP-OCRv5 ONNX pipeline (det + rec).
+class PPOCRv6Engine(OCREngine):
+	"""PP-OCRv6 Medium ONNX detection and recognition pipeline.
 	"""
 
 	def __init__(self):
@@ -50,15 +41,17 @@ class PPOCRv5Engine(OCREngine):
 		self.det_model = 'mobile'
 		self.device = 'cpu'
 		self.det_post = DBPostProcessor(
-			thresh=0.3, 
-			box_thresh=0.5, 
-			unclip_ratio=2.0, 
+			thresh=0.2,
+			box_thresh=0.45,
+			max_candidates=3000,
+			unclip_ratio=1.4,
 			use_dilation=False
 		)
 		self.decoder: Optional[CTCLabelDecoder] = None
 		self.rec_img_shape = (3, 48, 320)
 		self.rec_batch_size = 8
 		self.rec_threads = 4
+		self.source_language = 'Chinese'
 
 	def initialize(
 		self, 
@@ -109,7 +102,13 @@ class PPOCRv5Engine(OCREngine):
 	def _det_infer(self, img: np.ndarray) -> Tuple[np.ndarray, List[float]]:
 		self._ensure_det_session()
 		assert self.det_sess is not None
-		inp = det_preprocess(img, limit_side_len=960, limit_type='min')
+		inp = det_preprocess(
+			img,
+			mean=(0.485, 0.456, 0.406),
+			std=(0.229, 0.224, 0.225),
+			limit_side_len=960,
+			limit_type='min',
+		)
 		input_name = self.det_sess.get_inputs()[0].name
 		output_name = self.det_sess.get_outputs()[0].name
 		pred = self.det_sess.run([output_name], {input_name: inp})[0]
@@ -119,7 +118,7 @@ class PPOCRv5Engine(OCREngine):
 	def _ensure_det_session(self) -> None:
 		if self.det_sess is not None:
 			return
-		det_id = ModelID.PPOCR_V5_DET_MOBILE if self.det_model == 'mobile' else ModelID.PPOCR_V5_DET_SERVER
+		det_id = ModelID.PPOCR_V6_DET_MEDIUM
 		ModelDownloader.ensure([det_id])
 		det_path = ModelDownloader.primary_path(det_id)
 		providers = get_providers(self.device)
@@ -172,19 +171,57 @@ class PPOCRv5Engine(OCREngine):
 		if self.use_text_lines and any(getattr(blk, "lines", None) for blk in blk_list):
 			for blk in blk_list:
 				lines = getattr(blk, "lines", None) or [blk.xyxy]
-				crops = [
+				raw_crops = [
 					_crop_line(
 						img,
 						line,
 						padding=padding,
 						crop_scale=crop_scale,
-						adaptive_binarization=adaptive_binarization,
+						adaptive_binarization=False,
 						adaptive_binarization_strength=adaptive_binarization_strength,
 					)
 					for line in lines
 				]
-				valid_crops = [crop for crop in crops if crop is not None and crop.size > 0]
-				texts, confidences = self._rec_infer(valid_crops)
+				raw_results = self._recognize_line_crops(raw_crops)
+				results = raw_results
+
+				# Japanese coloured dialogue and highlighted captions are often
+				# damaged by thresholding. When the user explicitly enables it,
+				# compare both candidates and keep the stronger recognition instead
+				# of destructively replacing the colour crop.
+				if bool(adaptive_binarization) and _is_japanese_language(self.source_language):
+					adaptive_crops = [
+						_crop_line(
+							img,
+							line,
+							padding=padding,
+							crop_scale=crop_scale,
+							adaptive_binarization=True,
+							adaptive_binarization_strength=adaptive_binarization_strength,
+						)
+						for line in lines
+					]
+					adaptive_results = self._recognize_line_crops(adaptive_crops)
+					results = [
+						_choose_japanese_candidate(raw, adaptive)
+						for raw, adaptive in zip(raw_results, adaptive_results)
+					]
+				elif bool(adaptive_binarization):
+					adaptive_crops = [
+						_crop_line(
+							img,
+							line,
+							padding=padding,
+							crop_scale=crop_scale,
+							adaptive_binarization=True,
+							adaptive_binarization_strength=adaptive_binarization_strength,
+						)
+						for line in lines
+					]
+					results = self._recognize_line_crops(adaptive_crops)
+
+				texts = [text for text, _ in results]
+				confidences = [confidence for _, confidence in results]
 				valid_confidences = [
 					float(confidence)
 					for text, confidence in zip(texts, confidences)
@@ -234,6 +271,48 @@ class PPOCRv5Engine(OCREngine):
 		for block in result:
 			block.ocr_confidence = average_confidence
 		return result
+
+	def _recognize_line_crops(self, crops: List[np.ndarray | None]) -> List[Tuple[str, float]]:
+		results: List[Tuple[str, float]] = [("", 0.0) for _ in crops]
+		valid_indices = [
+			index for index, crop in enumerate(crops)
+			if crop is not None and crop.size > 0
+		]
+		texts, confidences = self._rec_infer([crops[index] for index in valid_indices])
+		for index, text, confidence in zip(valid_indices, texts, confidences):
+			results[index] = (str(text or "").strip(), float(confidence))
+		return results
+
+
+def _is_japanese_language(language: str | None) -> bool:
+	return str(language or "").strip().lower() in {"japanese", "日本語", "ja"}
+
+
+def _japanese_candidate_score(candidate: Tuple[str, float]) -> float:
+	text, confidence = candidate
+	if not text:
+		return -1.0
+	meaningful = [char for char in text if not char.isspace() and not re.match(r"[\W_]", char)]
+	if not meaningful:
+		return float(confidence) - 0.5
+	jp_count = sum(
+		"\u3040" <= char <= "\u30ff" or "\u3400" <= char <= "\u9fff"
+		for char in meaningful
+	)
+	latin_or_digit = sum(char.isascii() and char.isalnum() for char in meaningful)
+	ratio = jp_count / len(meaningful)
+	foreign_ratio = latin_or_digit / len(meaningful)
+	repeated_penalty = 0.25 if re.search(r"(.)\1{5,}", text) else 0.0
+	return float(confidence) + 0.18 * ratio - 0.22 * foreign_ratio - repeated_penalty
+
+
+def _choose_japanese_candidate(
+	raw: Tuple[str, float],
+	adaptive: Tuple[str, float],
+) -> Tuple[str, float]:
+	# Keep the colour crop on near-ties; thresholding must provide a meaningful
+	# improvement to replace it.
+	return adaptive if _japanese_candidate_score(adaptive) > _japanese_candidate_score(raw) + 0.04 else raw
 
 
 def _crop_line(

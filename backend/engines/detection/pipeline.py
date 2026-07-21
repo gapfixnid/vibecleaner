@@ -196,10 +196,20 @@ class DetectionPipeline:
     ) -> None:
         try:
             device = resolve_device(self.settings.is_gpu_enabled(), self.backend) if self.settings else "cpu"
-            _ = device
-            annotate_blocks_with_heuristic_lines(
+            from .ppocr_lines import annotate_blocks_with_ppocr_lines
+            annotate_blocks_with_ppocr_lines(
                 image,
                 text_blocks,
+                device=device,
+                backend="onnx",
+                det_model="mobile",
+            )
+            missing_lines = [block for block in text_blocks if not getattr(block, "lines", None)]
+            if not missing_lines:
+                return
+            annotate_blocks_with_heuristic_lines(
+                image,
+                missing_lines,
                 line_merge_sensitivity=line_merge_sensitivity,
                 smart_direction=smart_direction,
                 text_direction_override=text_direction_override,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -21,9 +20,10 @@ class PPOCRLineDetector:
         self.backend = "onnx"
         self.det_model = "mobile"
         self.post = DBPostProcessor(
-            thresh=0.3,
-            box_thresh=0.5,
-            unclip_ratio=2.0,
+            thresh=0.2,
+            box_thresh=0.45,
+            max_candidates=3000,
+            unclip_ratio=1.4,
             use_dilation=False,
         )
 
@@ -35,39 +35,34 @@ class PPOCRLineDetector:
         self.backend = backend
         self.det_model = det_model
 
-        if backend == "torch":
-            from ..ocr.ppocr.torch.inference_engine.torch_session import TorchInferSession
-
-            det_id = ModelID.PPOCR_V5_DET_MOBILE_TORCH
-            ModelDownloader.ensure([det_id])
-            model_path = ModelDownloader.primary_path(det_id)
-            arch_cfg_path = Path(__file__).parents[1] / "ocr" / "ppocr" / "torch" / "arch_config.yaml"
-            self.session = TorchInferSession(model_path, arch_cfg_path, device)
-            return
-
-        det_id = ModelID.PPOCR_V5_DET_MOBILE if det_model == "mobile" else ModelID.PPOCR_V5_DET_SERVER
+        det_id = ModelID.PPOCR_V6_DET_MEDIUM
         ModelDownloader.ensure([det_id])
         model_path = ModelDownloader.primary_path(det_id)
         providers = get_providers(device)
         sess_opt = make_session_options(log_severity_level=3)
         self.session = make_session(model_path, sess_options=sess_opt, providers=providers)
 
-    def detect_lines(self, image: np.ndarray) -> list[list[int]]:
+    def detect_lines(self, image: np.ndarray) -> list[list[list[int]]]:
         if self.session is None:
             self.initialize(self.device)
         if self.session is None:
             return []
 
-        inp = det_preprocess(image, limit_side_len=960, limit_type="min")
-        if self.backend == "torch":
-            pred = self.session(inp)
-        else:
-            input_name = self.session.get_inputs()[0].name
-            output_name = self.session.get_outputs()[0].name
-            pred = self.session.run([output_name], {input_name: inp})[0]
+        inp = det_preprocess(
+            image,
+            mean=(0.485, 0.456, 0.406),
+            std=(0.229, 0.224, 0.225),
+            limit_side_len=960,
+            limit_type="min",
+        )
+        input_name = self.session.get_inputs()[0].name
+        output_name = self.session.get_outputs()[0].name
+        pred = self.session.run([output_name], {input_name: inp})[0]
         quads, _ = self.post(pred, (image.shape[0], image.shape[1]))
-        boxes = [_axis_box(quad) for quad in quads]
-        return _merge_line_boxes(boxes, image.shape[1], image.shape[0])
+        return [
+            np.rint(np.asarray(quad).reshape(-1, 2)).astype(np.int32).tolist()
+            for quad in quads
+        ]
 
 
 _DETECTOR_CACHE: dict[str, PPOCRLineDetector] = {}
@@ -92,7 +87,7 @@ def annotate_blocks_with_ppocr_lines(
         _DETECTOR_CACHE[cache_key] = detector
 
     lines = detector.detect_lines(image)
-    groups: list[list[list[int]]] = [[] for _ in blocks]
+    groups: list[list[list[list[int]]]] = [[] for _ in blocks]
     usable_lines = [line for line in lines if _is_usable_line(line, image.shape[1], image.shape[0])]
 
     for line in usable_lines:
@@ -176,16 +171,17 @@ def _should_merge(a: list[int], b: list[int], image_width: int) -> bool:
     return False
 
 
-def _best_block_for_line(line: list[int], blocks: list[TextBlock], width: int, height: int) -> int:
+def _best_block_for_line(line, blocks: list[TextBlock], width: int, height: int) -> int:
+    line_box = _axis_box(np.asarray(line))
     best_index = -1
     best_score = 0.0
-    line_center_x = (line[0] + line[2]) / 2
-    line_center_y = (line[1] + line[3]) / 2
-    line_area = max(1, _box_area(line))
+    line_center_x = (line_box[0] + line_box[2]) / 2
+    line_center_y = (line_box[1] + line_box[3]) / 2
+    line_area = max(1, _box_area(line_box))
 
     for i, block in enumerate(blocks):
         container = _expand_box([int(v) for v in block.xyxy], 8, 8, width, height)
-        overlap = _intersection_area(container, line) / line_area
+        overlap = _intersection_area(container, line_box) / line_area
         center_bonus = 0.15 if _point_in_box(line_center_x, line_center_y, container) else 0.0
         score = overlap + center_bonus
         if score > best_score:
@@ -195,13 +191,14 @@ def _best_block_for_line(line: list[int], blocks: list[TextBlock], width: int, h
     return best_index if best_score >= 0.35 else -1
 
 
-def _infer_direction(lines: list[list[int]], block_box) -> str:
+def _infer_direction(lines, block_box) -> str:
     if lines:
         horizontal = 0.0
         vertical = 0.0
         for line in lines:
-            width = max(1, line[2] - line[0])
-            height = max(1, line[3] - line[1])
+            line_box = _axis_box(np.asarray(line))
+            width = max(1, line_box[2] - line_box[0])
+            height = max(1, line_box[3] - line_box[1])
             horizontal += max(0.0, width / height - 1)
             vertical += max(0.0, height / width - 1)
         if vertical > horizontal * 1.15 + 0.2:
@@ -215,14 +212,14 @@ def _infer_direction(lines: list[list[int]], block_box) -> str:
     return "vertical" if height > width * 1.25 else "horizontal"
 
 
-def _sort_lines(lines: list[list[int]], direction: str) -> list[list[int]]:
+def _sort_lines(lines, direction: str):
     if direction == "vertical":
-        return sorted((list(map(int, line)) for line in lines), key=lambda box: (-box[0], box[1]))
-    return sorted((list(map(int, line)) for line in lines), key=lambda box: (box[1], box[0]))
+        return sorted(lines, key=lambda line: (-_axis_box(np.asarray(line))[0], _axis_box(np.asarray(line))[1]))
+    return sorted(lines, key=lambda line: (_axis_box(np.asarray(line))[1], _axis_box(np.asarray(line))[0]))
 
 
-def _is_usable_line(line: list[int], width: int, height: int) -> bool:
-    box = _clamp_box(line, width, height)
+def _is_usable_line(line, width: int, height: int) -> bool:
+    box = _clamp_box(_axis_box(np.asarray(line)), width, height)
     area = _box_area(box)
     return box[2] - box[0] > 3 and box[3] - box[1] > 3 and area < width * height * 0.75
 

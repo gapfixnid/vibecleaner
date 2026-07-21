@@ -26,7 +26,7 @@ const DEFAULT_SETTINGS: Settings = {
   detect_model: "High Precision (FP32)",
   confidence_threshold: 0.45,
   tiling_enabled: true,
-  ocr_engine: "balanced",
+  ocr_engine: "ppocr",
   ocr_padding: 8,
   ocr_crop_scale: 1.5,
   line_merge_sensitivity: 1.2,

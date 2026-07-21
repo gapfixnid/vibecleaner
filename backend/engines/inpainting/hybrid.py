@@ -1,6 +1,7 @@
 # engines/inpainting/hybrid.py
 import numpy as np
 import cv2
+import math
 from threading import RLock
 
 
@@ -31,6 +32,15 @@ def build_oriented_target_mask(
         expanded = cv2.boxPoints((center, expanded_size, angle))
         cv2.fillConvexPoly(target, np.rint(expanded).astype(np.int32), 255)
     return target if np.any(target) else None
+
+
+def _polygon_is_slanted(polygon) -> bool:
+    points = np.asarray(polygon, dtype=np.float32)
+    if points.ndim != 2 or points.shape[0] < 4 or points.shape[1] != 2:
+        return False
+    edge = points[1] - points[0]
+    angle = abs(math.degrees(math.atan2(float(edge[1]), float(edge[0])))) % 90.0
+    return min(angle, 90.0 - angle) >= 3.0
 
 class HybridInpainter:
     def __init__(self):
@@ -106,13 +116,20 @@ class HybridInpainter:
                 if source_polygons is not None and index < len(source_polygons)
                 else None
             )
+            # Slanted glyphs expose antialiased tips outside a tight polygon.
+            # Expand only those regions; a global increase would reach ordinary
+            # speech-bubble borders and recreate the earlier smearing issue.
+            has_slanted_text = bool(polygon_group) and any(
+                _polygon_is_slanted(polygon) for polygon in polygon_group
+            )
+            effective_dilation = max(int(mask_dilation), 8) if has_slanted_text else int(mask_dilation)
             target_mask = build_oriented_target_mask(
                 polygon_group,
                 origin_x=x1,
                 origin_y=y1,
                 width=crop.shape[1],
                 height=crop.shape[0],
-                margin=max(4, int(mask_dilation) * 2),
+                margin=max(4, effective_dilation * 2),
             )
             
             # Estimate the background from the oriented text regions. A whole
@@ -169,7 +186,7 @@ class HybridInpainter:
                 # 4. Adaptive dilation based on estimated stroke width using Distance Transform
                 dist_transform = cv2.distanceTransform(final_mask, cv2.DIST_L2, 3)
                 max_dist = np.percentile(dist_transform[dist_transform > 0], 90) if np.any(dist_transform > 0) else 1.0
-                configured_dilation = max(1, int(mask_dilation))
+                configured_dilation = max(1, effective_dilation)
                 radius = max(configured_dilation + 1, int(round(max_dist * 1.8)))
                 kernel_size = 2 * radius + 1
                 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))

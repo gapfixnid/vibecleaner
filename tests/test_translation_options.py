@@ -90,5 +90,25 @@ class TranslationOptionsTests(unittest.TestCase):
             ["translated:台詞0", "translated:台詞1", "translated:台詞2"],
         )
 
+    def test_google_does_not_delete_mixed_script_ocr_text(self):
+        received = []
+
+        class FakeGoogleTranslator:
+            def __init__(self, source, target):
+                pass
+
+            def translate(self, text):
+                received.append(text)
+                return text
+
+        fake_module = types.SimpleNamespace(GoogleTranslator=FakeGoogleTranslator)
+        block = TextBlock(text="日本語 주석은 유지")
+        translator = translation_wrapper.GoogleTranslatorWrapper(max_retries=0, max_workers=1)
+
+        with patch.dict(sys.modules, {"deep_translator": fake_module}):
+            translator.translate_blocks([block], "Japanese", "Korean")
+
+        self.assertEqual(received, ["日本語 주석은 유지"])
+
 if __name__ == "__main__":
     unittest.main()

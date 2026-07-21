@@ -71,9 +71,9 @@ The defaults are the safest place to start.
 
 | Goal | Recommended option |
 | --- | --- |
-| Not sure what to choose | Balanced profile |
-| Best Japanese manga OCR | Manga OCR |
-| Other languages or faster OCR | PP-OCR |
+| Not sure what to choose | Default settings |
+| Diagonal, vertical, or curved text detection | PP-OCRv6 Medium |
+| Multilingual text recognition | PP-OCRv6 Medium |
 | Better text removal | LaMa inpainting |
 | Fast preview | OpenCV inpainting |
 
@@ -87,7 +87,7 @@ The app may need to download and load a local model. Later operations in the sam
 
 ### Vertical or diagonal text is read incorrectly
 
-Set the source language to Japanese and try Manga OCR or the Balanced profile. You can also correct the recognized source text in the inspector before translating again.
+Set the source language to Japanese. PP-OCRv6 Medium preserves rotated text regions for recognition. You can also correct the recognized source text in the inspector before translating again.
 
 ### Inpainting blurs outside a speech bubble
 

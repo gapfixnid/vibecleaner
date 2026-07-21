@@ -272,9 +272,7 @@ export type TranslationKey =
   | "settings.ocrOptions"
   | "settings.ocrEngine"
   | "settings.ocrEngineAuto"
-  | "settings.ocrEngineManga"
   | "settings.ocrEnginePpocr"
-  | "settings.ocrEngineBalanced"
   | "settings.ocrEngineFast"
   | "settings.ocrPadding"
   | "settings.ocrCropScale"
@@ -583,9 +581,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.ocrOptions": "OCR Options",
     "settings.ocrEngine": "OCR Engine",
     "settings.ocrEngineAuto": "Auto by source language",
-    "settings.ocrEngineManga": "Manga OCR Mobile ONNX",
     "settings.ocrEnginePpocr": "PP-OCRv6 Medium Recognition ONNX",
-    "settings.ocrEngineBalanced": "Auto - Manga OCR Mobile / PP-OCRv6 Medium",
     "settings.ocrEngineFast": "PP-OCRv6 Medium Recognition ONNX",
     "settings.ocrPadding": "Crop Padding",
     "settings.ocrCropScale": "Crop Scale",
@@ -893,9 +889,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.ocrOptions": "OCR 옵션",
     "settings.ocrEngine": "OCR 엔진",
     "settings.ocrEngineAuto": "원본 언어에 맞춰 자동 선택",
-    "settings.ocrEngineManga": "Manga OCR Mobile ONNX",
     "settings.ocrEnginePpocr": "PP-OCRv6 Medium Recognition ONNX",
-    "settings.ocrEngineBalanced": "자동 - Manga OCR Mobile / PP-OCRv6 Medium",
     "settings.ocrEngineFast": "PP-OCRv6 Medium Recognition ONNX",
     "settings.ocrPadding": "Crop 여백",
     "settings.ocrCropScale": "Crop 배율",

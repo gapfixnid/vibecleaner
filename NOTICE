@@ -19,9 +19,6 @@ Significant modifications have been made, including but not limited to:
 The inpainting helper and schema code include portions adapted from:
 https://github.com/Sanster/lama-cleaner
 
-The Manga OCR implementation includes portions adapted from:
-https://github.com/kha-white/manga-ocr
-
 The Pororo OCR compatibility path includes portions adapted from:
 https://github.com/kakaobrain/pororo
 
@@ -33,11 +30,8 @@ This product can download or use model artifacts from the following
 upstream model sources. These model artifacts keep their own upstream
 licenses and terms:
 - https://huggingface.co/ogkalu/comic-text-and-bubble-detector
-- https://huggingface.co/kha-white/manga-ocr-base
-- https://huggingface.co/ogkalu/manga-ocr-mobile
-- https://huggingface.co/ogkalu/ppocr-v5-onnx
-- https://huggingface.co/ogkalu/ppocr-v5-torch
-- https://www.modelscope.cn/models/RapidAI/RapidOCR
+- https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det_onnx
+- https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx
 - https://huggingface.co/ogkalu/lama-manga-onnx-dynamic
 - https://huggingface.co/ogkalu/aot-inpainting
 - https://github.com/Sanster/models/releases

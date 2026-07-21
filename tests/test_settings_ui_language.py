@@ -86,14 +86,14 @@ class SettingsUiLanguageTest(unittest.TestCase):
             response = settings_route.update_settings_payload(schema, cfg, translation_service)
 
         self.assertEqual(cfg.detect_model, "Small (INT8)")
-        self.assertEqual(cfg.ocr_engine, "manga_ocr")
+        self.assertEqual(cfg.ocr_engine, "ppocr")
         self.assertEqual(cfg.inpaint_engine, "opencv")
         self.assertEqual(cfg.ocr_crop_scale, 1.75)
         self.assertEqual(cfg.text_direction_override, "vertical")
         self.assertTrue(cfg.adaptive_binarization)
         self.assertTrue(cfg.show_detection_overlay)
         self.assertEqual(cfg.adaptive_binarization_strength, 2.75)
-        self.assertEqual(response["ocr_engine"], "manga_ocr")
+        self.assertEqual(response["ocr_engine"], "ppocr")
         self.assertEqual(response["inpaint_engine"], "opencv")
 
 if __name__ == "__main__":

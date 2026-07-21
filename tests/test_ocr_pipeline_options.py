@@ -5,23 +5,10 @@ import numpy as np
 
 from backend.core.config import AppConfig
 from backend.engines.ocr.ppocr import engine as ppocr_module
-from backend.engines.ocr.ppocr.engine import PPOCRv5Engine
+from backend.engines.ocr.ppocr.engine import PPOCRv6Engine
 from backend.engines.ocr.ppocr.preprocessing import apply_adaptive_binarization, crop_text_line
-from backend.engines.ocr.manga_ocr.mobile.onnx_engine import MangaOCRMobileONNXEngine
 from backend.engines.ocr.local import LocalOCR
 from backend.engines.common.textblock import TextBlock
-
-class FakeMangaEngine:
-    calls = []
-
-    def initialize(self, device="cpu"):
-        self.device = device
-
-    def process_image(self, image, blocks, **kwargs):
-        self.calls.append(kwargs)
-        for block in blocks:
-            block.text = "manga"
-        return blocks
 
 class FakePPOCREngine:
     calls = []
@@ -42,8 +29,7 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         image = np.zeros((16, 16, 3), dtype=np.uint8)
 
         with (
-            patch("backend.engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("backend.engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
+            patch("backend.engines.ocr.local.PPOCRv6Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="ppocr")
 
@@ -58,7 +44,7 @@ class OcrPipelineOptionsTests(unittest.TestCase):
                 return True
 
         with (
-            patch("backend.engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
+            patch("backend.engines.ocr.local.PPOCRv6Engine", FakePPOCREngine),
         ):
             ocr = LocalOCR(lang="English")
             ocr.settings = GpuSettings()
@@ -66,7 +52,7 @@ class OcrPipelineOptionsTests(unittest.TestCase):
 
         self.assertEqual(ocr.ppocr_engines["en"].device, "cuda")
 
-    def test_local_ocr_passes_gpu_device_to_manga_engine(self):
+    def test_legacy_manga_setting_routes_to_ppocr(self):
         block = TextBlock([1, 1, 10, 10])
         image = np.zeros((16, 16, 3), dtype=np.uint8)
 
@@ -74,20 +60,20 @@ class OcrPipelineOptionsTests(unittest.TestCase):
             def is_gpu_enabled(self):
                 return True
 
-        with patch("backend.engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine):
+        with patch("backend.engines.ocr.local.PPOCRv6Engine", FakePPOCREngine):
             ocr = LocalOCR(lang="Japanese")
             ocr.settings = GpuSettings()
             ocr.recognize_text(image, [block], engine="manga_ocr")
 
-        self.assertEqual(ocr.japanese_engine.device, "cuda")
+        self.assertEqual(ocr.ppocr_engines["ch"].device, "cuda")
+        self.assertEqual(block.text, "ppocr:ch")
 
     def test_forced_ppocr_engine_overrides_japanese_auto_engine(self):
         block = TextBlock([1, 1, 10, 10])
         image = np.zeros((16, 16, 3), dtype=np.uint8)
 
         with (
-            patch("backend.engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("backend.engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
+            patch("backend.engines.ocr.local.PPOCRv6Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="ppocr")
 
@@ -98,8 +84,7 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         image = np.zeros((16, 16, 3), dtype=np.uint8)
 
         with (
-            patch("backend.engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("backend.engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
+            patch("backend.engines.ocr.local.PPOCRv6Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="fast")
 
@@ -111,8 +96,7 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         FakePPOCREngine.calls = []
 
         with (
-            patch("backend.engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine),
-            patch("backend.engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
+            patch("backend.engines.ocr.local.PPOCRv6Engine", FakePPOCREngine),
         ):
             LocalOCR(lang="Japanese").recognize_text(
                 image,
@@ -157,15 +141,7 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         self.assertIsNotNone(crop)
         self.assertGreater(crop.shape[1], crop.shape[0] * 3)
 
-    def test_manga_ocr_uses_each_oriented_line_and_joins_japanese_text(self):
-        class FakeModel:
-            def __init__(self):
-                self.crops = []
-
-            def process_batch(self, crops):
-                self.crops = crops
-                return ["斜め", "台詞"]
-
+    def test_ppocr_v6_uses_each_oriented_line_and_joins_japanese_text(self):
         block = TextBlock(
             [5, 5, 110, 110],
             lines=[
@@ -174,20 +150,23 @@ class OcrPipelineOptionsTests(unittest.TestCase):
             ],
             source_lang="Japanese",
         )
-        engine = MangaOCRMobileONNXEngine()
-        engine.model = FakeModel()
+        engine = PPOCRv6Engine()
+        engine.rec_sess = object()
+        engine.decoder = object()
+        engine.source_language = "Japanese"
 
-        engine.process_image(
-            np.full((120, 120, 3), 255, dtype=np.uint8),
-            [block],
-            padding=0,
-            crop_scale=1.0,
-            adaptive_binarization=False,
-        )
+        with patch.object(engine, "_rec_infer", return_value=(["斜め", "台詞"], [0.98, 0.97])):
+            engine.process_image(
+                np.full((120, 120, 3), 255, dtype=np.uint8),
+                [block],
+                padding=0,
+                crop_scale=1.0,
+                adaptive_binarization=False,
+            )
 
         self.assertEqual(block.text, "斜め台詞")
         self.assertEqual(block.texts, ["斜め", "台詞"])
-        self.assertTrue(all(crop.shape[1] > crop.shape[0] for crop in engine.model.crops))
+        self.assertAlmostEqual(block.ocr_confidence, 0.975)
 
     def test_adaptive_binarization_strength_controls_clahe_clip_limit(self):
         cfg = AppConfig(adaptive_binarization_strength=3.25)
@@ -204,7 +183,7 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         create_clahe.assert_called_once_with(clipLimit=3.25, tileGridSize=(8, 8))
 
     def test_ppocr_bboxes_use_y_coordinates_for_y2(self):
-        engine = PPOCRv5Engine()
+        engine = PPOCRv6Engine()
         engine.rec_sess = object()
         engine.decoder = object()
         block = TextBlock([0, 0, 100, 100])

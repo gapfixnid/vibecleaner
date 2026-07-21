@@ -91,7 +91,7 @@ class ConfigMigrationTests(unittest.TestCase):
 
         self.assertEqual(saved["future_additive_field"], {"enabled": True})
 
-    def test_removed_high_precision_profiles_migrate_to_balanced_profiles(self):
+    def test_removed_high_precision_profiles_migrate_to_supported_profiles(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings_path = Path(tmpdir) / "settings.json"
             settings_path.write_text(
@@ -106,7 +106,7 @@ class ConfigMigrationTests(unittest.TestCase):
             cfg = AppConfig(settings_path=str(settings_path))
             cfg.load()
 
-        self.assertEqual(cfg.ocr_engine, "balanced")
+        self.assertEqual(cfg.ocr_engine, "ppocr")
         self.assertEqual(cfg.inpaint_engine, "lama")
 
     def test_existing_settings_without_setup_flag_are_treated_as_completed(self):

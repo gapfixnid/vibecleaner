@@ -110,8 +110,8 @@ def test_local_stage_manifests_cover_current_advanced_settings():
         "High Precision (FP32)", "Small (INT8)"
     }
     assert {model["selection_value"] for model in ocr["model_catalog"]} == {
-        "balanced", "manga_ocr", "ppocr"
+        "ppocr"
     }
     ocr_engine = next(field for field in ocr["config_schema"] if field["key"] == "ocr_engine")
-    assert ocr_engine["choices"] == ["balanced", "manga_ocr", "ppocr"]
+    assert ocr_engine["choices"] == ["ppocr"]
     assert {model["selection_value"] for model in inpainting["model_catalog"]} == {"lama", "opencv"}

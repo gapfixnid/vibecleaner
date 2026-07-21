@@ -36,7 +36,7 @@ class SettingsSchema(BaseModel):
     detect_model: str
     confidence_threshold: float
     tiling_enabled: bool
-    ocr_engine: str = "balanced"
+    ocr_engine: str = "ppocr"
     ocr_padding: int = 8
     ocr_crop_scale: float = 1.5
     line_merge_sensitivity: float = 1.2
@@ -83,7 +83,7 @@ def get_settings_payload(config, translation_service):
         "detect_model": config.detect_model,
         "confidence_threshold": config.confidence_threshold,
         "tiling_enabled": config.tiling_enabled,
-        "ocr_engine": config.ocr_engine,
+        "ocr_engine": "ppocr",
         "ocr_padding": config.ocr_padding,
         "ocr_crop_scale": config.ocr_crop_scale,
         "line_merge_sensitivity": config.line_merge_sensitivity,
@@ -138,7 +138,7 @@ def update_settings_payload(settings: SettingsSchema, config, translation_servic
     config.detect_model = settings.detect_model
     config.confidence_threshold = settings.confidence_threshold
     config.tiling_enabled = settings.tiling_enabled
-    config.ocr_engine = settings.ocr_engine
+    config.ocr_engine = "ppocr"
     config.ocr_padding = settings.ocr_padding
     config.ocr_crop_scale = settings.ocr_crop_scale
     config.line_merge_sensitivity = settings.line_merge_sensitivity

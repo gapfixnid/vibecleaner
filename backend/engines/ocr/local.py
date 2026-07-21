@@ -2,8 +2,7 @@
 import numpy as np
 import threading
 from ..common.textblock import TextBlock
-from .manga_ocr.mobile.onnx_engine import MangaOCRMobileONNXEngine
-from .ppocr.engine import PPOCRv5Engine
+from .ppocr.engine import PPOCRv6Engine
 from .preprocessing_profile import resolve_ocr_preprocessing_profile
 
 class DummySettings:
@@ -22,23 +21,13 @@ class LocalOCR:
     def __init__(self, lang: str = "Japanese"):
         self.lang = lang
         self.settings = DummySettings()
-        self.japanese_engine = None
         self.korean_engine = None
         self.ppocr_engines = {}
         self._lock = threading.Lock()
 
     def _resolve_engine_name(self, engine: str | None = None) -> str:
-        requested = str(engine or "auto").strip().lower()
-        if requested in {"manga_ocr", "manga-ocr", "manga", "manga_ocr_mobile"}:
-            return "manga_ocr"
-        if requested in {"ppocr", "paddleocr", "paddle_ocr", "fast", "speed"}:
-            return "ppocr"
-        if requested in {"balanced", "standard", "auto"}:
-            if self.lang in ["Japanese", "日本語", "ja"]:
-                return "manga_ocr"
-            return "ppocr"
-        if self.lang in ["Japanese", "日本語", "ja"]:
-            return "manga_ocr"
+        # PP-OCR is the sole local OCR runtime. Legacy values are accepted so
+        # old projects and settings migrate without attempting a removed model.
         return "ppocr"
 
     def _ppocr_lang_code(self) -> str:
@@ -74,38 +63,22 @@ class LocalOCR:
             adaptive_binarization=adaptive_binarization,
             adaptive_binarization_strength=adaptive_binarization_strength,
         )
-        if engine_name == "manga_ocr":
-            if self.japanese_engine is None:
-                with self._lock:
-                    if self.japanese_engine is None:
-                        engine = MangaOCRMobileONNXEngine()
-                        device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
-                        engine.initialize(device=device)
-                        self.japanese_engine = engine
-            return self.japanese_engine.process_image(
-                image,
-                text_blocks,
-                padding=profile.padding,
-                crop_scale=profile.crop_scale,
-                adaptive_binarization=profile.adaptive_binarization,
-                adaptive_binarization_strength=profile.adaptive_binarization_strength,
-            )
-        else:
-            lang_code = self._ppocr_lang_code()
-            if lang_code not in self.ppocr_engines:
-                with self._lock:
-                    if lang_code not in self.ppocr_engines:
-                        engine = PPOCRv5Engine()
-                        device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
-                        engine.initialize(lang=lang_code, device=device)
-                        self.ppocr_engines[lang_code] = engine
-                        if lang_code == "ko":
-                            self.korean_engine = engine
-            return self.ppocr_engines[lang_code].process_image(
-                image,
-                text_blocks,
-                padding=profile.padding,
-                crop_scale=profile.crop_scale,
-                adaptive_binarization=profile.adaptive_binarization,
-                adaptive_binarization_strength=profile.adaptive_binarization_strength,
-            )
+        lang_code = self._ppocr_lang_code()
+        if lang_code not in self.ppocr_engines:
+            with self._lock:
+                if lang_code not in self.ppocr_engines:
+                    ppocr_engine = PPOCRv6Engine()
+                    device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
+                    ppocr_engine.initialize(lang=lang_code, device=device)
+                    ppocr_engine.source_language = self.lang
+                    self.ppocr_engines[lang_code] = ppocr_engine
+                    if lang_code == "ko":
+                        self.korean_engine = ppocr_engine
+        return self.ppocr_engines[lang_code].process_image(
+            image,
+            text_blocks,
+            padding=profile.padding,
+            crop_scale=profile.crop_scale,
+            adaptive_binarization=profile.adaptive_binarization,
+            adaptive_binarization_strength=profile.adaptive_binarization_strength,
+        )
