@@ -154,7 +154,7 @@ def test_ocr_uses_language_profile_and_explicit_overrides():
         image = np.zeros((16, 16, 3), dtype=np.uint8)
         service.ocr_only(image, [FakeBlock()], lang="English")
         assert ocr.options[-1] == {
-            "engine": "ppocr", "padding": 6, "crop_scale": 1.25,
+            "engine": "ppocr", "model": "ppocr-v6-medium", "padding": 6, "crop_scale": 1.25,
             "adaptive_binarization": True, "adaptive_binarization_strength": 1.5,
         }
         service.ocr_only(
@@ -187,7 +187,7 @@ def test_cached_single_block_ocr_does_not_wait_for_another_ocr_inference():
             image,
             cached.xyxy,
             lang="Japanese",
-            engine="ppocr",
+            engine="ppocr:ppocr-v6-medium",
             padding=8,
             crop_scale=1.5,
             adaptive_binarization=False,

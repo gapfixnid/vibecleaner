@@ -72,6 +72,9 @@ class DetectionService:
     def _ocr_engine_name(self, engine: str | None = None) -> str:
         return engine or config_value(self.config, "ocr_engine")
 
+    def _ocr_model_name(self) -> str:
+        return config_value(self.config, "ocr_model")
+
     def _detect_model_name(self, model_name: str | None = None) -> str:
         return model_name or config_value(self.config, "detect_model")
 
@@ -388,6 +391,9 @@ class DetectionService:
         try:
             with self._detection_gate.slot():
                 with self._detector_lock:
+                    detector_settings = getattr(self.detector, "settings", None)
+                    if detector_settings is not None:
+                        detector_settings.ocr_model = self._ocr_model_name()
                     blocks = self.detector.detect_bubbles(
                     image,
                     model_name=self._detect_model_name(model_name),
@@ -431,7 +437,8 @@ class DetectionService:
         block_hashes = {}
         for block in blocks:
             crop_hash = self._get_crop_hash(
-                image, block.xyxy, lang=lang, engine=self._ocr_engine_name(engine),
+                image, block.xyxy, lang=lang,
+                engine=f"{self._ocr_engine_name(engine)}:{self._ocr_model_name()}",
                 padding=profile.padding, crop_scale=profile.crop_scale,
                 adaptive_binarization=profile.adaptive_binarization,
                 adaptive_binarization_strength=profile.adaptive_binarization_strength,
@@ -449,7 +456,10 @@ class DetectionService:
                 with self._ocr_gate.slot():
                     with self._ocr_engine_lock:
                         self.ocr_engine.lang = lang
-                        ocr_options = {"engine": self._ocr_engine_name(engine)}
+                        ocr_options = {
+                            "engine": self._ocr_engine_name(engine),
+                            "model": self._ocr_model_name(),
+                        }
                         ocr_options.update({
                             "padding": profile.padding,
                             "crop_scale": profile.crop_scale,
@@ -518,7 +528,8 @@ class DetectionService:
         """Run OCR on a single block without blocking cache hits on model inference."""
         profile = resolve_ocr_preprocessing_profile(lang, self._ocr_engine_name(engine))
         crop_hash = self._get_crop_hash(
-            image, block.xyxy, lang=lang, engine=self._ocr_engine_name(engine),
+            image, block.xyxy, lang=lang,
+            engine=f"{self._ocr_engine_name(engine)}:{self._ocr_model_name()}",
             padding=profile.padding, crop_scale=profile.crop_scale,
             adaptive_binarization=profile.adaptive_binarization,
             adaptive_binarization_strength=profile.adaptive_binarization_strength,
@@ -535,6 +546,7 @@ class DetectionService:
                     self.ocr_engine.lang = lang
                     self.ocr_engine.recognize_text(
                         image, [block], engine=self._ocr_engine_name(engine),
+                        model=self._ocr_model_name(),
                         padding=profile.padding, crop_scale=profile.crop_scale,
                         adaptive_binarization=profile.adaptive_binarization,
                         adaptive_binarization_strength=profile.adaptive_binarization_strength,

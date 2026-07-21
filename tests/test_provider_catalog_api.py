@@ -40,6 +40,16 @@ def test_catalog_api_returns_metadata_without_adapters_or_secret_values():
     translation = next(item for item in payload["providers"] if item["provider_id"] == "builtin.translation.openai")
     secret = next(field for field in translation["config_schema"] if field["value_type"] == "secret")
     assert secret["default"] is None
+    local_fields = {
+        provider["stage"]: {field["key"]: field for field in provider["config_schema"]}
+        for provider in payload["providers"]
+        if provider["stage"] in {"detection", "ocr", "inpainting"}
+    }
+    assert local_fields["detection"]["detect_model"]["choices"][:3] == [
+        "High Precision (FP32)", "Small (INT8)", "YOLOv8/11 ONNX"
+    ]
+    assert local_fields["ocr"]["ocr_model"]["choices"][:2] == ["ppocr-v6-medium", "ppocr-v6-small"]
+    assert local_fields["inpainting"]["inpaint_engine"]["choices"][:2] == ["aot", "lama"]
 
 
 def test_application_exposes_provider_catalog_route_and_registry():
@@ -96,7 +106,7 @@ def test_local_stage_manifests_cover_current_advanced_settings():
         "show_detection_overlay",
     }
     assert {field["key"] for field in ocr["config_schema"]} == {
-        "ocr_engine", "ocr_padding", "ocr_crop_scale",
+            "ocr_model", "ocr_padding", "ocr_crop_scale",
         "adaptive_binarization", "adaptive_binarization_strength",
     }
     assert {field["key"] for field in inpainting["config_schema"]} == {
@@ -107,11 +117,13 @@ def test_local_stage_manifests_cover_current_advanced_settings():
     assert strength["visible_when_key"] == "adaptive_binarization"
     assert strength["minimum"] == 0.5
     assert {model["selection_value"] for model in detection["model_catalog"]} == {
-        "High Precision (FP32)", "Small (INT8)"
+        "High Precision (FP32)", "Small (INT8)", "YOLOv8/11 ONNX"
     }
     assert {model["selection_value"] for model in ocr["model_catalog"]} == {
-        "ppocr"
+        "ppocr-v6-medium", "ppocr-v6-small"
     }
-    ocr_engine = next(field for field in ocr["config_schema"] if field["key"] == "ocr_engine")
-    assert ocr_engine["choices"] == ["ppocr"]
-    assert {model["selection_value"] for model in inpainting["model_catalog"]} == {"lama", "opencv"}
+    ocr_model = next(field for field in ocr["config_schema"] if field["key"] == "ocr_model")
+    assert ocr_model["choices"] == ["ppocr-v6-medium", "ppocr-v6-small"]
+    assert {model["selection_value"] for model in inpainting["model_catalog"]} == {"lama", "aot"}
+    inpaint_engine = next(field for field in inpainting["config_schema"] if field["key"] == "inpaint_engine")
+    assert inpaint_engine["default"] == "aot"

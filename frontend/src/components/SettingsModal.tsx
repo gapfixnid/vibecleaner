@@ -314,6 +314,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
 
     if (field.value_type === "enum") {
+      const recommendedModelKeys = new Set(["detect_model", "ocr_model", "inpaint_engine"]);
+      const enumOptions: Array<{ value: string; label: string; disabled?: boolean }> = field.choices.map((choice, index) => ({
+        value: choice,
+        label: `${catalogText(field.choice_labels[index] || choice)}${
+          recommendedModelKeys.has(field.key) && choice === field.default
+            ? ` (${t("settings.recommended")})`
+            : ""
+        }`,
+      }));
       return (
         <div className="form-row-group" key={field.key}>
           <label className="pref-label">{catalogText(field.label)}</label>
@@ -321,10 +330,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <AppleSelect
               value={String(value ?? "")}
               onChange={(next) => updateCatalogSetting(field, next, true)}
-              options={field.choices.map((choice, index) => ({
-                value: choice,
-                label: catalogText(field.choice_labels[index] || choice),
-              }))}
+              options={enumOptions}
             />
           </div>
         </div>
@@ -942,8 +948,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           value={localSettings.detect_model}
                           onChange={(v) => handleAutoSave("detect_model", v)}
                           options={[
-                            { value: "High Precision (FP32)", label: t("settings.modelHighPrecision") },
+                            { value: "High Precision (FP32)", label: `${t("settings.modelHighPrecision")} (${t("settings.recommended")})` },
                             { value: "Small (INT8)", label: t("settings.modelSmall") },
+                            { value: "YOLOv8/11 ONNX", label: "YOLOv8/11 ONNX" },
                           ]}
                         />
                       </div>
@@ -984,6 +991,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   <div className="section-title-label">{t("settings.ocrOptions")}</div>
                   <div className="settings-card">
+                    <div className="form-row-group">
+                      <label className="pref-label">{t("settings.ocrModel")}</label>
+                      <div className="pref-control-right">
+                        <AppleSelect
+                          value={localSettings.ocr_model}
+                          onChange={(v) => handleAutoSave("ocr_model", v)}
+                          options={[{
+                            value: "ppocr-v6-medium",
+                            label: `PP-OCRv6 Medium ONNX (${t("settings.recommended")})`,
+                          }, {
+                            value: "ppocr-v6-small",
+                            label: "PP-OCRv6 Small ONNX",
+                          }]}
+                        />
+                      </div>
+                    </div>
                     <div className="form-row-group">
                       <label className="pref-label">{t("settings.ocrPadding")}</label>
                       <div className="pref-control-right">
@@ -1108,8 +1131,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           value={localSettings.inpaint_engine}
                           onChange={(v) => handleAutoSave("inpaint_engine", v)}
                           options={[
+                            { value: "aot", label: `${t("settings.inpaintingEngineAot")} (${t("settings.recommended")})` },
                             { value: "lama", label: t("settings.inpaintingEngineBalanced") },
-                            { value: "opencv", label: t("settings.inpaintingEngineFast") },
                           ]}
                         />
                       </div>

@@ -10,6 +10,7 @@ from ...core.container import AppContainer
 from ...core.config import OLLAMA_API_URL
 from ...core.languages import validate_translation_language_pair
 from ...infrastructure.downloads.requirements import download_required_models, get_model_status
+from ...infrastructure.model_catalog import list_supported_models, resolve_model
 
 router = APIRouter()
 logger = logging.getLogger(APP_NAME)
@@ -37,6 +38,7 @@ class SettingsSchema(BaseModel):
     confidence_threshold: float
     tiling_enabled: bool
     ocr_engine: str = "ppocr"
+    ocr_model: str = "ppocr-v6-medium"
     ocr_padding: int = 8
     ocr_crop_scale: float = 1.5
     line_merge_sensitivity: float = 1.2
@@ -49,7 +51,7 @@ class SettingsSchema(BaseModel):
     min_font_size: float
     max_font_size: float
     default_font_size: float
-    inpaint_engine: str = "lama"
+    inpaint_engine: str = "aot"
     inpaint_mask_dilation: int
     inpaint_use_textbox_only: bool
     inpaint_clip_to_bubble: bool
@@ -80,10 +82,11 @@ def get_settings_payload(config, translation_service):
         "source_language": config.source_language,
         "target_language": config.target_language,
         "system_prompt": translation_service.system_prompt or config.system_prompt,
-        "detect_model": config.detect_model,
+        "detect_model": resolve_model("detection", config.detect_model).id,
         "confidence_threshold": config.confidence_threshold,
         "tiling_enabled": config.tiling_enabled,
         "ocr_engine": "ppocr",
+        "ocr_model": resolve_model("ocr", config.ocr_model).id,
         "ocr_padding": config.ocr_padding,
         "ocr_crop_scale": config.ocr_crop_scale,
         "line_merge_sensitivity": config.line_merge_sensitivity,
@@ -96,7 +99,7 @@ def get_settings_payload(config, translation_service):
         "min_font_size": config.min_font_size,
         "max_font_size": config.max_font_size,
         "default_font_size": config.default_font_size,
-        "inpaint_engine": config.inpaint_engine,
+        "inpaint_engine": resolve_model("inpainting", config.inpaint_engine).id,
         "inpaint_mask_dilation": config.inpaint_mask_dilation,
         "inpaint_use_textbox_only": config.inpaint_use_textbox_only,
         "inpaint_clip_to_bubble": config.inpaint_clip_to_bubble,
@@ -115,6 +118,15 @@ def update_settings_payload(settings: SettingsSchema, config, translation_servic
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    supported = list_supported_models()
+    selections = {
+        "detect_model": ("detection", settings.detect_model),
+        "ocr_model": ("ocr", settings.ocr_model),
+        "inpaint_engine": ("inpainting", settings.inpaint_engine),
+    }
+    for field, (stage, selection) in selections.items():
+        if selection not in {option.id for option in supported[stage]}:
+            raise HTTPException(status_code=422, detail=f"Unsupported {field}: {selection}")
     config.translation_model = settings.translation_model
     config.translation_provider = settings.translation_provider
     config.translation_api_base_url = settings.translation_api_base_url
@@ -139,6 +151,7 @@ def update_settings_payload(settings: SettingsSchema, config, translation_servic
     config.confidence_threshold = settings.confidence_threshold
     config.tiling_enabled = settings.tiling_enabled
     config.ocr_engine = "ppocr"
+    config.ocr_model = settings.ocr_model
     config.ocr_padding = settings.ocr_padding
     config.ocr_crop_scale = settings.ocr_crop_scale
     config.line_merge_sensitivity = settings.line_merge_sensitivity

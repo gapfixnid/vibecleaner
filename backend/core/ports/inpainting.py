@@ -15,7 +15,7 @@ class InpaintRegion:
 
 @dataclass(frozen=True)
 class InpaintOptions:
-    engine: str = "lama"
+    engine: str = "aot"
     mask_dilation: int = 3
     clip_to_bubble: bool = True
 

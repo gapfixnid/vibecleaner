@@ -26,12 +26,12 @@ class ModelRequirementsTests(unittest.TestCase):
             ],
         )
 
-    def test_fast_japanese_uses_int8_detection_ppocr_chinese_recognition_and_no_inpaint_model(self):
+    def test_int8_japanese_with_aot_uses_supported_onnx_models(self):
         cfg = AppConfig(
             detect_model="Small (INT8)",
             source_language="Japanese",
             ocr_engine="fast",
-            inpaint_engine="opencv",
+            inpaint_engine="aot",
         )
 
         self.assertEqual(
@@ -40,6 +40,43 @@ class ModelRequirementsTests(unittest.TestCase):
                 ModelID.RTDETR_INT8_ONNX,
                 ModelID.PPOCR_V6_DET_MEDIUM,
                 ModelID.PPOCR_V6_REC_MEDIUM,
+                ModelID.AOT_ONNX,
+            ],
+        )
+
+    def test_yolo_selection_uses_downloadable_yolo_model(self):
+        cfg = AppConfig(
+            detect_model="YOLOv8/11 ONNX",
+            source_language="Japanese",
+            ocr_model="ppocr-v6-medium",
+            inpaint_engine="aot",
+        )
+
+        self.assertEqual(
+            get_required_model_ids(cfg),
+            [
+                ModelID.YOLO_V8_ONNX,
+                ModelID.PPOCR_V6_DET_MEDIUM,
+                ModelID.PPOCR_V6_REC_MEDIUM,
+                ModelID.AOT_ONNX,
+            ],
+        )
+
+    def test_small_ocr_selection_uses_small_detection_and_recognition(self):
+        cfg = AppConfig(
+            detect_model="High Precision (FP32)",
+            source_language="Japanese",
+            ocr_model="ppocr-v6-small",
+            inpaint_engine="aot",
+        )
+
+        self.assertEqual(
+            get_required_model_ids(cfg),
+            [
+                ModelID.RTDETR_V2_ONNX,
+                ModelID.PPOCR_V6_DET_SMALL,
+                ModelID.PPOCR_V6_REC_SMALL,
+                ModelID.AOT_ONNX,
             ],
         )
 
@@ -66,12 +103,12 @@ class ModelRequirementsTests(unittest.TestCase):
             detect_model="High Precision (FP32)",
             source_language="Korean",
             ocr_engine="manga_ocr",
-            inpaint_engine="opencv",
+            inpaint_engine="aot",
         )
 
         self.assertEqual(
             get_required_model_ids(cfg),
-            [ModelID.RTDETR_V2_ONNX, ModelID.PPOCR_V6_DET_MEDIUM, ModelID.PPOCR_V6_REC_MEDIUM],
+            [ModelID.RTDETR_V2_ONNX, ModelID.PPOCR_V6_DET_MEDIUM, ModelID.PPOCR_V6_REC_MEDIUM, ModelID.AOT_ONNX],
         )
 
     def test_status_marks_missing_models_without_downloading(self):
@@ -79,7 +116,7 @@ class ModelRequirementsTests(unittest.TestCase):
             detect_model="Small (INT8)",
             source_language="English",
             ocr_engine="fast",
-            inpaint_engine="opencv",
+            inpaint_engine="aot",
         )
 
         with patch(
@@ -89,19 +126,19 @@ class ModelRequirementsTests(unittest.TestCase):
             status = get_model_status(cfg)
 
         self.assertFalse(status["all_ready"])
-        self.assertEqual(status["missing_count"], 2)
+        self.assertEqual(status["missing_count"], 3)
         self.assertEqual(
             [item["id"] for item in status["missing"]],
-            [ModelID.PPOCR_V6_DET_MEDIUM.value, ModelID.PPOCR_V6_REC_MEDIUM.value],
+            [ModelID.PPOCR_V6_DET_MEDIUM.value, ModelID.PPOCR_V6_REC_MEDIUM.value, ModelID.AOT_ONNX.value],
         )
-        self.assertEqual(is_downloaded.call_count, 3)
+        self.assertEqual(is_downloaded.call_count, 4)
 
     def test_download_script_current_profile_uses_settings_requirements(self):
         cfg = AppConfig(
             detect_model="Small (INT8)",
             source_language="Korean",
             ocr_engine="balanced",
-            inpaint_engine="opencv",
+            inpaint_engine="aot",
         )
 
         self.assertEqual(
@@ -110,6 +147,7 @@ class ModelRequirementsTests(unittest.TestCase):
                 ModelID.RTDETR_INT8_ONNX,
                 ModelID.PPOCR_V6_DET_MEDIUM,
                 ModelID.PPOCR_V6_REC_MEDIUM,
+                ModelID.AOT_ONNX,
             ],
         )
 
@@ -118,7 +156,7 @@ class ModelRequirementsTests(unittest.TestCase):
             detect_model="High Precision (FP32)",
             source_language="Japanese",
             ocr_engine="balanced",
-            inpaint_engine="opencv",
+            inpaint_engine="aot",
         )
 
         with (
@@ -129,7 +167,7 @@ class ModelRequirementsTests(unittest.TestCase):
         self.assertTrue(status["all_ready"])
         self.assertEqual(
             [item["id"] for item in status["required"]],
-            [ModelID.RTDETR_V2_ONNX.value, ModelID.PPOCR_V6_DET_MEDIUM.value, ModelID.PPOCR_V6_REC_MEDIUM.value],
+            [ModelID.RTDETR_V2_ONNX.value, ModelID.PPOCR_V6_DET_MEDIUM.value, ModelID.PPOCR_V6_REC_MEDIUM.value, ModelID.AOT_ONNX.value],
         )
 
 if __name__ == "__main__":

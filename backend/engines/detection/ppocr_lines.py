@@ -11,6 +11,7 @@ from ...infrastructure.runtime.device import get_providers
 from ...infrastructure.runtime.onnx import make_session, make_session_options
 from ..common.textblock import TextBlock
 from .backend import resolve_detection_backend
+from ...infrastructure.model_catalog import DEFAULT_OCR_MODEL, SMALL_OCR_MODEL, resolve_model
 
 
 class PPOCRLineDetector:
@@ -18,7 +19,7 @@ class PPOCRLineDetector:
         self.session: Any | None = None
         self.device = "cpu"
         self.backend = "onnx"
-        self.det_model = "mobile"
+        self.det_model = DEFAULT_OCR_MODEL
         self.post = DBPostProcessor(
             thresh=0.2,
             box_thresh=0.45,
@@ -27,7 +28,7 @@ class PPOCRLineDetector:
             use_dilation=False,
         )
 
-    def initialize(self, device: str = "cpu", backend: str = "onnx", det_model: str = "mobile") -> None:
+    def initialize(self, device: str = "cpu", backend: str = "onnx", det_model: str = DEFAULT_OCR_MODEL) -> None:
         backend = resolve_detection_backend(backend)
         if self.session is not None and self.device == device and self.backend == backend and self.det_model == det_model:
             return
@@ -35,9 +36,13 @@ class PPOCRLineDetector:
         self.backend = backend
         self.det_model = det_model
 
-        det_id = ModelID.PPOCR_V6_DET_MEDIUM
-        ModelDownloader.ensure([det_id])
-        model_path = ModelDownloader.primary_path(det_id)
+        option = resolve_model("ocr", det_model)
+        if option.paths:
+            model_path = option.paths[0]
+        else:
+            det_id = ModelID.PPOCR_V6_DET_SMALL if option.id == SMALL_OCR_MODEL else ModelID.PPOCR_V6_DET_MEDIUM
+            ModelDownloader.ensure([det_id])
+            model_path = ModelDownloader.primary_path(det_id)
         providers = get_providers(device)
         sess_opt = make_session_options(log_severity_level=3)
         self.session = make_session(model_path, sess_options=sess_opt, providers=providers)
@@ -73,7 +78,7 @@ def annotate_blocks_with_ppocr_lines(
     blocks: list[TextBlock],
     device: str = "cpu",
     backend: str = "onnx",
-    det_model: str = "mobile",
+    det_model: str = DEFAULT_OCR_MODEL,
 ) -> list[TextBlock]:
     if not blocks:
         return blocks

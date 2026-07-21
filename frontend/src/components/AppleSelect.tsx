@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 interface AppleSelectOption {
   value: string;
   label: ReactNode;
+  disabled?: boolean;
 }
 
 interface AppleSelectProps {
@@ -76,10 +77,11 @@ export function AppleSelect({ value, onChange, options, disabled = false }: Appl
 
   const handleSelect = useCallback(
     (optValue: string) => {
+      if (options.find((option) => option.value === optValue)?.disabled) return;
       onChange(optValue);
       setOpen(false);
     },
-    [onChange],
+    [onChange, options],
   );
 
   // Keyboard navigation within the dropdown
@@ -91,12 +93,13 @@ export function AppleSelect({ value, onChange, options, disabled = false }: Appl
       } else if (e.key === "ArrowDown" && open) {
         e.preventDefault();
         const idx = options.findIndex((o) => o.value === value);
-        const next = options[(idx + 1) % options.length];
+        const next = [...options.slice(idx + 1), ...options.slice(0, idx + 1)].find((option) => !option.disabled);
         if (next) handleSelect(next.value);
       } else if (e.key === "ArrowUp" && open) {
         e.preventDefault();
         const idx = options.findIndex((o) => o.value === value);
-        const prev = options[(idx - 1 + options.length) % options.length];
+        const reversed = [...options.slice(0, idx), ...options.slice(idx)].reverse();
+        const prev = reversed.find((option) => !option.disabled);
         if (prev) handleSelect(prev.value);
       } else if (e.key === "Enter" && !open) {
         e.preventDefault();
@@ -161,14 +164,15 @@ export function AppleSelect({ value, onChange, options, disabled = false }: Appl
             key={opt.value}
             role="option"
             aria-selected={isActive}
-            onClick={() => handleSelect(opt.value)}
+            aria-disabled={opt.disabled || undefined}
+            onClick={() => !opt.disabled && handleSelect(opt.value)}
             style={{
               padding: "6px 12px",
               fontSize: "12.5px",
               fontFamily: "var(--font-family)",
-              color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+              color: opt.disabled ? "var(--text-tertiary)" : isActive ? "var(--text-primary)" : "var(--text-secondary)",
               backgroundColor: isActive ? "var(--bg-input-focus)" : "transparent",
-              cursor: "pointer",
+              cursor: opt.disabled ? "not-allowed" : "pointer",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",

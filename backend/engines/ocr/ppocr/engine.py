@@ -15,6 +15,7 @@ from ....infrastructure.downloads import ModelDownloader, ModelID
 from ....infrastructure.runtime.onnx import make_session
 from .preprocessing import apply_adaptive_binarization, crop_text_line, det_preprocess, crop_quad, rec_resize_norm
 from .postprocessing import DBPostProcessor, CTCLabelDecoder
+from ....infrastructure.model_catalog import DEFAULT_OCR_MODEL, SMALL_OCR_MODEL, resolve_model
 
 
 def _make_ppocr_session_options(threads: int = 4):
@@ -52,17 +53,22 @@ class PPOCRv6Engine(OCREngine):
 		self.rec_batch_size = 8
 		self.rec_threads = 4
 		self.source_language = 'Chinese'
+		self.model_name = DEFAULT_OCR_MODEL
+		self.model_option = resolve_model("ocr", DEFAULT_OCR_MODEL)
 
 	def initialize(
 		self, 
 		lang: str = 'ch', 
 		device: str = 'cpu', 
 		det_model: str = 'mobile',
-		use_text_lines: bool = True
+		use_text_lines: bool = True,
+		model_name: str = DEFAULT_OCR_MODEL,
 	) -> None:
 		self.det_model = det_model
 		self.device = device
 		self.use_text_lines = use_text_lines
+		self.model_name = model_name
+		self.model_option = resolve_model("ocr", model_name)
 		self.rec_batch_size = 1 if lang == 'latin' else 8
 		if lang == 'latin':
 			self.rec_threads = 3
@@ -70,18 +76,22 @@ class PPOCRv6Engine(OCREngine):
 			self.rec_threads = 6
 		else:
 			self.rec_threads = 4
-		rec_id = ModelID.PPOCR_V6_REC_MEDIUM
-		ModelDownloader.ensure([rec_id])
-
-		rec_paths = ModelDownloader.file_path_map(rec_id)
-		rec_model = [p for n, p in rec_paths.items() if n.endswith('.onnx')][0]
-		# dict file name can vary per lang
-		config_file = [p for n, p in rec_paths.items() if n.endswith('.yml')]
-		config_path = config_file[0] if config_file else None
+		if self.model_option.paths:
+			rec_model = self.model_option.paths[1]
+			config_path = self.model_option.config_path
+		else:
+			rec_id = ModelID.PPOCR_V6_REC_SMALL if self.model_option.id == SMALL_OCR_MODEL else ModelID.PPOCR_V6_REC_MEDIUM
+			ModelDownloader.ensure([rec_id])
+			rec_paths = ModelDownloader.file_path_map(rec_id)
+			rec_model = [p for n, p in rec_paths.items() if n.endswith('.onnx')][0]
+			config_file = [p for n, p in rec_paths.items() if n.endswith(('.yml', '.yaml'))]
+			config_path = config_file[0] if config_file else None
 
 		providers = get_providers(device)
 		sess_opt = _make_ppocr_session_options(self.rec_threads)
 		self.rec_sess = make_session(rec_model, sess_options=sess_opt, providers=providers)
+		if len(self.rec_sess.get_inputs()) != 1 or not self.rec_sess.get_outputs():
+			raise ValueError('PP-OCR CTC Recognition ONNX 모델은 입력과 출력이 각각 1개여야 합니다.')
 
 		# Prepare CTC decoder
 		if config_path:
@@ -118,13 +128,18 @@ class PPOCRv6Engine(OCREngine):
 	def _ensure_det_session(self) -> None:
 		if self.det_sess is not None:
 			return
-		det_id = ModelID.PPOCR_V6_DET_MEDIUM
-		ModelDownloader.ensure([det_id])
-		det_path = ModelDownloader.primary_path(det_id)
+		if self.model_option.paths:
+			det_path = self.model_option.paths[0]
+		else:
+			det_id = ModelID.PPOCR_V6_DET_SMALL if self.model_option.id == SMALL_OCR_MODEL else ModelID.PPOCR_V6_DET_MEDIUM
+			ModelDownloader.ensure([det_id])
+			det_path = ModelDownloader.primary_path(det_id)
 		providers = get_providers(self.device)
 		sess_opt = ort.SessionOptions()
 		sess_opt.log_severity_level = 3
 		self.det_sess = make_session(det_path, sess_options=sess_opt, providers=providers)
+		if len(self.det_sess.get_inputs()) != 1 or not self.det_sess.get_outputs():
+			raise ValueError('PP-OCR DB Detection ONNX 모델은 입력과 출력이 각각 1개여야 합니다.')
 
 	def _rec_infer(self, crops: List[np.ndarray]) -> Tuple[List[str], List[float]]:
 		assert self.rec_sess is not None and self.decoder is not None

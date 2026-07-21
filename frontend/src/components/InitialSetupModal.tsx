@@ -4,7 +4,7 @@ import { AppleSelect } from "./AppleSelect";
 import * as api from "../services/api";
 import { createTranslator } from "../i18n";
 import type { WaitForJob } from "../hooks/useProcessingTask";
-import type { ModelStatus, Settings } from "../types";
+import type { ModelStatus, ProviderCatalogDto, Settings } from "../types";
 import { getSafeTargetLanguage, getTargetLanguageOptions, SUPPORTED_TRANSLATION_LANGUAGES } from "../languageOptions";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 
@@ -28,30 +28,82 @@ function appendUnique(items: PreviewModel[], item: Omit<PreviewModel, "downloade
   items.push({ ...item, downloaded: installed.has(item.id) });
 }
 
-function getPreviewModels(settings: Settings, status: ModelStatus | null): PreviewModel[] {
+function getCatalogOptions(catalog: ProviderCatalogDto | null, stage: string, key: string) {
+  const field = catalog?.providers.find((provider) => provider.stage === stage)
+    ?.config_schema.find((item) => item.key === key);
+  return field?.choices.map((value, index) => ({
+    value,
+    label: field.choice_labels[index] || value,
+  })) || [];
+}
+
+function getSetupModelLabel(value: string, label: string) {
+  if (value === "ppocr-v6-medium") return "PP-OCRv6 Medium ONNX";
+  if (value === "ppocr-v6-small") return "PP-OCRv6 Small ONNX";
+  return label;
+}
+
+function getPreviewModels(settings: Settings, status: ModelStatus | null, catalog: ProviderCatalogDto | null): PreviewModel[] {
   const installed = new Set(status?.required.filter((model) => model.downloaded).map((model) => model.id) || []);
   const items: PreviewModel[] = [];
   const detectModel = settings.detect_model.toLowerCase();
   const inpaintEngine = settings.inpaint_engine.toLowerCase();
+  const detectionOptions = getCatalogOptions(catalog, "detection", "detect_model");
+  const ocrOptions = getCatalogOptions(catalog, "ocr", "ocr_model");
+  const inpaintOptions = getCatalogOptions(catalog, "inpainting", "inpaint_engine");
 
-  appendUnique(
-    items,
-    detectModel.includes("int8")
-      ? { id: "rtdetr-int8-onnx", category: "Detection", label: "RT-DETRv2 INT8" }
-      : { id: "rtdetr-v2-onnx", category: "Detection", label: "RT-DETRv2 FP32" },
-    installed
-  );
+  if (settings.detect_model.startsWith("custom:")) {
+    appendUnique(items, {
+      id: settings.detect_model,
+      category: "Detection",
+      label: detectionOptions.find((option) => option.value === settings.detect_model)?.label || settings.detect_model,
+    }, new Set([settings.detect_model]));
+  } else {
+    appendUnique(
+      items,
+      detectModel.includes("yolo")
+        ? { id: "yolo-v8-onnx", category: "Detection", label: "YOLOv8/11 ONNX" }
+        : detectModel.includes("int8")
+          ? { id: "rtdetr-int8-onnx", category: "Detection", label: "RT-DETRv2 INT8" }
+          : { id: "rtdetr-v2-onnx", category: "Detection", label: "RT-DETRv2 FP32" },
+      installed
+    );
+  }
 
+  const useSmallOcr = settings.ocr_model === "ppocr-v6-small";
   const ppocrRecognition = {
-    id: "ppocr-v6-rec-medium",
+    id: useSmallOcr ? "ppocr-v6-rec-small" : "ppocr-v6-rec-medium",
     category: "OCR",
-    label: "PP-OCRv6 Medium Recognition",
+    label: useSmallOcr ? "PP-OCRv6 Small Recognition" : "PP-OCRv6 Medium Recognition",
   };
 
-  appendUnique(items, { id: "ppocr-v6-det-medium", category: "OCR", label: "PP-OCRv6 Medium Detection" }, installed);
-  appendUnique(items, ppocrRecognition, installed);
+  if (settings.ocr_model.startsWith("custom:")) {
+    appendUnique(items, {
+      id: settings.ocr_model,
+      category: "OCR",
+      label: getSetupModelLabel(
+        settings.ocr_model,
+        ocrOptions.find((option) => option.value === settings.ocr_model)?.label || settings.ocr_model,
+      ),
+    }, new Set([settings.ocr_model]));
+  } else {
+    appendUnique(items, {
+      id: useSmallOcr ? "ppocr-v6-det-small" : "ppocr-v6-det-medium",
+      category: "OCR",
+      label: useSmallOcr ? "PP-OCRv6 Small Detection" : "PP-OCRv6 Medium Detection",
+    }, installed);
+    appendUnique(items, ppocrRecognition, installed);
+  }
 
-  if (inpaintEngine !== "opencv") {
+  if (settings.inpaint_engine.startsWith("custom:")) {
+    appendUnique(items, {
+      id: settings.inpaint_engine,
+      category: "Inpainting",
+      label: inpaintOptions.find((option) => option.value === settings.inpaint_engine)?.label || settings.inpaint_engine,
+    }, new Set([settings.inpaint_engine]));
+  } else if (inpaintEngine === "aot") {
+    appendUnique(items, { id: "aot-onnx", category: "Inpainting", label: "AOT ONNX" }, installed);
+  } else {
     appendUnique(items, { id: "lama-manga-dynamic", category: "Inpainting", label: "LaMa Manga ONNX" }, installed);
   }
 
@@ -66,6 +118,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 }) => {
   const [localSettings, setLocalSettings] = useState<Settings>({ ...settings });
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
+  const [providerCatalog, setProviderCatalog] = useState<ProviderCatalogDto | null>(null);
   const [isWorking, setIsWorking] = useState(false);
   const [progressText, setProgressText] = useState("");
   const [progressPct, setProgressPct] = useState<number | null>(null);
@@ -77,7 +130,15 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    api.getModelStatus().then(setModelStatus).catch(() => setModelStatus(null));
+    Promise.all([api.getModelStatus(), api.getProviderCatalog()])
+      .then(([status, catalog]) => {
+        setModelStatus(status);
+        setProviderCatalog(catalog);
+      })
+      .catch(() => {
+        setModelStatus(null);
+        setProviderCatalog(null);
+      });
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -91,7 +152,23 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         }
       : { ...prev, [key]: value });
   };
-  const previewModels = getPreviewModels(localSettings, modelStatus);
+  const previewModels = getPreviewModels(localSettings, modelStatus, providerCatalog);
+  const detectionOptions = getCatalogOptions(providerCatalog, "detection", "detect_model");
+  const ocrOptions = getCatalogOptions(providerCatalog, "ocr", "ocr_model").map((option) => ({
+    ...option,
+    label: getSetupModelLabel(option.value, option.label),
+  }));
+  const inpaintOptions = getCatalogOptions(providerCatalog, "inpainting", "inpaint_engine");
+  const recommendedLabel = uiT("settings.recommended");
+  const withRecommended = (options: Array<{ value: string; label: string; disabled?: boolean }>, defaultValue: string) =>
+    options.map((option) => option.value === defaultValue
+      ? { ...option, label: `${option.label} (${recommendedLabel})` }
+      : option);
+  const visibleDetectionOptions = detectionOptions.length ? detectionOptions : [
+      { value: "High Precision (FP32)", label: uiT("settings.modelHighPrecision") },
+      { value: "Small (INT8)", label: uiT("settings.modelSmall") },
+      { value: "YOLOv8/11 ONNX", label: "YOLOv8/11 ONNX" },
+  ];
   const previewReady = previewModels.length > 0 && previewModels.every((model) => model.downloaded);
 
   const completeWithoutDownload = async () => {
@@ -205,10 +282,18 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               <AppleSelect
                 value={localSettings.detect_model}
                 onChange={(value) => updateLocal("detect_model", value)}
-                options={[
-                  { value: "High Precision (FP32)", label: uiT("settings.modelHighPrecision") },
-                  { value: "Small (INT8)", label: uiT("settings.modelSmall") },
-                ]}
+                options={withRecommended(visibleDetectionOptions, "High Precision (FP32)")}
+              />
+            </div>
+            <div className="setup-row">
+              <label>{uiT("settings.ocrModel")}</label>
+              <AppleSelect
+                value={localSettings.ocr_model}
+                onChange={(value) => updateLocal("ocr_model", value)}
+                options={withRecommended(ocrOptions.length ? ocrOptions : [
+                  { value: "ppocr-v6-medium", label: "PP-OCRv6 Medium ONNX" },
+                  { value: "ppocr-v6-small", label: "PP-OCRv6 Small ONNX" },
+                ], "ppocr-v6-medium")}
               />
             </div>
             <div className="setup-row">
@@ -216,10 +301,10 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               <AppleSelect
                 value={localSettings.inpaint_engine}
                 onChange={(value) => updateLocal("inpaint_engine", value)}
-                options={[
+                options={withRecommended(inpaintOptions.length ? inpaintOptions : [
+                  { value: "aot", label: uiT("settings.inpaintingEngineAot") },
                   { value: "lama", label: uiT("settings.inpaintingEngineBalanced") },
-                  { value: "opencv", label: uiT("settings.inpaintingEngineFast") },
-                ]}
+                ], "aot")}
               />
             </div>
           </section>}

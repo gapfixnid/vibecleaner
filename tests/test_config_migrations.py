@@ -107,7 +107,7 @@ class ConfigMigrationTests(unittest.TestCase):
             cfg.load()
 
         self.assertEqual(cfg.ocr_engine, "ppocr")
-        self.assertEqual(cfg.inpaint_engine, "lama")
+        self.assertEqual(cfg.inpaint_engine, "aot")
 
     def test_existing_settings_without_setup_flag_are_treated_as_completed(self):
         with tempfile.TemporaryDirectory() as tmpdir:

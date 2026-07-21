@@ -4,6 +4,7 @@ from ...core.container import AppContainer
 from ..dependencies import get_container
 from ...pipeline.telemetry import DEFAULT_TELEMETRY_FILENAME, load_telemetry, summarize_telemetry
 from ...infrastructure.storage import get_app_data_dir
+from ...infrastructure.model_catalog import list_supported_models
 import os
 
 
@@ -13,7 +14,35 @@ router = APIRouter()
 @router.get("/api/providers/catalog")
 def get_provider_catalog(container: AppContainer = Depends(get_container)):
     """Return public provider metadata without runtime adapters or secrets."""
-    return container.provider_registry.catalog()
+    catalog = container.provider_registry.catalog()
+    options_by_stage = list_supported_models()
+    field_by_stage = {
+        "detection": "detect_model",
+        "ocr": "ocr_model",
+        "inpainting": "inpaint_engine",
+    }
+    for provider in catalog["providers"]:
+        stage = provider.get("stage")
+        field_key = field_by_stage.get(stage)
+        if not field_key:
+            continue
+        options = options_by_stage[stage]
+        for field in provider.get("config_schema", []):
+            if field.get("key") == field_key:
+                field["choices"] = [option.id for option in options]
+                field["choice_labels"] = [option.label for option in options]
+                break
+        provider["model_catalog"] = [
+            {
+                "selection_value": option.id,
+                "display_name": option.label,
+                "quality_score": 0.0,
+                "speed_score": 0.0,
+                "resource_classes": ["cpu", "gpu"],
+            }
+            for option in options
+        ]
+    return catalog
 
 
 @router.get("/api/providers/runtime")

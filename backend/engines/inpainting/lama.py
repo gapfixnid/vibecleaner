@@ -26,10 +26,14 @@ class LaMa(TorchAutocastMixin, InpaintModel):
     def init_model(self, device, **kwargs):
         self.backend = kwargs.get("backend")
         if self.backend == "onnx":
-            ModelDownloader.get(ModelID.LAMA_ONNX)
-            onnx_path = ModelDownloader.primary_path(ModelID.LAMA_ONNX)
+            onnx_path = kwargs.get("model_path")
+            if not onnx_path:
+                ModelDownloader.get(ModelID.LAMA_ONNX)
+                onnx_path = ModelDownloader.primary_path(ModelID.LAMA_ONNX)
             providers = get_providers(device)
             self.session = make_session(onnx_path, providers=providers)
+            if len(self.session.get_inputs()) != 2 or not self.session.get_outputs():
+                raise ValueError("LaMa ONNX 모델은 이미지/마스크 입력 2개와 출력 1개가 필요합니다.")
         else:
             import torch
             ModelDownloader.get(ModelID.LAMA_JIT)
@@ -83,4 +87,3 @@ class LaMa(TorchAutocastMixin, InpaintModel):
             cur_res = np.clip(cur_res * 255, 0, 255).astype("uint8")
             # cur_res is already in RGB format
             return cur_res
-    

@@ -4,6 +4,7 @@ import threading
 from ..common.textblock import TextBlock
 from .ppocr.engine import PPOCRv6Engine
 from .preprocessing_profile import resolve_ocr_preprocessing_profile
+from ...infrastructure.model_catalog import DEFAULT_OCR_MODEL
 
 class DummySettings:
     def is_gpu_enabled(self):
@@ -43,6 +44,7 @@ class LocalOCR:
         text_blocks: list[TextBlock],
         *,
         engine: str | None = None,
+        model: str = DEFAULT_OCR_MODEL,
         padding: int | None = None,
         crop_scale: float | None = None,
         adaptive_binarization: bool | None = None,
@@ -64,17 +66,18 @@ class LocalOCR:
             adaptive_binarization_strength=adaptive_binarization_strength,
         )
         lang_code = self._ppocr_lang_code()
-        if lang_code not in self.ppocr_engines:
+        cache_key = (model, lang_code)
+        if cache_key not in self.ppocr_engines:
             with self._lock:
-                if lang_code not in self.ppocr_engines:
+                if cache_key not in self.ppocr_engines:
                     ppocr_engine = PPOCRv6Engine()
                     device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
-                    ppocr_engine.initialize(lang=lang_code, device=device)
+                    ppocr_engine.initialize(lang=lang_code, device=device, model_name=model)
                     ppocr_engine.source_language = self.lang
-                    self.ppocr_engines[lang_code] = ppocr_engine
+                    self.ppocr_engines[cache_key] = ppocr_engine
                     if lang_code == "ko":
                         self.korean_engine = ppocr_engine
-        return self.ppocr_engines[lang_code].process_image(
+        return self.ppocr_engines[cache_key].process_image(
             image,
             text_blocks,
             padding=profile.padding,

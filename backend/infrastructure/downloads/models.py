@@ -62,10 +62,13 @@ class ModelID(Enum):
     MIGAN_JIT = "migan-traced"
     RTDETR_V2_ONNX = "rtdetr-v2-onnx"
     RTDETR_INT8_ONNX = "rtdetr-int8-onnx"
+    YOLO_V8_ONNX = "yolo-v8-onnx"
     
     # PP-OCRv6 multilingual detection and recognition models
     PPOCR_V6_DET_MEDIUM = "ppocr-v6-det-medium"
     PPOCR_V6_REC_MEDIUM = "ppocr-v6-rec-medium"
+    PPOCR_V6_DET_SMALL = "ppocr-v6-det-small"
+    PPOCR_V6_REC_SMALL = "ppocr-v6-rec-small"
 
     # Legacy registry IDs kept for compatibility with existing model caches.
     # The application runtime and setup flow use only the PP-OCRv6 models above.
@@ -422,6 +425,18 @@ def _register_defaults():
         save_dir=os.path.join(models_base_dir, 'detection')
     ))
 
+    # YOLOv8 manga speech-bubble segmentation model.  The detector uses the
+    # bounding-box branch of the exported ONNX graph; masks are intentionally
+    # left to the inpainting pipeline.
+    ModelDownloader.register(ModelSpec(
+        id=ModelID.YOLO_V8_ONNX,
+        url='https://huggingface.co/kitsumed/yolov8m_seg-speech-bubble/resolve/main/',
+        files=['model_dynamic.onnx'],
+        sha256=['36c26bdefe150226acd9669772e9ff5a011fa0dd4622469b49d3d5e359f3251c'],
+        save_dir=os.path.join(models_base_dir, 'detection'),
+        save_as={'model_dynamic.onnx': 'yolov8m-speech-bubble.onnx'},
+    ))
+
     # PP-OCRv6 Detection Model
     ModelDownloader.register(ModelSpec(
         id=ModelID.PPOCR_V6_DET_MEDIUM,
@@ -437,6 +452,22 @@ def _register_defaults():
         files=['inference.onnx', 'inference.yml'],
         sha256=[None, None],
         save_dir=os.path.join(models_base_dir, 'ocr', 'ppocr-v6-onnx')
+    ))
+
+    ModelDownloader.register(ModelSpec(
+        id=ModelID.PPOCR_V6_DET_SMALL,
+        url='https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx/resolve/main/',
+        files=['inference.onnx', 'inference.yml'],
+        sha256=['d73e0058b7a8086bbd57f3d10b8bcd4ff95363f67e06e2762b5e814fe9c9410e', None],
+        save_dir=os.path.join(models_base_dir, 'ocr', 'ppocr-v6-det-small-onnx')
+    ))
+
+    ModelDownloader.register(ModelSpec(
+        id=ModelID.PPOCR_V6_REC_SMALL,
+        url='https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx/resolve/main/',
+        files=['inference.onnx', 'inference.yml'],
+        sha256=['5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634', None],
+        save_dir=os.path.join(models_base_dir, 'ocr', 'ppocr-v6-rec-small-onnx')
     ))
 
     # PPOCRv5 Recognition Models - Chinese

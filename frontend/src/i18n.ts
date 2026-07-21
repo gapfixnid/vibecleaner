@@ -289,6 +289,10 @@ export type TranslationKey =
   | "settings.inpaintingEngine"
   | "settings.inpaintingEngineBalanced"
   | "settings.inpaintingEngineFast"
+  | "settings.inpaintingEngineAot"
+  | "settings.ocrModel"
+  | "settings.recommended"
+  | "settings.addModelToFolder"
   | "settings.cleanTextboxOnly"
   | "settings.clipInpaintingMask"
   | "settings.maskTolerances"
@@ -598,6 +602,10 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.inpaintingEngine": "Inpainting Engine",
     "settings.inpaintingEngineBalanced": "LaMa Manga ONNX (lama-manga-dynamic)",
     "settings.inpaintingEngineFast": "OpenCV Telea (no model download)",
+    "settings.inpaintingEngineAot": "AOT ONNX",
+    "settings.ocrModel": "OCR Model",
+    "settings.recommended": "Recommended",
+    "settings.addModelToFolder": "add a compatible model to the models folder",
     "settings.cleanTextboxOnly": "Clean Text Box Areas Only (Recommended)",
     "settings.clipInpaintingMask": "Clip Inpainting Mask to speech bubble stroke edges",
     "settings.maskTolerances": "Mask tolerances",
@@ -906,6 +914,10 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.inpaintingEngine": "인페인팅 엔진",
     "settings.inpaintingEngineBalanced": "LaMa Manga ONNX (lama-manga-dynamic)",
     "settings.inpaintingEngineFast": "OpenCV Telea (모델 다운로드 없음)",
+    "settings.inpaintingEngineAot": "AOT ONNX",
+    "settings.ocrModel": "OCR 모델",
+    "settings.recommended": "권장",
+    "settings.addModelToFolder": "models 폴더에 호환 모델 추가 필요",
     "settings.cleanTextboxOnly": "텍스트 박스 영역만 지우기(권장)",
     "settings.clipInpaintingMask": "인페인팅 마스크를 말풍선 테두리 안쪽으로 제한",
     "settings.maskTolerances": "마스크 허용값",

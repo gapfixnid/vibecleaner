@@ -12,6 +12,14 @@ class FakeSession:
     def run(self, *_args, **_kwargs):
         return [np.zeros((1, 6, 0), dtype=np.float32)]
 
+
+class FakeSegmentationSession(FakeSession):
+    def run(self, *_args, **_kwargs):
+        predictions = np.zeros((1, 37, 100), dtype=np.float32)
+        predictions[0, :5, 0] = [320, 320, 160, 120, 0.9]
+        prototypes = np.zeros((1, 32, 160, 160), dtype=np.float32)
+        return [predictions, prototypes]
+
 def test_yolo_initialize_uses_explicit_model_name_without_global_config():
     created_paths = []
 
@@ -67,3 +75,14 @@ def test_yolo_detect_uses_explicit_confidence_and_tiling_options():
 
     assert len(calls) == 1
     assert calls[0]["confidence_threshold"] == 0.72
+
+
+def test_yolo_segmentation_export_uses_only_the_bubble_class_score():
+    detector = YoloONNXDetection()
+    detector.session = FakeSegmentationSession()
+    detector.confidence_threshold = 0.45
+
+    bubbles, text = detector._detect_single_image(np.zeros((640, 640, 3), dtype=np.uint8))
+
+    assert bubbles.shape == (1, 4)
+    assert text.size == 0

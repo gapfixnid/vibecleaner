@@ -3,17 +3,22 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from ...core.config import AppConfig
+from ...core.config import AppConfig, config_value
 from ..job_messages import msg
 from . import ModelDownloader, ModelID
+from ..model_catalog import resolve_model
 
 
 MODEL_LABELS: dict[ModelID, tuple[str, str]] = {
     ModelID.RTDETR_V2_ONNX: ("Detection", "RT-DETRv2 FP32"),
     ModelID.RTDETR_INT8_ONNX: ("Detection", "RT-DETRv2 INT8"),
+    ModelID.YOLO_V8_ONNX: ("Detection", "YOLOv8/11 ONNX"),
     ModelID.PPOCR_V6_DET_MEDIUM: ("OCR", "PP-OCRv6 Medium Detection"),
     ModelID.PPOCR_V6_REC_MEDIUM: ("OCR", "PP-OCRv6 Medium Recognition"),
+    ModelID.PPOCR_V6_DET_SMALL: ("OCR", "PP-OCRv6 Small Detection"),
+    ModelID.PPOCR_V6_REC_SMALL: ("OCR", "PP-OCRv6 Small Recognition"),
     ModelID.LAMA_ONNX: ("Inpainting", "LaMa Manga ONNX"),
+    ModelID.AOT_ONNX: ("Inpainting", "AOT ONNX"),
 }
 
 
@@ -41,16 +46,30 @@ def get_required_model_ids(settings: AppConfig) -> list[ModelID]:
     required: list[ModelID] = []
 
     detect_model = _normalized(cfg.detect_model)
-    if detect_model in {"small (int8)", "small (int8) [기본값]", "int8", "fast"}:
+    detect_option = resolve_model("detection", cfg.detect_model)
+    if detect_option.paths:
+        pass
+    elif detect_option.family == "yolo":
+        _append_unique(required, [ModelID.YOLO_V8_ONNX])
+    elif detect_model in {"small (int8)", "small (int8) [기본값]", "int8", "fast"}:
         _append_unique(required, [ModelID.RTDETR_INT8_ONNX])
     else:
         _append_unique(required, [ModelID.RTDETR_V2_ONNX])
 
-    source_language = cfg.source_language
-    _append_unique(required, [ModelID.PPOCR_V6_DET_MEDIUM, _ppocr_recognition_model(source_language)])
+    ocr_option = resolve_model("ocr", config_value(cfg, "ocr_model"))
+    if not ocr_option.paths and ocr_option.id == "ppocr-v6-small":
+        _append_unique(required, [ModelID.PPOCR_V6_DET_SMALL, ModelID.PPOCR_V6_REC_SMALL])
+    elif not ocr_option.paths:
+        source_language = cfg.source_language
+        _append_unique(required, [ModelID.PPOCR_V6_DET_MEDIUM, _ppocr_recognition_model(source_language)])
 
     inpaint_engine = _normalized(cfg.inpaint_engine)
-    if inpaint_engine not in {"opencv", "fast", "speed", "telea"}:
+    inpaint_option = resolve_model("inpainting", cfg.inpaint_engine)
+    if inpaint_option.paths:
+        pass
+    elif inpaint_option.family == "aot":
+        _append_unique(required, [ModelID.AOT_ONNX])
+    else:
         _append_unique(required, [ModelID.LAMA_ONNX])
 
     return required

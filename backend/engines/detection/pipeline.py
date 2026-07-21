@@ -10,6 +10,7 @@ from .utils.content import filter_and_fix_bboxes
 from ..common.geometry import does_rectangle_fit, do_rectangles_overlap, merge_overlapping_boxes
 from ...infrastructure.runtime.device import resolve_device
 from ..common.textblock import TextBlock
+from ...infrastructure.model_catalog import DEFAULT_OCR_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +203,7 @@ class DetectionPipeline:
                 text_blocks,
                 device=device,
                 backend="onnx",
-                det_model="mobile",
+                det_model=getattr(self.settings, "ocr_model", DEFAULT_OCR_MODEL),
             )
             missing_lines = [block for block in text_blocks if not getattr(block, "lines", None)]
             if not missing_lines:

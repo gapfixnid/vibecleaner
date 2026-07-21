@@ -23,6 +23,7 @@ export interface SettingsDto {
   confidence_threshold: number;
   tiling_enabled: boolean;
   ocr_engine: string;
+  ocr_model: string;
   ocr_padding: number;
   ocr_crop_scale: number;
   line_merge_sensitivity: number;

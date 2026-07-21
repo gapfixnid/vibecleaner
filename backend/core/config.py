@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_API_URL = "http://127.0.0.1:11434"
 SETTINGS_FORMAT = "vibecleaner-settings"
-SETTINGS_SCHEMA_VERSION = 2
+SETTINGS_SCHEMA_VERSION = 4
 SETTINGS_SCHEMA_VERSION_KEY = "schema_version"
 LEGACY_SETTINGS_SCHEMA_VERSION_KEY = "settings_schema_version"
 
@@ -47,6 +47,7 @@ class AppConfigSnapshot:
     bubbles_only: bool = False
     show_detection_overlay: bool = False
     ocr_engine: str = "ppocr"
+    ocr_model: str = "ppocr-v6-medium"
     ocr_padding: int = 8
     ocr_crop_scale: float = 1.5
     line_merge_sensitivity: float = 1.2
@@ -57,7 +58,7 @@ class AppConfigSnapshot:
     min_font_size: float = 6.0
     max_font_size: float = 48.0
     default_font_size: float = 18.0
-    inpaint_engine: str = "lama"
+    inpaint_engine: str = "aot"
     inpaint_mask_dilation: int = 2
     inpaint_use_textbox_only: bool = True
     inpaint_clip_to_bubble: bool = True
@@ -121,6 +122,7 @@ class AppConfig:
 
     # -- OCR ----------------------------------------------------------------
     ocr_engine: str = "ppocr"
+    ocr_model: str = "ppocr-v6-medium"
     ocr_padding: int = 8
     ocr_crop_scale: float = 1.5
     line_merge_sensitivity: float = 1.2
@@ -135,7 +137,7 @@ class AppConfig:
     default_font_size: float = 18.0
 
     # -- Inpainting ---------------------------------------------------------
-    inpaint_engine: str = "lama"
+    inpaint_engine: str = "aot"
     inpaint_mask_dilation: int = 2
     inpaint_use_textbox_only: bool = True
     inpaint_clip_to_bubble: bool = True
@@ -247,6 +249,7 @@ class AppConfig:
             "confidence_threshold": "confidence_threshold",
             "tiling_enabled": "tiling_enabled",
             "ocr_engine": "ocr_engine",
+            "ocr_model": "ocr_model",
             "ocr_padding": "ocr_padding",
             "ocr_crop_scale": "ocr_crop_scale",
             "line_merge_sensitivity": "line_merge_sensitivity",
@@ -359,7 +362,7 @@ class AppConfig:
             if migrated.get("detect_model") == "Small (INT8) [기본값]":
                 migrated["detect_model"] = "High Precision (FP32)"
             if migrated.get("inpaint_engine") in {
-                "aot", "high_precision", "high-quality", "high_quality", "quality"
+                "high_precision", "high-quality", "high_quality", "quality"
             }:
                 migrated["inpaint_engine"] = "lama"
             if migrated.get("confidence_threshold") == 0.30:
@@ -367,6 +370,9 @@ class AppConfig:
         # PP-OCR is the only supported local OCR engine. This deliberately
         # normalizes every historical profile, including Manga OCR projects.
         migrated["ocr_engine"] = "ppocr"
+        migrated.setdefault("ocr_model", "ppocr-v6-medium")
+        if migrated.get("inpaint_engine") in {"opencv", "fast", "speed", "telea"}:
+            migrated["inpaint_engine"] = "lama"
         migrated["format"] = SETTINGS_FORMAT
         migrated[SETTINGS_SCHEMA_VERSION_KEY] = SETTINGS_SCHEMA_VERSION
         migrated.setdefault("app_version", "unknown")

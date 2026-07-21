@@ -4,11 +4,29 @@ from unittest.mock import patch
 
 from backend.api.routes import settings as settings_route
 from backend.core.config import AppConfig
+from fastapi import HTTPException
 
 def make_translation_service():
     return SimpleNamespace(system_prompt="", reload=lambda: None)
 
 class SettingsUiLanguageTest(unittest.TestCase):
+    def test_new_install_defaults_to_aot_inpainting(self):
+        self.assertEqual(AppConfig().inpaint_engine, "aot")
+
+    def test_update_settings_rejects_unsupported_local_model(self):
+        cfg = AppConfig()
+        service = make_translation_service()
+        payload = settings_route.get_settings_payload(cfg, service)
+        schema = settings_route.SettingsSchema(**{
+            **payload,
+            "detect_model": "arbitrary-model.onnx",
+        })
+
+        with self.assertRaises(HTTPException) as raised:
+            settings_route.update_settings_payload(schema, cfg, service)
+
+        self.assertEqual(raised.exception.status_code, 422)
+
     def test_get_settings_includes_ui_language(self):
         cfg = AppConfig(ui_language="ko")
 
@@ -20,7 +38,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
         cfg = AppConfig(
             detect_model="Small (INT8)",
             ocr_engine="ppocr",
-            inpaint_engine="opencv",
+            inpaint_engine="aot",
             ocr_crop_scale=1.25,
             text_direction_override="horizontal",
             adaptive_binarization=False,
@@ -32,7 +50,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
 
         self.assertEqual(payload["detect_model"], "Small (INT8)")
         self.assertEqual(payload["ocr_engine"], "ppocr")
-        self.assertEqual(payload["inpaint_engine"], "opencv")
+        self.assertEqual(payload["inpaint_engine"], "aot")
         self.assertEqual(payload["ocr_crop_scale"], 1.25)
         self.assertEqual(payload["text_direction_override"], "horizontal")
         self.assertFalse(payload["adaptive_binarization"])
@@ -68,7 +86,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
             **current,
             "detect_model": "Small (INT8)",
             "ocr_engine": "manga_ocr",
-            "inpaint_engine": "opencv",
+            "inpaint_engine": "aot",
             "ocr_crop_scale": 1.75,
             "text_direction_override": "vertical",
             "adaptive_binarization": True,
@@ -87,14 +105,14 @@ class SettingsUiLanguageTest(unittest.TestCase):
 
         self.assertEqual(cfg.detect_model, "Small (INT8)")
         self.assertEqual(cfg.ocr_engine, "ppocr")
-        self.assertEqual(cfg.inpaint_engine, "opencv")
+        self.assertEqual(cfg.inpaint_engine, "aot")
         self.assertEqual(cfg.ocr_crop_scale, 1.75)
         self.assertEqual(cfg.text_direction_override, "vertical")
         self.assertTrue(cfg.adaptive_binarization)
         self.assertTrue(cfg.show_detection_overlay)
         self.assertEqual(cfg.adaptive_binarization_strength, 2.75)
         self.assertEqual(response["ocr_engine"], "ppocr")
-        self.assertEqual(response["inpaint_engine"], "opencv")
+        self.assertEqual(response["inpaint_engine"], "aot")
 
 if __name__ == "__main__":
     unittest.main()

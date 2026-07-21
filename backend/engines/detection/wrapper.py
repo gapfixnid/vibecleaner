@@ -32,6 +32,7 @@ class RTDETRv2Detector:
             self.engine_error = str(exc)
             logger.exception("Failed to initialize RT-DETR-v2 detection engine")
             self.engine = None
+        self._model_selection = "High Precision (FP32)"
         
     def detect_bubbles(
         self,
@@ -51,6 +52,16 @@ class RTDETRv2Detector:
         if self.engine is None:
             detail = f": {self.engine_error}" if self.engine_error else ""
             raise DetectorUnavailableError(f"Detection engine is unavailable{detail}")
+
+        requested_model = model_name or "High Precision (FP32)"
+        if requested_model != self._model_selection:
+            try:
+                self.engine = DetectionEngineFactory.create_engine(
+                    self.settings, model_name=requested_model, backend="onnx"
+                )
+                self._model_selection = requested_model
+            except Exception as exc:
+                raise DetectorUnavailableError(f"Detection model could not be loaded: {exc}") from exc
             
         try:
             # Convert BGR to RGB for detection

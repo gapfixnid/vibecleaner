@@ -9,6 +9,7 @@ from ...infrastructure.runtime.onnx import make_session
 from ..common.textblock import TextBlock
 from .utils.slicer import ImageSlicer
 from .base import DetectionEngine
+from ...infrastructure.model_catalog import resolve_model
 
 
 def _make_rtdetr_session_options():
@@ -58,15 +59,21 @@ class RTDetrV2ONNXDetection(DetectionEngine):
         self.current_loaded_model = model_name
         self.tiling_enabled = True if tiling_enabled is None else bool(tiling_enabled)
 
-        if model_name in {"Small (INT8)", "Small (INT8) [기본값]"}:
+        model_option = resolve_model("detection", model_name)
+        if model_option.family != "rtdetr":
+            raise ValueError(f"Unsupported RT-DETR model selection: {model_name}")
+        if model_option.paths:
+            file_path = model_option.paths[0]
+        elif model_name in {"Small (INT8)", "Small (INT8) [기본값]"}:
             model_id = ModelID.RTDETR_INT8_ONNX
             filename = 'detector-v4-s_int8.onnx'
+            ModelDownloader.ensure([model_id])
+            file_path = ModelDownloader.get_file_path(model_id, filename)
         else:
             model_id = ModelID.RTDETR_V2_ONNX
             filename = 'detector.onnx'
-
-        ModelDownloader.ensure([model_id])
-        file_path = ModelDownloader.get_file_path(model_id, filename)
+            ModelDownloader.ensure([model_id])
+            file_path = ModelDownloader.get_file_path(model_id, filename)
         providers = get_providers(self.device)
         self.session = make_session(file_path, sess_options=_make_rtdetr_session_options(), providers=providers)
 
@@ -125,9 +132,12 @@ class RTDetrV2ONNXDetection(DetectionEngine):
         w, h = pil_image.size
         orig_size = np.array([[w, h]], dtype=np.int64)
 
+        inputs = self.session.get_inputs()
+        if len(inputs) != 2 or len(self.session.get_outputs()) < 3:
+            raise ValueError("RT-DETR-v2 ONNX 모델은 이미지/원본 크기 입력 2개와 출력 3개가 필요합니다.")
         outputs = self.session.run(None, {
-            "images": im_data,
-            "orig_target_sizes": orig_size
+            inputs[0].name: im_data,
+            inputs[1].name: orig_size,
         })
 
         # expected outputs: labels, boxes, scores

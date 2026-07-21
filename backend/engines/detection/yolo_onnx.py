@@ -10,6 +10,7 @@ from ...infrastructure.runtime.onnx import make_session
 from ..common.textblock import TextBlock
 from .utils.slicer import ImageSlicer
 from .base import DetectionEngine
+from ...infrastructure.model_catalog import resolve_model
 
 
 class YoloONNXDetection(DetectionEngine):
@@ -44,22 +45,22 @@ class YoloONNXDetection(DetectionEngine):
         self.current_loaded_model = model_name
         self.tiling_enabled = True if tiling_enabled is None else bool(tiling_enabled)
         
-        # Resolve file path
-        # Check if the exact filename exists in models/detection
-        file_path = os.path.join(self.model_dir, model_name)
-        if not os.path.exists(file_path):
-            # Check if any .onnx file with 'ysg' or 'yolo' is in models_base_dir/detection/
-            if os.path.exists(self.model_dir):
-                for f in os.listdir(self.model_dir):
-                    if f.endswith('.onnx') and ('ysg' in f.lower() or 'yolo' in f.lower()):
-                        file_path = os.path.join(self.model_dir, f)
-                        break
-        
-        if not os.path.exists(file_path):
-            # Fallback to default RT-DETR model
-            model_id = ModelID.RTDETR_V2_ONNX
-            ModelDownloader.ensure([model_id])
-            file_path = ModelDownloader.get_file_path(model_id, 'detector.onnx')
+        model_option = resolve_model("detection", model_name)
+        if model_option.family == "yolo" and model_option.paths:
+            file_path = model_option.paths[0]
+        elif model_option.id == "YOLOv8/11 ONNX":
+            file_path = ModelDownloader.primary_path(ModelID.YOLO_V8_ONNX)
+        else:
+            candidate = os.path.abspath(os.path.join(self.model_dir, model_name))
+            model_root = os.path.abspath(self.model_dir)
+            if (
+                os.path.commonpath([candidate, model_root]) != model_root
+                or "yolo" not in os.path.basename(candidate).lower()
+                or not candidate.lower().endswith(".onnx")
+                or not os.path.exists(candidate)
+            ):
+                raise ValueError(f"YOLOv8/11 ONNX 모델을 찾을 수 없습니다: {model_name}")
+            file_path = candidate
             
         providers = get_providers(self.device)
         from ...infrastructure.runtime.onnx import get_optimal_cpu_threads, make_session_options
@@ -122,14 +123,25 @@ class YoloONNXDetection(DetectionEngine):
         im_data = arr[np.newaxis, ...]  # (1, 3, 640, 640)
 
         # Run model
+        if len(self.session.get_inputs()) != 1:
+            raise ValueError("YOLOv8/11 ONNX 모델은 이미지 입력 1개가 필요합니다.")
         outputs = self.session.run(None, {self.session.get_inputs()[0].name: im_data})
         output0 = outputs[0]  # shape: (1, 4+num_classes, 8400)
+        if output0.ndim != 3:
+            raise ValueError("지원하지 않는 YOLO ONNX 출력 형식입니다.")
         
-        if output0.ndim == 3 and output0.shape[0] == 1:
+        if output0.shape[0] == 1:
             output0 = output0[0]  # (4+num_classes, 8400)
-            
+
         # Parse boxes (center_x, center_y, width, height, class0_score, class1_score, ...)
-        predictions = output0.T  # (8400, 4+num_classes)
+        predictions = output0.T if output0.shape[0] < output0.shape[1] else output0
+        if predictions.ndim != 2 or predictions.shape[1] < 5:
+            raise ValueError("YOLOv8/11 ONNX 출력에는 좌표 4개와 클래스 점수가 필요합니다.")
+
+        # Ultralytics segmentation exports append 32 mask coefficients after
+        # the class scores and expose the mask prototype as a second output.
+        # The bundled model has one bubble class, so only column 4 is a score.
+        class_score_count = 1 if len(outputs) > 1 and np.asarray(outputs[1]).ndim == 4 else predictions.shape[1] - 4
         
         boxes = []
         scores = []
@@ -137,7 +149,7 @@ class YoloONNXDetection(DetectionEngine):
         
         for pred in predictions:
             coords = pred[:4]
-            cls_scores = pred[4:]
+            cls_scores = pred[4:4 + class_score_count]
             class_id = np.argmax(cls_scores)
             score = cls_scores[class_id]
             

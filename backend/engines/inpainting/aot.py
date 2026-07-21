@@ -39,14 +39,18 @@ class AOT(TorchAutocastMixin, InpaintModel):
     def init_model(self, device, **kwargs):
         self.backend = kwargs.get("backend")
         if self.backend == "onnx":
-            ModelDownloader.get(ModelID.AOT_ONNX)
-            onnx_path = ModelDownloader.primary_path(ModelID.AOT_ONNX)
+            onnx_path = kwargs.get("model_path")
+            if not onnx_path:
+                ModelDownloader.get(ModelID.AOT_ONNX)
+                onnx_path = ModelDownloader.primary_path(ModelID.AOT_ONNX)
             providers = get_providers(device)
             self.session = make_session(
                 onnx_path,
                 sess_options=_make_aot_session_options(),
                 providers=providers,
             )
+            if len(self.session.get_inputs()) != 2 or not self.session.get_outputs():
+                raise ValueError("AOT ONNX 모델은 이미지/마스크 입력 2개와 출력 1개가 필요합니다.")
         else:
             import torch
             ModelDownloader.get(ModelID.AOT_JIT)

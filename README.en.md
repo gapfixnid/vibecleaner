@@ -74,10 +74,20 @@ The defaults are the safest place to start.
 | Not sure what to choose | Default settings |
 | Diagonal, vertical, or curved text detection | PP-OCRv6 Medium |
 | Multilingual text recognition | PP-OCRv6 Medium |
-| Better text removal | LaMa inpainting |
-| Fast preview | OpenCV inpainting |
+| Typical dialogue removal | AOT inpainting (recommended) |
+| Very large regions or repeating patterns | LaMa inpainting |
 
 Only adjust advanced padding, mask dilation, and confidence settings when a particular page needs correction.
+
+## Add your own ONNX models
+
+Place compatible ONNX files in the app data `models` directory. They will appear in both initial setup and the regular settings screen. No separate manifest is used; only these names and layouts are recognized:
+
+- `detection`: an RT-DETR-v2 or YOLOv8/11 ONNX file whose name contains `rtdetr` or `yolo`
+- `ocr/<model name>`: PP-OCR DB + CTC files named `*det*.onnx`, `*rec*.onnx`, and `inference.yml` in one directory
+- `inpainting`: a compatible ONNX file whose name contains `lama` or `aot`
+
+The default Windows location is `%LOCALAPPDATA%\vibecleaner\models`. Reopen Settings after adding a model to rescan the directory. Detection classes must use `0=speech bubble` and `1+=text`.
 
 ## Common questions
 
@@ -91,7 +101,7 @@ Set the source language to Japanese. PP-OCRv6 Medium preserves rotated text regi
 
 ### Inpainting blurs outside a speech bubble
 
-Use LaMa inpainting and enable clipping to the speech-bubble boundary. If detection is wrong, enable the detection overlay in Advanced Settings and inspect the region first.
+Enable clipping to the speech-bubble boundary. If detection is wrong, enable the detection overlay in Advanced Settings and inspect the region first.
 
 ### The translated text is positioned poorly
 

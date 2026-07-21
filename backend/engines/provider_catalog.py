@@ -215,6 +215,7 @@ def register_builtin_providers(
             model_catalog=(
                 ProviderModelProfile("High Precision (FP32)", "High Precision (FP32)", 0.95, 0.45, frozenset({"cpu", "gpu"})),
                 ProviderModelProfile("Small (INT8)", "Small (INT8)", 0.75, 0.90, frozenset({"cpu"})),
+                ProviderModelProfile("YOLOv8/11 ONNX", "YOLOv8/11 ONNX", 0.82, 0.80, frozenset({"cpu", "gpu"})),
             ),
             queue_capacity=2,
             config_schema=(
@@ -223,8 +224,8 @@ def register_builtin_providers(
                     value_type="enum",
                     label="settings.detectionModel",
                     default="High Precision (FP32)",
-                    choices=("High Precision (FP32)", "Small (INT8)"),
-                    choice_labels=("settings.modelHighPrecision", "settings.modelSmall"),
+                    choices=("High Precision (FP32)", "Small (INT8)", "YOLOv8/11 ONNX"),
+                    choice_labels=("settings.modelHighPrecision", "settings.modelSmall", "YOLOv8/11 ONNX"),
                 ),
                 ConfigFieldSpec(
                     key="confidence_threshold",
@@ -302,18 +303,28 @@ def register_builtin_providers(
             ),
             resource_classes={"cpu", "gpu", "io"},
             model_catalog=(
-                ProviderModelProfile("ppocr", "PP-OCRv6 Medium Recognition ONNX", 0.88, 0.85, frozenset({"cpu", "gpu", "io"})),
+                ProviderModelProfile(
+                    "ppocr-v6-medium",
+                    "PP-OCRv6 Medium ONNX",
+                    0.88, 0.85, frozenset({"cpu", "gpu", "io"}),
+                ),
+                ProviderModelProfile(
+                    "ppocr-v6-small",
+                    "PP-OCRv6 Small ONNX",
+                    0.84, 0.95, frozenset({"cpu", "gpu", "io"}),
+                ),
             ),
             queue_capacity=4,
             config_schema=(
                 ConfigFieldSpec(
-                    key="ocr_engine",
+                    key="ocr_model",
                     value_type="enum",
-                    label="settings.ocrEngine",
-                    default="ppocr",
-                    choices=("ppocr",),
+                    label="settings.ocrModel",
+                    default="ppocr-v6-medium",
+                    choices=("ppocr-v6-medium", "ppocr-v6-small"),
                     choice_labels=(
-                        "settings.ocrEnginePpocr",
+                        "PP-OCRv6 Medium ONNX",
+                        "PP-OCRv6 Small ONNX",
                     ),
                 ),
                 ConfigFieldSpec(
@@ -373,8 +384,8 @@ def register_builtin_providers(
             ),
             resource_classes={"cpu", "gpu"},
             model_catalog=(
+                ProviderModelProfile("aot", "AOT", 0.88, 0.70, frozenset({"cpu", "gpu"})),
                 ProviderModelProfile("lama", "LaMa", 0.92, 0.45, frozenset({"cpu", "gpu"})),
-                ProviderModelProfile("opencv", "OpenCV Telea", 0.68, 0.95, frozenset({"cpu"})),
             ),
             queue_capacity=2,
             config_schema=(
@@ -382,9 +393,9 @@ def register_builtin_providers(
                     key="inpaint_engine",
                     value_type="enum",
                     label="settings.inpaintEngine",
-                    default="lama",
-                    choices=("lama", "opencv"),
-                    choice_labels=("settings.inpaintingEngineBalanced", "settings.inpaintingEngineFast"),
+                    default="aot",
+                    choices=("aot", "lama"),
+                    choice_labels=("settings.inpaintingEngineAot", "settings.inpaintingEngineBalanced"),
                 ),
                 ConfigFieldSpec(
                     key="inpaint_mask_dilation",

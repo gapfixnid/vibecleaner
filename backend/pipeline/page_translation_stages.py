@@ -387,7 +387,7 @@ class PageInpaintingStage:
 
             quality_score = self.quality_router.evaluate_inpainting(image, inpainted_image, boxes)
             if not quality_score.passed:
-                current_engine = str(getattr(config, "inpaint_engine", "lama"))
+                current_engine = str(getattr(config, "inpaint_engine", "aot"))
                 retry_engine = self.quality_router.select_model(
                     "inpainting", current_engine, quality_score, self.provider_manifest
                 )

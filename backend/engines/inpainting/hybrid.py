@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import math
 from threading import RLock
+from ...infrastructure.model_catalog import resolve_model
 
 
 def build_oriented_target_mask(
@@ -54,25 +55,36 @@ class HybridInpainter:
                     return False
         self.settings = DummySettings()
         self.lama_model = None
+        self._models = {}
         self._model_lock = RLock()
 
     def _resolve_engine_name(self, engine: str | None = None) -> str:
-        requested = str(engine or "lama").strip().lower()
+        requested = str(engine or "aot").strip().lower()
         if requested in {"opencv", "fast", "speed", "telea"}:
             return "opencv"
-        return "lama"
+        return str(engine or "aot")
 
     def _get_deep_model(self, engine_name: str):
         device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
         with self._model_lock:
-            if self.lama_model is None:
+            if engine_name not in self._models:
                 import logging
-                logging.info("Initializing LaMa inpainting model...")
-                from .lama import LaMa
-                self.lama_model = LaMa(device=device, backend="onnx")
-        return self.lama_model
+                option = resolve_model("inpainting", engine_name)
+                logging.info("Initializing %s inpainting model...", option.family)
+                if option.family == "aot":
+                    from .aot import AOT
+                    model_class = AOT
+                else:
+                    from .lama import LaMa
+                    model_class = LaMa
+                model_path = option.paths[0] if option.paths else None
+                self._models[engine_name] = model_class(
+                    device=device, backend="onnx", model_path=model_path
+                )
+                self.lama_model = self._models[engine_name]
+        return self._models[engine_name]
 
-    def prepare(self, engine: str = "lama") -> None:
+    def prepare(self, engine: str = "aot") -> None:
         engine_name = self._resolve_engine_name(engine)
         if engine_name != "opencv":
             self._get_deep_model(engine_name)
@@ -84,7 +96,7 @@ class HybridInpainter:
         bubble_boxes: list[list[int]] | None = None,
         source_polygons: list[list[list[list[int]]]] | None = None,
         protect_edges: bool = False,
-        engine: str = "lama",
+        engine: str = "aot",
         mask_dilation: int = 2,
         clip_to_bubble: bool = True,
     ) -> np.ndarray:
@@ -222,6 +234,8 @@ class HybridInpainter:
                     except Exception:
                         import logging
                         logging.exception("%s inpainting failed; falling back to Telea CV2 inpainting", engine_name)
+                        if str(engine_name).startswith("custom:"):
+                            raise
                         inpainted_crop = cv2.inpaint(crop, mask, 3, cv2.INPAINT_TELEA)
 
                 # Some model backends can slightly alter known pixels. Always

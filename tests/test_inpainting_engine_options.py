@@ -63,12 +63,12 @@ class InpaintingEngineOptionsTests(unittest.TestCase):
         np.testing.assert_array_equal(result[2, 2], image[2, 2])
         np.testing.assert_array_equal(result[11, 11], output_crop[9, 9])
 
-    def test_legacy_high_precision_profile_uses_balanced_lama_engine(self):
+    def test_aot_profile_uses_aot_engine(self):
         image = np.full((24, 24, 3), 255, dtype=np.uint8)
         image[9:15, 9:15] = 0
         output_crop = np.full((20, 20, 3), 180, dtype=np.uint8)
 
-        class FakeLaMa:
+        class FakeAOT:
             def __init__(self, *args, **kwargs):
                 pass
 
@@ -76,13 +76,13 @@ class InpaintingEngineOptionsTests(unittest.TestCase):
                 return output_crop
 
         with (
-            patch("backend.engines.inpainting.lama.LaMa", side_effect=FakeLaMa) as lama_cls,
-            patch("backend.engines.inpainting.aot.AOT") as aot_cls,
+            patch("backend.engines.inpainting.lama.LaMa") as lama_cls,
+            patch("backend.engines.inpainting.aot.AOT", side_effect=FakeAOT) as aot_cls,
         ):
             result = HybridInpainter().inpaint(image, [[10, 10, 14, 14]], engine="aot")
 
-        aot_cls.assert_not_called()
-        self.assertEqual(lama_cls.call_count, 1)
+        self.assertEqual(aot_cls.call_count, 1)
+        lama_cls.assert_not_called()
         np.testing.assert_array_equal(result[2, 2], image[2, 2])
         np.testing.assert_array_equal(result[11, 11], output_crop[9, 9])
 

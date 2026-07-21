@@ -2,6 +2,7 @@ from .base import DetectionEngine
 from .rtdetr_v2_onnx import RTDetrV2ONNXDetection
 from ...infrastructure.runtime.device import resolve_device
 from .backend import DEFAULT_DETECTION_BACKEND, resolve_detection_backend
+from ...infrastructure.model_catalog import resolve_model
 
 
 class DetectionEngineFactory:
@@ -46,13 +47,14 @@ class DetectionEngineFactory:
         
         # Get the appropriate factory method, defaulting to RT-DETR-v2
         # If it's YOLO-ONNX or the name contains yolo/ysg, use YOLO ONNX engine
-        if model_name == 'YOLO-ONNX' or any(x in model_name.lower() for x in ['yolo', 'ysg']):
+        model_option = resolve_model("detection", model_name)
+        if model_option.family == "yolo":
             factory_method = cls._create_yolo_onnx
         else:
             factory_method = engine_factories.get(model_name, cls._create_rtdetr_v2)
 
         # Create and cache the engine
-        engine = factory_method(settings, effective_backend)
+        engine = factory_method(settings, effective_backend, model_name)
         engine.backend = effective_backend
         engine.pipeline.backend = effective_backend
         cls._engines[cache_key] = engine
@@ -63,20 +65,20 @@ class DetectionEngineFactory:
         return resolve_detection_backend(backend)
 
     @staticmethod
-    def _create_rtdetr_v2(settings, backend: str = 'onnx'):
+    def _create_rtdetr_v2(settings, backend: str = 'onnx', model_name: str = "High Precision (FP32)"):
         """Create and initialize RT-DETR-v2 detection engine."""
         device = resolve_device(settings.is_gpu_enabled(), backend)
         
         engine = RTDetrV2ONNXDetection(settings)
-        engine.initialize(device=device)
+        engine.initialize(device=device, model_name=model_name)
         
         return engine
     
     @staticmethod
-    def _create_yolo_onnx(settings, backend: str = 'onnx'):
+    def _create_yolo_onnx(settings, backend: str = 'onnx', model_name: str = "YOLO-ONNX"):
         """Create and initialize YOLO-ONNX detection engine."""
         from .yolo_onnx import YoloONNXDetection
         device = resolve_device(settings.is_gpu_enabled(), 'onnx')
         engine = YoloONNXDetection(settings)
-        engine.initialize(device=device)
+        engine.initialize(device=device, model_name=model_name)
         return engine

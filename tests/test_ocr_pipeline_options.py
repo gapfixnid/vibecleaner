@@ -13,9 +13,10 @@ from backend.engines.common.textblock import TextBlock
 class FakePPOCREngine:
     calls = []
 
-    def initialize(self, lang="ch", device="cpu"):
+    def initialize(self, lang="ch", device="cpu", model_name="ppocr-v6-medium"):
         self.lang = lang
         self.device = device
+        self.model_name = model_name
 
     def process_image(self, image, blocks, **kwargs):
         self.calls.append(kwargs)
@@ -50,7 +51,7 @@ class OcrPipelineOptionsTests(unittest.TestCase):
             ocr.settings = GpuSettings()
             ocr.recognize_text(image, [block], engine="ppocr")
 
-        self.assertEqual(ocr.ppocr_engines["en"].device, "cuda")
+        self.assertEqual(ocr.ppocr_engines[("ppocr-v6-medium", "en")].device, "cuda")
 
     def test_legacy_manga_setting_routes_to_ppocr(self):
         block = TextBlock([1, 1, 10, 10])
@@ -65,7 +66,7 @@ class OcrPipelineOptionsTests(unittest.TestCase):
             ocr.settings = GpuSettings()
             ocr.recognize_text(image, [block], engine="manga_ocr")
 
-        self.assertEqual(ocr.ppocr_engines["ch"].device, "cuda")
+        self.assertEqual(ocr.ppocr_engines[("ppocr-v6-medium", "ch")].device, "cuda")
         self.assertEqual(block.text, "ppocr:ch")
 
     def test_forced_ppocr_engine_overrides_japanese_auto_engine(self):
@@ -89,6 +90,17 @@ class OcrPipelineOptionsTests(unittest.TestCase):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="fast")
 
         self.assertEqual(block.text, "ppocr:ch")
+
+    def test_local_ocr_uses_selected_small_model(self):
+        block = TextBlock([1, 1, 10, 10])
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+
+        with patch("backend.engines.ocr.local.PPOCRv6Engine", FakePPOCREngine):
+            ocr = LocalOCR(lang="Japanese")
+            ocr.recognize_text(image, [block], engine="ppocr", model="ppocr-v6-small")
+
+        self.assertIn(("ppocr-v6-small", "ch"), ocr.ppocr_engines)
+        self.assertEqual(ocr.ppocr_engines[("ppocr-v6-small", "ch")].model_name, "ppocr-v6-small")
 
     def test_local_ocr_passes_explicit_crop_options_to_ppocr(self):
         block = TextBlock([1, 1, 10, 10])
