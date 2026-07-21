@@ -970,6 +970,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <span>{t("settings.bubblesOnly")}</span>
                       </label>
                     </div>
+                    <div className="form-row-group checkbox-row">
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={localSettings.show_detection_overlay}
+                          onChange={(e) => handleAutoSave("show_detection_overlay", e.target.checked)}
+                        />
+                        <span>{t("settings.showDetectionOverlay")}</span>
+                      </label>
+                    </div>
                   </div>
 
                   <div className="section-title-label">{t("settings.ocrOptions")}</div>
@@ -982,7 +992,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           onChange={(v) => handleAutoSave("ocr_engine", v)}
                           options={[
                             { value: "balanced", label: t("settings.ocrEngineBalanced") },
-                            { value: "fast", label: t("settings.ocrEngineFast") },
+                            { value: "manga_ocr", label: t("settings.ocrEngineManga") },
+                            { value: "ppocr", label: t("settings.ocrEnginePpocr") },
                           ]}
                         />
                       </div>

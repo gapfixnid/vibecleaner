@@ -25,6 +25,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
             text_direction_override="horizontal",
             adaptive_binarization=False,
             adaptive_binarization_strength=3.0,
+            show_detection_overlay=True,
         )
 
         payload = settings_route.get_settings_payload(cfg, make_translation_service())
@@ -36,6 +37,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
         self.assertEqual(payload["text_direction_override"], "horizontal")
         self.assertFalse(payload["adaptive_binarization"])
         self.assertEqual(payload["adaptive_binarization_strength"], 3.0)
+        self.assertTrue(payload["show_detection_overlay"])
 
     def test_update_settings_persists_ui_language(self):
         cfg = AppConfig()
@@ -71,6 +73,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
             "text_direction_override": "vertical",
             "adaptive_binarization": True,
             "adaptive_binarization_strength": 2.75,
+            "show_detection_overlay": True,
             "translation_api_key": "",
             "translation_api_key_configured": True,
         }
@@ -88,6 +91,7 @@ class SettingsUiLanguageTest(unittest.TestCase):
         self.assertEqual(cfg.ocr_crop_scale, 1.75)
         self.assertEqual(cfg.text_direction_override, "vertical")
         self.assertTrue(cfg.adaptive_binarization)
+        self.assertTrue(cfg.show_detection_overlay)
         self.assertEqual(cfg.adaptive_binarization_strength, 2.75)
         self.assertEqual(response["ocr_engine"], "manga_ocr")
         self.assertEqual(response["inpaint_engine"], "opencv")

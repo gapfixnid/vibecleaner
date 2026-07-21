@@ -44,17 +44,22 @@ function getPreviewModels(settings: Settings, status: ModelStatus | null): Previ
     installed
   );
 
-  const ppocrRecognition =
-    sourceLanguage === "english" || sourceLanguage === "en"
-      ? { id: "ppocr-v5-rec-en-mobile", category: "OCR", label: "PP-OCRv5 English Recognition" }
-      : sourceLanguage === "korean" || sourceLanguage === "ko"
-        ? { id: "ppocr-v5-rec-korean-mobile", category: "OCR", label: "PP-OCRv5 Korean Recognition" }
-        : { id: "ppocr-v5-rec-ch-mobile", category: "OCR", label: "PP-OCRv5 Chinese/Japanese Recognition" };
+  const ppocrRecognition = {
+    id: "ppocr-v6-rec-medium",
+    category: "OCR",
+    label: "PP-OCRv6 Medium Recognition",
+  };
 
   if (ocrEngine === "fast" || ocrEngine === "ppocr") {
     appendUnique(items, { id: "ppocr-v5-det-mobile", category: "OCR", label: "PP-OCRv5 Mobile Detector" }, installed);
     appendUnique(items, ppocrRecognition, installed);
-  } else if (sourceLanguage === "japanese" || sourceLanguage === "ja" || sourceLanguage === "日本語") {
+  } else if (
+    ocrEngine === "manga_ocr"
+    || ocrEngine === "manga-ocr"
+    || sourceLanguage === "japanese"
+    || sourceLanguage === "ja"
+    || sourceLanguage === "日本語"
+  ) {
     appendUnique(items, { id: "manga-ocr-mobile-onnx", category: "OCR", label: "Manga OCR Mobile ONNX" }, installed);
   } else {
     appendUnique(items, { id: "ppocr-v5-det-mobile", category: "OCR", label: "PP-OCRv5 Mobile Detector" }, installed);
@@ -228,7 +233,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 onChange={(value) => updateLocal("ocr_engine", value)}
                 options={[
                   { value: "balanced", label: uiT("settings.ocrEngineBalanced") },
-                  { value: "fast", label: uiT("settings.ocrEngineFast") },
+                  { value: "manga_ocr", label: uiT("settings.ocrEngineManga") },
+                  { value: "ppocr", label: uiT("settings.ocrEnginePpocr") },
                 ]}
               />
             </div>

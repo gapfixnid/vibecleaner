@@ -60,6 +60,19 @@ class ModelRequirementsTests(unittest.TestCase):
             ],
         )
 
+    def test_explicit_manga_ocr_uses_manga_model_regardless_of_language(self):
+        cfg = AppConfig(
+            detect_model="High Precision (FP32)",
+            source_language="Korean",
+            ocr_engine="manga_ocr",
+            inpaint_engine="opencv",
+        )
+
+        self.assertEqual(
+            get_required_model_ids(cfg),
+            [ModelID.RTDETR_V2_ONNX, ModelID.MANGA_OCR_MOBILE_ONNX],
+        )
+
     def test_status_marks_missing_models_without_downloading(self):
         cfg = AppConfig(
             detect_model="Small (INT8)",

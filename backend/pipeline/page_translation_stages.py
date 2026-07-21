@@ -11,7 +11,9 @@ from .page_analysis import (
     bubbles_from_analysis,
     merge_overlapping_bubbles,
     bubble_clip_boxes,
+    bubble_source_polygons,
     inpaint_boxes,
+    recover_missing_source_polygons,
 )
 from .context import PipelineContext
 from .registry import StageRegistry
@@ -368,11 +370,17 @@ class PageInpaintingStage:
         if inpainted_image is None:
             if show_progress:
                 job_manager.update(job, progress=60, message=msg_from_context("page_translation.cleaning", context))
+            recover_missing_source_polygons(
+                image,
+                local_bubbles,
+                source_language=str(getattr(config, "source_language", "")),
+            )
             boxes = inpaint_boxes(local_bubbles, use_textbox_only=config.inpaint_use_textbox_only)
             inpainted_image = self.inpainting_service.clean_background(
                 image,
                 boxes,
                 bubble_clip_boxes(local_bubbles),
+                source_polygons=bubble_source_polygons(local_bubbles),
                 protect_edges=True,
             )
             job_manager.ensure_not_cancelled(job)
@@ -387,6 +395,7 @@ class PageInpaintingStage:
                     image,
                     boxes,
                     bubble_clip_boxes(local_bubbles),
+                    source_polygons=bubble_source_polygons(local_bubbles),
                     protect_edges=True,
                     engine=retry_engine,
                     mask_dilation=max(1, int(getattr(config, "inpaint_mask_dilation", 2)) + 2),

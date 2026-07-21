@@ -3,9 +3,24 @@ from unittest.mock import patch
 
 import numpy as np
 
-from backend.engines.inpainting.hybrid import HybridInpainter
+from backend.engines.inpainting.hybrid import HybridInpainter, build_oriented_target_mask
 
 class InpaintingEngineOptionsTests(unittest.TestCase):
+    def test_oriented_target_mask_does_not_fill_axis_aligned_corners(self):
+        mask = build_oriented_target_mask(
+            [[[20, 8], [32, 20], [20, 32], [8, 20]]],
+            origin_x=0,
+            origin_y=0,
+            width=40,
+            height=40,
+            margin=2,
+        )
+
+        self.assertIsNotNone(mask)
+        assert mask is not None
+        self.assertEqual(mask[20, 20], 255)
+        self.assertEqual(mask[8, 8], 0)
+
     def test_inpainter_uses_explicit_options_without_global_config(self):
         image = np.full((24, 24, 3), 255, dtype=np.uint8)
         image[9:15, 9:15] = 0
@@ -25,7 +40,8 @@ class InpaintingEngineOptionsTests(unittest.TestCase):
 
         self.assertEqual(cv_inpaint.call_count, 1)
         lama_cls.assert_not_called()
-        np.testing.assert_array_equal(result[2:22, 2:22], output_crop)
+        np.testing.assert_array_equal(result[2, 2], image[2, 2])
+        np.testing.assert_array_equal(result[11, 11], output_crop[9, 9])
 
     def test_opencv_inpaint_profile_does_not_initialize_lama(self):
         image = np.full((24, 24, 3), 255, dtype=np.uint8)
@@ -40,7 +56,8 @@ class InpaintingEngineOptionsTests(unittest.TestCase):
 
         self.assertEqual(cv_inpaint.call_count, 1)
         lama_cls.assert_not_called()
-        np.testing.assert_array_equal(result[2:22, 2:22], output_crop)
+        np.testing.assert_array_equal(result[2, 2], image[2, 2])
+        np.testing.assert_array_equal(result[11, 11], output_crop[9, 9])
 
     def test_legacy_high_precision_profile_uses_balanced_lama_engine(self):
         image = np.full((24, 24, 3), 255, dtype=np.uint8)
@@ -62,7 +79,8 @@ class InpaintingEngineOptionsTests(unittest.TestCase):
 
         aot_cls.assert_not_called()
         self.assertEqual(lama_cls.call_count, 1)
-        np.testing.assert_array_equal(result[2:22, 2:22], output_crop)
+        np.testing.assert_array_equal(result[2, 2], image[2, 2])
+        np.testing.assert_array_equal(result[11, 11], output_crop[9, 9])
 
 if __name__ == "__main__":
     unittest.main()

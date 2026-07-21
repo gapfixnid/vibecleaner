@@ -52,6 +52,8 @@ def get_required_model_ids(settings: AppConfig) -> list[ModelID]:
     source_lang = _normalized(source_language)
     if ocr_engine in {"fast", "speed", "ppocr", "paddleocr", "paddle_ocr"}:
         _append_unique(required, [ModelID.PPOCR_V5_DET_MOBILE, _ppocr_recognition_model(source_language)])
+    elif ocr_engine in {"manga_ocr", "manga-ocr", "manga", "manga_ocr_mobile"}:
+        _append_unique(required, [ModelID.MANGA_OCR_MOBILE_ONNX])
     elif source_lang in {"japanese", "日本語", "ja"}:
         _append_unique(required, [ModelID.MANGA_OCR_MOBILE_ONNX])
     else:

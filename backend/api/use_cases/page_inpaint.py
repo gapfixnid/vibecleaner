@@ -1,6 +1,11 @@
 from fastapi import HTTPException
 
-from ...pipeline.page_analysis import bubble_clip_boxes, inpaint_boxes
+from ...pipeline.page_analysis import (
+    bubble_clip_boxes,
+    bubble_source_polygons,
+    inpaint_boxes,
+    recover_missing_source_polygons,
+)
 from ...infrastructure.image.encoding import encode_preview_jpeg_bytes
 from ...infrastructure.image.loading import ensure_page_image, invalidate_page_caches
 from ...infrastructure.job_messages import msg
@@ -56,12 +61,26 @@ def _inpaint_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, i
         bubble_snapshot = bubble.clone()
 
     snapshots = [bubble_snapshot]
-    boxes = inpaint_boxes(snapshots)
+    recover_missing_source_polygons(
+        image,
+        snapshots,
+        source_language=str(getattr(config, "source_language", "")),
+    )
+    boxes = inpaint_boxes(
+        snapshots,
+        use_textbox_only=bool(getattr(config, "inpaint_use_textbox_only", True)),
+    )
     bubble_boxes = bubble_clip_boxes(snapshots)
 
     job_manager.ensure_not_cancelled(job)
     job_manager.update(job, progress=30, message=msg("inpaint.bubble", ui_lang))
-    inpainted_image = inpainting_service.clean_background(image, boxes, bubble_boxes, protect_edges=True)
+    inpainted_image = inpainting_service.clean_background(
+        image,
+        boxes,
+        bubble_boxes,
+        source_polygons=bubble_source_polygons(snapshots),
+        protect_edges=True,
+    )
     job_manager.ensure_not_cancelled(job)
     preview_bytes = encode_preview_jpeg_bytes(inpainted_image)
     job_manager.ensure_not_cancelled(job)
@@ -72,6 +91,10 @@ def _inpaint_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, i
         page_idx = resolve_page_index(state, page_id)
         page = state.pages[page_idx]
         page.inpainted_image = inpainted_image
+        current_bubble = next((item for item in page.bubbles if item.id == bubble_snapshot.id), None)
+        if current_bubble is not None and bubble_snapshot.source_polygons:
+            current_bubble.source_polygons = bubble_snapshot.source_polygons
+            current_bubble.text_box = bubble_snapshot.text_box
         refresh_page_status(page)
         invalidate_page_caches(page, thumbnails=True, layouts=False, responses=True)
         page._preview_inpainted_bytes = preview_bytes
@@ -88,12 +111,26 @@ def _inpaint_job(state, job: dict, page_id: str, inpainting_service, job_manager
         start_revision = state.revision
         image = page.cv_image.copy()
         bubbles_snapshot = [bubble.clone() for bubble in page.bubbles]
-        boxes = inpaint_boxes(bubbles_snapshot)
+        recover_missing_source_polygons(
+            image,
+            bubbles_snapshot,
+            source_language=str(getattr(config, "source_language", "")),
+        )
+        boxes = inpaint_boxes(
+            bubbles_snapshot,
+            use_textbox_only=bool(getattr(config, "inpaint_use_textbox_only", True)),
+        )
         bubble_boxes = bubble_clip_boxes(bubbles_snapshot)
 
     job_manager.ensure_not_cancelled(job)
     job_manager.update(job, progress=30, message=msg("inpaint.page", ui_lang))
-    inpainted_image = inpainting_service.clean_background(image, boxes, bubble_boxes, protect_edges=True)
+    inpainted_image = inpainting_service.clean_background(
+        image,
+        boxes,
+        bubble_boxes,
+        source_polygons=bubble_source_polygons(bubbles_snapshot),
+        protect_edges=True,
+    )
     job_manager.ensure_not_cancelled(job)
     preview_bytes = encode_preview_jpeg_bytes(inpainted_image)
     job_manager.ensure_not_cancelled(job)
@@ -104,6 +141,12 @@ def _inpaint_job(state, job: dict, page_id: str, inpainting_service, job_manager
         page_idx = resolve_page_index(state, page_id)
         page = state.pages[page_idx]
         page.inpainted_image = inpainted_image
+        recovered_by_id = {bubble.id: bubble for bubble in bubbles_snapshot if bubble.source_polygons}
+        for current_bubble in page.bubbles:
+            recovered = recovered_by_id.get(current_bubble.id)
+            if recovered is not None:
+                current_bubble.source_polygons = recovered.source_polygons
+                current_bubble.text_box = recovered.text_box
         refresh_page_status(page)
         invalidate_page_caches(page, thumbnails=True, layouts=False, responses=True)
         page._preview_inpainted_bytes = preview_bytes

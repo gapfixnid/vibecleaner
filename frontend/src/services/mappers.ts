@@ -64,6 +64,12 @@ export function toBubbleInfo(bubble: BubbleDto): BubbleInfo {
     layout_margin: bubble.layout.margin || {},
     layout_confidence: bubble.layout.confidence || 0,
     layout_reasoning: bubble.layout.reasoning || "",
+    text_box: bubble.textBox ? {
+      x: bubble.textBox.x,
+      y: bubble.textBox.y,
+      width: bubble.textBox.width,
+      height: bubble.textBox.height,
+    } : null,
     lines: bubble.layout.lines.map((line) => ({
       text: line.text,
       x: line.x,

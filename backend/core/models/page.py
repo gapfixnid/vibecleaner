@@ -26,6 +26,7 @@ class TextBubble:
     translated: str = ""
     text_box: Optional[Rect] = None
     layout_box: Optional[Rect] = None
+    source_polygons: List[List[tuple[int, int]]] = field(default_factory=list)
     text_class: str = ""
     font_family: str = ""
     font_size: int = 0
@@ -98,6 +99,7 @@ class TextBubble:
             "style": style,
             "layout_plan": layout_plan,
             "detection_confidence": self.detection_confidence,
+            "source_polygons": deepcopy(self.source_polygons),
         })
         text_box = self._rect_to_project_list(self.text_box)
         if text_box is not None:
@@ -119,7 +121,7 @@ class TextBubble:
             "status", "problems", "edited", "style", "layout_plan", "font_family", "font_size",
             "bold", "italic", "color", "alignment", "writing_mode", "text_direction",
             "justification", "layout_padding", "layout_margin", "layout_confidence", "layout_reasoning",
-            "detection_confidence",
+            "detection_confidence", "source_polygons",
         }
         extensions = {key: deepcopy(value) for key, value in data.items() if key not in known_keys}
         unknown_style = {
@@ -143,6 +145,7 @@ class TextBubble:
             translated=data.get("translated", ""),
             text_box=cls._rect_from_project_list(data.get("text_box")),
             layout_box=cls._rect_from_project_list(data.get("layout_box")),
+            source_polygons=deepcopy(data.get("source_polygons", [])),
             text_class=data.get("text_class", ""),
             font_family=style.get("font_family", data.get("font_family", "")),
             font_size=style.get("font_size", data.get("font_size", 0)),
@@ -173,6 +176,7 @@ class TextBubble:
             translated=self.translated,
             text_box=self.text_box,
             layout_box=self.layout_box,
+            source_polygons=deepcopy(self.source_polygons),
             text_class=self.text_class,
             font_family=self.font_family,
             font_size=self.font_size,

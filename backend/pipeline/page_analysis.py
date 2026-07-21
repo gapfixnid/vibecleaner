@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import math
 
 import numpy as np
 
@@ -14,7 +15,89 @@ def inpaint_boxes(bubbles, *, use_textbox_only: bool = True) -> list:
 
 
 def bubble_clip_boxes(bubbles) -> list:
-    return [bubble.box.to_xyxy() for bubble in bubbles]
+    boxes = []
+    for bubble in bubbles:
+        clip_box = bubble.box
+        points = [point for polygon in bubble.source_polygons for point in polygon]
+        if points:
+            polygon_box = Rect.from_xyxy(
+                min(point[0] for point in points),
+                min(point[1] for point in points),
+                max(point[0] for point in points),
+                max(point[1] for point in points),
+            )
+            clip_box = clip_box.united(polygon_box)
+        boxes.append(clip_box.to_xyxy())
+    return boxes
+
+
+def recover_missing_source_polygons(
+    image: np.ndarray,
+    bubbles,
+    *,
+    source_language: str = "",
+) -> None:
+    """Recover oriented line geometry for projects saved before polygons existed."""
+    from ..engines.common.textblock import TextBlock
+    from ..engines.detection.heuristic_lines import annotate_blocks_with_heuristic_lines
+
+    for bubble in bubbles:
+        if bubble.source_polygons:
+            continue
+        block = TextBlock(
+            text_bbox=np.asarray(bubble.source_xyxy(), dtype=np.int32),
+            bubble_bbox=np.asarray(bubble.box.to_xyxy(), dtype=np.int32),
+            text_class=bubble.text_class,
+            source_lang=source_language,
+        )
+        annotate_blocks_with_heuristic_lines(
+            image,
+            [block],
+            source_language=source_language,
+        )
+        polygons = []
+        for line in block.lines or []:
+            array = np.asarray(line)
+            if array.ndim == 2 and array.shape[0] >= 4 and array.shape[1] == 2:
+                polygons.append([
+                    (int(round(float(point[0]))), int(round(float(point[1]))))
+                    for point in array
+                ])
+            elif array.size == 4:
+                x1, y1, x2, y2 = [int(round(float(value))) for value in array.reshape(-1)]
+                polygons.append([(x1, y1), (x2, y1), (x2, y2), (x1, y2)])
+        oriented_polygons = []
+        for polygon in polygons:
+            dx = float(polygon[1][0] - polygon[0][0])
+            dy = float(polygon[1][1] - polygon[0][1])
+            angle = abs(math.degrees(math.atan2(dy, dx))) % 90.0
+            distance_from_axis = min(angle, 90.0 - angle)
+            if distance_from_axis >= 3.0:
+                oriented_polygons.append(polygon)
+        # Axis-aligned recovery adds no information over source_xyxy and can
+        # accidentally widen a valid saved text box to the entire bubble.
+        if not oriented_polygons:
+            continue
+        bubble.source_polygons = oriented_polygons
+        points = [point for polygon in oriented_polygons for point in polygon]
+        polygon_box = Rect.from_xyxy(
+            min(point[0] for point in points),
+            min(point[1] for point in points),
+            max(point[0] for point in points),
+            max(point[1] for point in points),
+        )
+        bubble.text_box = bubble.source_box().united(polygon_box)
+
+
+def bubble_source_polygons(bubbles) -> list:
+    polygon_groups = []
+    for bubble in bubbles:
+        if bubble.source_polygons:
+            polygon_groups.append(bubble.source_polygons)
+            continue
+        x1, y1, x2, y2 = [int(round(value)) for value in bubble.source_xyxy()]
+        polygon_groups.append([[(x1, y1), (x2, y1), (x2, y2), (x1, y2)]])
+    return polygon_groups
 
 
 def _rect_from_xyxy(xyxy) -> Rect:
@@ -110,6 +193,7 @@ def bubbles_from_analysis(
             translated="",
             text_box=text_rect,
             layout_box=layout_box,
+            source_polygons=bubble_data.text_polygons,
             text_class=bubble_data.text_class,
         )
         text_bubble.font_family = ""
@@ -166,6 +250,7 @@ def merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float = 
                         first.text_box = first.text_box.united(second.text_box)
                     elif second.text_box is not None:
                         first.text_box = second.text_box
+                    first.source_polygons.extend(second.source_polygons)
 
                     if first.layout_box is not None and second.layout_box is not None:
                         first.layout_box = first.layout_box.united(second.layout_box)

@@ -6,6 +6,8 @@ export type TranslationKey =
   | "app.title"
   | "layout.resizePages"
   | "layout.resizeInspector"
+  | "layout.hidePages"
+  | "layout.showPages"
   | "layout.hideInspector"
   | "layout.showInspector"
   | "toolbar.addImages"
@@ -259,6 +261,7 @@ export type TranslationKey =
   | "settings.llmOptionsHelp"
   | "settings.recognitionRules"
   | "settings.detectionModel"
+  | "settings.showDetectionOverlay"
   | "settings.modelHighPrecision"
   | "settings.modelSmall"
   | "settings.tilingEnabled"
@@ -313,6 +316,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "app.title": "VibeCleaner",
     "layout.resizePages": "Resize pages panel",
     "layout.resizeInspector": "Resize inspector panel",
+    "layout.hidePages": "Hide pages panel",
+    "layout.showPages": "Show pages panel",
     "layout.hideInspector": "Hide inspector (Alt+I)",
     "layout.showInspector": "Show inspector (Alt+I)",
     "toolbar.addImages": "Add Images",
@@ -566,8 +571,9 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.llmOptionsHelp": "Defaults favor stable comic dialogue and valid JSON output. Higher values can sound more varied but may be less consistent.",
     "settings.recognitionRules": "Recognition Rules",
     "settings.detectionModel": "Detection Model",
-    "settings.modelHighPrecision": "Balanced - RT-DETRv2 FP32",
-    "settings.modelSmall": "Fast - RT-DETRv2 INT8",
+    "settings.showDetectionOverlay": "Show detection boxes on the canvas",
+    "settings.modelHighPrecision": "RT-DETRv2 FP32 ONNX",
+    "settings.modelSmall": "RT-DETRv2 INT8 ONNX",
     "settings.tilingEnabled": "Tiling Enabled (Increases detection quality for small bubbles)",
     "settings.bubblesOnly": "Speech Bubbles Only (Ignore free-floating sfx text)",
     "settings.confidenceTolerances": "Confidence Tolerances",
@@ -575,10 +581,10 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.ocrOptions": "OCR Options",
     "settings.ocrEngine": "OCR Engine",
     "settings.ocrEngineAuto": "Auto by source language",
-    "settings.ocrEngineManga": "Manga OCR Mobile",
-    "settings.ocrEnginePpocr": "PPOCR v5",
-    "settings.ocrEngineBalanced": "Balanced - automatic OCR by source language",
-    "settings.ocrEngineFast": "Fast - PPOCR v5 Mobile",
+    "settings.ocrEngineManga": "Manga OCR Mobile ONNX",
+    "settings.ocrEnginePpocr": "PP-OCRv6 Medium Recognition ONNX",
+    "settings.ocrEngineBalanced": "Auto - Manga OCR Mobile / PP-OCRv6 Medium",
+    "settings.ocrEngineFast": "PP-OCRv6 Medium Recognition ONNX",
     "settings.ocrPadding": "Crop Padding",
     "settings.ocrCropScale": "Crop Scale",
     "settings.adaptiveBinarization": "Adaptive Binarization",
@@ -592,8 +598,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.lineMergeSensitivity": "Line Merge Sensitivity",
     "settings.inpaintingOptions": "Inpainting Options",
     "settings.inpaintingEngine": "Inpainting Engine",
-    "settings.inpaintingEngineBalanced": "Balanced - LaMa Manga ONNX",
-    "settings.inpaintingEngineFast": "Fast - OpenCV Telea",
+    "settings.inpaintingEngineBalanced": "LaMa Manga ONNX (lama-manga-dynamic)",
+    "settings.inpaintingEngineFast": "OpenCV Telea (no model download)",
     "settings.cleanTextboxOnly": "Clean Text Box Areas Only (Recommended)",
     "settings.clipInpaintingMask": "Clip Inpainting Mask to speech bubble stroke edges",
     "settings.maskTolerances": "Mask tolerances",
@@ -619,6 +625,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "app.title": "VibeCleaner",
     "layout.resizePages": "페이지 패널 크기 조절",
     "layout.resizeInspector": "인스펙터 패널 크기 조절",
+    "layout.hidePages": "페이지 패널 숨기기",
+    "layout.showPages": "페이지 패널 표시",
     "layout.hideInspector": "인스펙터 숨기기 (Alt+I)",
     "layout.showInspector": "인스펙터 표시 (Alt+I)",
     "toolbar.addImages": "이미지 추가",
@@ -872,8 +880,9 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.llmOptionsHelp": "기본값은 안정적인 만화 대사와 올바른 JSON 출력을 우선합니다. 값을 높이면 표현은 다양해질 수 있지만 일관성은 낮아질 수 있습니다.",
     "settings.recognitionRules": "인식 규칙",
     "settings.detectionModel": "감지 모델",
-    "settings.modelHighPrecision": "균형 - RT-DETRv2 FP32",
-    "settings.modelSmall": "고속 - RT-DETRv2 INT8",
+    "settings.showDetectionOverlay": "캔버스에 검출 박스 표시",
+    "settings.modelHighPrecision": "RT-DETRv2 FP32 ONNX",
+    "settings.modelSmall": "RT-DETRv2 INT8 ONNX",
     "settings.tilingEnabled": "타일링 활성화(작은 말풍선 감지 품질 향상)",
     "settings.bubblesOnly": "말풍선만 처리(떠 있는 효과음 텍스트 무시)",
     "settings.confidenceTolerances": "신뢰도 허용값",
@@ -881,10 +890,10 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.ocrOptions": "OCR 옵션",
     "settings.ocrEngine": "OCR 엔진",
     "settings.ocrEngineAuto": "원본 언어에 맞춰 자동 선택",
-    "settings.ocrEngineManga": "Manga OCR Mobile",
-    "settings.ocrEnginePpocr": "PPOCR v5",
-    "settings.ocrEngineBalanced": "균형 - 원본 언어 기준 자동 OCR",
-    "settings.ocrEngineFast": "고속 - PPOCR v5 Mobile",
+    "settings.ocrEngineManga": "Manga OCR Mobile ONNX",
+    "settings.ocrEnginePpocr": "PP-OCRv6 Medium Recognition ONNX",
+    "settings.ocrEngineBalanced": "자동 - Manga OCR Mobile / PP-OCRv6 Medium",
+    "settings.ocrEngineFast": "PP-OCRv6 Medium Recognition ONNX",
     "settings.ocrPadding": "Crop 여백",
     "settings.ocrCropScale": "Crop 배율",
     "settings.adaptiveBinarization": "적응형 이진화",
@@ -898,8 +907,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.lineMergeSensitivity": "줄 병합 감도",
     "settings.inpaintingOptions": "인페인팅 옵션",
     "settings.inpaintingEngine": "인페인팅 엔진",
-    "settings.inpaintingEngineBalanced": "균형 - LaMa Manga ONNX",
-    "settings.inpaintingEngineFast": "고속 - OpenCV Telea",
+    "settings.inpaintingEngineBalanced": "LaMa Manga ONNX (lama-manga-dynamic)",
+    "settings.inpaintingEngineFast": "OpenCV Telea (모델 다운로드 없음)",
     "settings.cleanTextboxOnly": "텍스트 박스 영역만 지우기(권장)",
     "settings.clipInpaintingMask": "인페인팅 마스크를 말풍선 테두리 안쪽으로 제한",
     "settings.maskTolerances": "마스크 허용값",

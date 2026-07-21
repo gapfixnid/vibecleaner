@@ -1,6 +1,6 @@
 // frontend/src/components/Canvas.tsx
 import React, { useRef, useState } from "react";
-import { Bug, ScanEye } from "lucide-react";
+import { ScanEye } from "lucide-react";
 import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
 import { CanvasZoomControls } from "./canvas/CanvasZoomControls";
@@ -38,6 +38,7 @@ interface CanvasProps {
   selectedPageCount?: number;
   /** When true, page image is reloading — keep existing bubble overlay until new bubbles load. */
   isWaitingForImageReload?: boolean;
+  showDetectionOverlay?: boolean;
   t?: (key: string) => string;
 }
 
@@ -65,6 +66,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   isMultiPageSelection,
   selectedPageCount,
   isWaitingForImageReload,
+  showDetectionOverlay = false,
   t,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -72,7 +74,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   const imageRef = useRef<HTMLImageElement>(null);
   const [scale, setScale] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [showDetectionOverlay, setShowDetectionOverlay] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
 
   // Tracks whether the user has manually zoomed/panned the current page, so
@@ -215,23 +216,11 @@ export const Canvas: React.FC<CanvasProps> = ({
         />
       )}
 
-      {/* Floating zoom cluster */}
-      {displayImageUrl && !isMultiPageSelection && (
-        <CanvasZoomControls
-          scale={scale}
-          onZoomIn={() => zoomBy(1.25)}
-          onZoomOut={() => zoomBy(1 / 1.25)}
-          onZoomReset={() => zoomTo(1)}
-          onZoomFit={fitToWindow}
-          t={t}
-        />
-      )}
-
-      {/* Floating control bar */}
+      {/* Unified floating control bar */}
       {displayImageUrl && (
         <div className="canvas-floating-controls">
           <div className="actions-capsule">
-            {originalImageUrl && hasProcessedImage && (
+            {!isMultiPageSelection && originalImageUrl && hasProcessedImage && (
               <button
                 type="button"
                 className={`canvas-compare-button${showOriginal ? " active" : ""}`}
@@ -251,15 +240,22 @@ export const Canvas: React.FC<CanvasProps> = ({
                 <span>{showOriginal ? (t?.("canvas.viewingOriginal") || "Original") : (t?.("canvas.compare") || "Compare")}</span>
               </button>
             )}
-            <button
-              type="button"
-              className={`canvas-debug-button${showDetectionOverlay ? " active" : ""}`}
-              onClick={() => setShowDetectionOverlay((visible) => !visible)}
-              title={showDetectionOverlay ? (t?.("canvas.hideDetection") || "Hide detection boxes") : (t?.("canvas.showDetection") || "Show detection boxes")}
-              aria-label={showDetectionOverlay ? (t?.("canvas.hideDetection") || "Hide detection boxes") : (t?.("canvas.showDetection") || "Show detection boxes")}
-            >
-              <Bug size={15} />
-            </button>
+            {!isMultiPageSelection && (
+              <>
+                {originalImageUrl && hasProcessedImage && (
+                  <div className="control-divider" aria-hidden="true" />
+                )}
+                <CanvasZoomControls
+                  scale={scale}
+                  onZoomIn={() => zoomBy(1.25)}
+                  onZoomOut={() => zoomBy(1 / 1.25)}
+                  onZoomReset={() => zoomTo(1)}
+                  onZoomFit={fitToWindow}
+                  t={t}
+                />
+              </>
+            )}
+            {!isMultiPageSelection && <div className="control-divider" aria-hidden="true" />}
             <CanvasTranslateButton
               isProcessing={isProcessing}
               isJobActive={isJobActive}
@@ -425,24 +421,6 @@ export const Canvas: React.FC<CanvasProps> = ({
           max-height: none;
         }
 
-        .canvas-debug-button {
-          width: 30px;
-          height: 30px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border: 0;
-          border-radius: 9px;
-          color: var(--text-secondary);
-          background: transparent;
-          cursor: pointer;
-        }
-
-        .canvas-debug-button:hover, .canvas-debug-button.active {
-          color: var(--system-blue);
-          background: color-mix(in srgb, var(--system-blue) 14%, transparent);
-        }
-
         .canvas-svg-overlay, .canvas-text-overlay {
           top: 0;
           left: 0;
@@ -463,6 +441,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           align-items: center;
           gap: 12px;
           z-index: 5;
+          max-width: calc(100% - 28px);
         }
 
         /* Press feedback: every toolbar button dips slightly when pressed. */
@@ -473,6 +452,14 @@ export const Canvas: React.FC<CanvasProps> = ({
         .actions-capsule {
           display: flex;
           align-items: center;
+          gap: 2px;
+          padding: 5px;
+          border: 1px solid var(--overlay-border);
+          border-radius: var(--radius-lg);
+          background: var(--overlay-bg);
+          backdrop-filter: var(--glass-blur);
+          -webkit-backdrop-filter: var(--glass-blur);
+          box-shadow: var(--overlay-shadow);
         }
 
         .actions-capsule button {
@@ -498,6 +485,15 @@ export const Canvas: React.FC<CanvasProps> = ({
         .actions-capsule button svg {
           display: block;
           flex-shrink: 0;
+        }
+
+        .actions-capsule .canvas-zoom-controls button {
+          min-width: 28px;
+          padding: 0 6px;
+        }
+
+        .actions-capsule .canvas-zoom-controls .zoom-readout {
+          min-width: 46px;
         }
 
         /* Prevent layout jitter when Translate ↔ Cancel morphs. */

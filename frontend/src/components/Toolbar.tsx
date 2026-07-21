@@ -1,6 +1,6 @@
 // frontend/src/components/Toolbar.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { Download, FilePlus2, FolderOpen, ImagePlus, Info, Menu, Minus, PanelRightClose, PanelRightOpen, Save, Settings, Square, X } from "lucide-react";
+import { Download, FilePlus2, FolderOpen, ImagePlus, Info, Menu, Minus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Save, Settings, Square, X } from "lucide-react";
 import * as desktop from "../services/desktop";
 import { APP_NAME } from "../appMeta";
 
@@ -12,6 +12,8 @@ interface ToolbarProps {
   onExport: () => void;
   onPreferences: () => void;
   onAbout: () => void;
+  onToggleSidebar: () => void;
+  isSidebarOpen: boolean;
   onToggleInspector: () => void;
   isInspectorOpen: boolean;
   isDirty: boolean;
@@ -27,6 +29,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onExport,
   onPreferences,
   onAbout,
+  onToggleSidebar,
+  isSidebarOpen,
   onToggleInspector,
   isInspectorOpen,
   isDirty,
@@ -129,6 +133,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           aria-label={t("toolbar.preferences")}
         >
           <Settings size={17} />
+        </button>
+        <button
+          type="button"
+          className="toolbar-action sidebar-toggle"
+          onClick={onToggleSidebar}
+          data-tooltip={t(isSidebarOpen ? "layout.hidePages" : "layout.showPages")}
+          aria-label={t(isSidebarOpen ? "layout.hidePages" : "layout.showPages")}
+          aria-pressed={isSidebarOpen}
+        >
+          {isSidebarOpen ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
         </button>
         <button
           type="button"

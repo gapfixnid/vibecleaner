@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_API_URL = "http://127.0.0.1:11434"
 SETTINGS_FORMAT = "vibecleaner-settings"
-SETTINGS_SCHEMA_VERSION = 1
+SETTINGS_SCHEMA_VERSION = 2
 SETTINGS_SCHEMA_VERSION_KEY = "schema_version"
 LEGACY_SETTINGS_SCHEMA_VERSION_KEY = "settings_schema_version"
 
@@ -45,6 +45,7 @@ class AppConfigSnapshot:
     confidence_threshold: float = 0.45
     tiling_enabled: bool = True
     bubbles_only: bool = False
+    show_detection_overlay: bool = False
     ocr_engine: str = "balanced"
     ocr_padding: int = 8
     ocr_crop_scale: float = 1.5
@@ -116,6 +117,7 @@ class AppConfig:
     confidence_threshold: float = 0.45
     tiling_enabled: bool = True
     bubbles_only: bool = False
+    show_detection_overlay: bool = False
 
     # -- OCR ----------------------------------------------------------------
     ocr_engine: str = "balanced"
@@ -253,6 +255,7 @@ class AppConfig:
             "smart_direction": "smart_direction",
             "text_direction_override": "text_direction_override",
             "bubbles_only": "bubbles_only",
+            "show_detection_overlay": "show_detection_overlay",
             "min_font_size": "min_font_size",
             "max_font_size": "max_font_size",
             "default_font_size": "default_font_size",
@@ -365,6 +368,11 @@ class AppConfig:
                 migrated["inpaint_engine"] = "lama"
             if migrated.get("confidence_threshold") == 0.30:
                 migrated["confidence_threshold"] = 0.45
+        if schema_version < 2:
+            if str(migrated.get("ocr_engine", "")).strip().lower() in {
+                "fast", "speed", "paddleocr", "paddle_ocr"
+            }:
+                migrated["ocr_engine"] = "ppocr"
         migrated["format"] = SETTINGS_FORMAT
         migrated[SETTINGS_SCHEMA_VERSION_KEY] = SETTINGS_SCHEMA_VERSION
         migrated.setdefault("app_version", "unknown")

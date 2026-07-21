@@ -35,6 +35,7 @@ const DEFAULT_SETTINGS: Settings = {
   smart_direction: true,
   text_direction_override: "auto",
   bubbles_only: false,
+  show_detection_overlay: false,
   min_font_size: 6,
   max_font_size: 48,
   default_font_size: 18,

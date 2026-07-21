@@ -248,6 +248,13 @@ def register_builtin_providers(
                     default=False,
                 ),
                 ConfigFieldSpec(
+                    key="show_detection_overlay",
+                    value_type="boolean",
+                    label="settings.showDetectionOverlay",
+                    default=False,
+                    advanced=True,
+                ),
+                ConfigFieldSpec(
                     key="smart_direction",
                     value_type="boolean",
                     label="settings.smartDirection",
@@ -295,8 +302,9 @@ def register_builtin_providers(
             ),
             resource_classes={"cpu", "gpu", "io"},
             model_catalog=(
-                ProviderModelProfile("balanced", "Balanced OCR", 0.90, 0.55, frozenset({"cpu", "gpu", "io"})),
-                ProviderModelProfile("fast", "Fast OCR", 0.72, 0.92, frozenset({"cpu", "io"})),
+                ProviderModelProfile("balanced", "Automatic OCR", 0.90, 0.70, frozenset({"cpu", "gpu", "io"})),
+                ProviderModelProfile("manga_ocr", "Manga OCR Mobile ONNX", 0.92, 0.55, frozenset({"cpu", "gpu", "io"})),
+                ProviderModelProfile("ppocr", "PP-OCRv6 Medium Recognition ONNX", 0.88, 0.85, frozenset({"cpu", "gpu", "io"})),
             ),
             queue_capacity=4,
             config_schema=(
@@ -305,8 +313,12 @@ def register_builtin_providers(
                     value_type="enum",
                     label="settings.ocrEngine",
                     default="balanced",
-                    choices=("balanced", "fast"),
-                    choice_labels=("settings.ocrEngineBalanced", "settings.ocrEngineFast"),
+                    choices=("balanced", "manga_ocr", "ppocr"),
+                    choice_labels=(
+                        "settings.ocrEngineBalanced",
+                        "settings.ocrEngineManga",
+                        "settings.ocrEnginePpocr",
+                    ),
                 ),
                 ConfigFieldSpec(
                     key="ocr_padding",

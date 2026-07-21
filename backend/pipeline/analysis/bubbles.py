@@ -43,6 +43,7 @@ class BubbleData:
     text_box: Tuple[int, int, int, int]    # (x1, y1, x2, y2) of text region
     layout_box: Tuple[int, int, int, int]  # (x1, y1, x2, y2) for text placement
     polygon: List[Tuple[int, int]] = field(default_factory=list)  # bubble outline
+    text_polygons: List[List[Tuple[int, int]]] = field(default_factory=list)
 
     # Content
     text: str = ""
@@ -165,10 +166,20 @@ class BubbleAnalysisService:
         if isinstance(font_color, str):
             font_color = self._hex_to_rgb(font_color)
 
+        text_polygons = self._extract_text_polygons(block)
+        if text_polygons:
+            polygon_xs = [point[0] for polygon in text_polygons for point in polygon]
+            polygon_ys = [point[1] for polygon in text_polygons for point in polygon]
+            text_box = self._union_box(
+                text_box,
+                (min(polygon_xs), min(polygon_ys), max(polygon_xs), max(polygon_ys)),
+            )
+
         return BubbleData(
             bubble_box=bubble_box,
             text_box=text_box,
             layout_box=text_box,  # Will be recalculated
+            text_polygons=text_polygons,
             text=getattr(block, 'text', ''),
             text_class=text_class,
             font_color=font_color,
@@ -217,6 +228,7 @@ class BubbleAnalysisService:
             for item in group[1:]:
                 first.bubble_box = self._union_box(first.bubble_box, item.bubble_box)
                 first.text_box = self._union_box(first.text_box, item.text_box)
+                first.text_polygons.extend(item.text_polygons)
                 first.text = self._join_text([first.text, item.text], first.direction)
                 first.confidence = max(first.confidence, item.confidence)
                 if item.model_confidence is not None:
@@ -226,6 +238,28 @@ class BubbleAnalysisService:
             first.layout_box = first.text_box
             grouped.append(first)
         return grouped
+
+    @staticmethod
+    def _extract_text_polygons(block) -> List[List[Tuple[int, int]]]:
+        """Preserve oriented OCR line geometry for precise inpainting masks."""
+        polygons: List[List[Tuple[int, int]]] = []
+        candidates = list(getattr(block, "lines", None) or [])
+        segmentation = getattr(block, "segm_pts", None)
+        if not candidates and segmentation is not None:
+            candidates = [segmentation]
+
+        for candidate in candidates:
+            array = np.asarray(candidate)
+            if array.ndim == 2 and array.shape[0] >= 4 and array.shape[1] == 2:
+                polygons.append([
+                    (int(round(float(point[0]))), int(round(float(point[1]))))
+                    for point in array
+                ])
+                continue
+            if array.size == 4:
+                x1, y1, x2, y2 = [int(round(float(value))) for value in array.reshape(-1)]
+                polygons.append([(x1, y1), (x2, y1), (x2, y2), (x1, y2)])
+        return polygons
 
     @staticmethod
     def _bubble_iou(first: BubbleData, second: BubbleData) -> float:

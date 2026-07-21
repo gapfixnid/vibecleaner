@@ -31,6 +31,7 @@ export interface SettingsDto {
   smart_direction: boolean;
   text_direction_override: string;
   bubbles_only: boolean;
+  show_detection_overlay: boolean;
   min_font_size: number;
   max_font_size: number;
   default_font_size: number;

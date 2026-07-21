@@ -139,7 +139,8 @@ function App() {
   // --- Local UI state ---
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
-  const [isInspectorOpen, setIsInspectorOpen] = useState(() => localStorage.getItem("vibecleaner.inspectorOpen") !== "false");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const { theme, setTheme, themes } = useTheme();
   const {
     sidebarWidth,
@@ -150,12 +151,12 @@ function App() {
     adjustInspectorWidth,
   } = usePanelWidths();
 
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((open) => !open);
+  }, []);
+
   const toggleInspector = useCallback(() => {
-    setIsInspectorOpen((open) => {
-      const next = !open;
-      localStorage.setItem("vibecleaner.inspectorOpen", String(next));
-      return next;
-    });
+    setIsInspectorOpen((open) => !open);
   }, []);
 
   useEffect(() => {
@@ -321,6 +322,8 @@ function App() {
         onExport={handleToolbarExport}
         onPreferences={() => setIsSettingsOpen(true)}
         onAbout={() => setIsAboutOpen(true)}
+        onToggleSidebar={toggleSidebar}
+        isSidebarOpen={isSidebarOpen}
         onToggleInspector={toggleInspector}
         isInspectorOpen={isInspectorOpen}
         isDirty={isDirty}
@@ -329,36 +332,40 @@ function App() {
       />
 
       <div className="main-workspace">
-        <Sidebar
-          pages={pages}
-          currentIndex={currentIndex}
-          selectedPageIds={selectedPageIds}
-          pageVersions={pagesApi.pageVersions}
-          onSelectPage={pagesApi.handleSelectPage}
-          onPageClick={handlePageSelection}
-          onSelectAllPages={handleSelectAllPages}
-          onDuplicatePage={(idx) => pagesApi.handleDuplicatePages(resolveContextTargets(idx))}
-          onDeletePage={handleDeletePage}
-          onReorderPages={pagesApi.handleReorderPages}
-          onImportImages={handleImportImages}
-          onExportSelectedImages={() => handleExportPages(selectedPageIds)}
-          onRenamePage={handleRenamePage}
-          onTranslatePages={handleContextTranslate}
-          onSaveImages={handleContextSaveImages}
-          backendUrl={currentBackendUrl}
-          isLoading={isBootstrapping}
-          t={t}
-        />
+        {isSidebarOpen && (
+          <>
+            <Sidebar
+              pages={pages}
+              currentIndex={currentIndex}
+              selectedPageIds={selectedPageIds}
+              pageVersions={pagesApi.pageVersions}
+              onSelectPage={pagesApi.handleSelectPage}
+              onPageClick={handlePageSelection}
+              onSelectAllPages={handleSelectAllPages}
+              onDuplicatePage={(idx) => pagesApi.handleDuplicatePages(resolveContextTargets(idx))}
+              onDeletePage={handleDeletePage}
+              onReorderPages={pagesApi.handleReorderPages}
+              onImportImages={handleImportImages}
+              onExportSelectedImages={() => handleExportPages(selectedPageIds)}
+              onRenamePage={handleRenamePage}
+              onTranslatePages={handleContextTranslate}
+              onSaveImages={handleContextSaveImages}
+              backendUrl={currentBackendUrl}
+              isLoading={isBootstrapping}
+              t={t}
+            />
 
-        <div
-          className="panel-resizer sidebar-resizer"
-          role="separator"
-          aria-label={t("layout.resizePages")}
-          aria-orientation="vertical"
-          tabIndex={0}
-          onPointerDown={startSidebarResize}
-          onKeyDown={(event) => handlePanelResizeKey(event, "sidebar")}
-        />
+            <div
+              className="panel-resizer sidebar-resizer"
+              role="separator"
+              aria-label={t("layout.resizePages")}
+              aria-orientation="vertical"
+              tabIndex={0}
+              onPointerDown={startSidebarResize}
+              onKeyDown={(event) => handlePanelResizeKey(event, "sidebar")}
+            />
+          </>
+        )}
 
         <Canvas
           imageUrl={currentIndex >= 0 && activePage ? buildPageImageUrl(activePage) : ""}
@@ -384,6 +391,7 @@ function App() {
           isMultiPageSelection={isMultiPageSelection}
           selectedPageCount={selectedPageIds.length}
           isWaitingForImageReload={isWaitingForImageReload}
+          showDetectionOverlay={settings.show_detection_overlay}
           t={t}
         />
 

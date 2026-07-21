@@ -126,5 +126,23 @@ class ConfigMigrationTests(unittest.TestCase):
 
         self.assertTrue(cfg.setup_completed)
 
+    def test_schema_v1_fast_ocr_migrates_to_explicit_ppocr(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            settings_path.write_text(
+                json.dumps(
+                    {
+                        "format": SETTINGS_FORMAT,
+                        "schema_version": 1,
+                        "ocr_engine": "fast",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            cfg = AppConfig(settings_path=str(settings_path))
+            cfg.load()
+
+        self.assertEqual(cfg.ocr_engine, "ppocr")
+
 if __name__ == "__main__":
     unittest.main()
