@@ -136,6 +136,11 @@ def get_bubbles_response(state, page_id: str, render_service):
             for bubble in bubbles_snapshot
         }
 
+    # A newly imported page has no bubbles to lay out. Avoid decoding and
+    # retaining the full source image merely to return an empty response.
+    if not bubbles_snapshot:
+        return {"bubbles": []}
+
     if source_img is None:
         source_img = load_cv_image(load_path)
         if source_img is None:

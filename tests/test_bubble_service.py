@@ -1,5 +1,6 @@
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 from backend.core.models import Rect
@@ -108,6 +109,20 @@ class BubbleServiceTests(unittest.TestCase):
         self.assertEqual(bubble["status"], "layout_overflow")
         self.assertIn("layout overflow", bubble["problems"])
         self.assertTrue(bubble["layout_overflow"])
+
+    def test_get_bubbles_response_does_not_load_image_when_page_has_no_bubbles(self):
+        page = MangaPage(file_path="missing.png", cv_image=None, bubbles=[])
+        page.page_id = "page_a"
+        page._loaded = False
+        with self.state.lock:
+            self.state.pages = [page]
+            self.state.current_page_idx = 0
+
+        with patch.object(bubble_service, "load_cv_image") as load_image:
+            response = bubble_service.get_bubbles_response(self.state, "page_a", FakeRenderService(None))
+
+        self.assertEqual(response, {"bubbles": []})
+        load_image.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()

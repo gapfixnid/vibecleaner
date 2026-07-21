@@ -469,9 +469,7 @@ async fn import_images(
         .await
         .map_err(|e| format!("HTTP POST 실패: {e}"))?;
 
-    let _: serde_json::Value = response_json(res).await?;
-
-    get_project(port_state).await
+    response_json(res).await
 }
 
 #[tauri::command]
@@ -479,12 +477,16 @@ async fn import_directory(
     port_state: tauri::State<'_, PortState>,
     directory: String,
 ) -> Result<serde_json::Value, String> {
-    let _: serde_json::Value = forward_form(
+    forward_form(
         port_state.0,
         "/api/project/open-directory",
         vec![("directory".to_string(), directory)],
-    ).await?;
-    get_project(port_state).await
+    ).await
+}
+
+#[tauri::command]
+async fn get_pages(port_state: tauri::State<'_, PortState>) -> Result<serde_json::Value, String> {
+    forward_get(port_state.0, "/api/pages").await
 }
 
 #[tauri::command]
@@ -1064,6 +1066,7 @@ pub fn run() {
             import_images,
             import_directory,
             get_project,
+            get_pages,
             get_page,
             new_project,
             load_project,

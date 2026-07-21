@@ -39,18 +39,18 @@ def get_page_image_response(
         if thumbnail:
             if image_type == "inpainted" and page.inpainted_image is not None:
                 cached_bytes = getattr(page, "_thumbnail_inpainted_bytes", None)
-                if cached_bytes is None:
-                    cached_bytes = encode_thumbnail_bytes(page.inpainted_image)
-                    page._thumbnail_inpainted_bytes = cached_bytes
+                thumbnail_source = page.inpainted_image
+                thumbnail_kind = "inpainted"
             else:
-                cached_bytes = ensure_original_thumbnail(page)
-            return StreamingResponse(
-                io.BytesIO(cached_bytes),
-                media_type="image/png",
-                headers=IMAGE_CACHE_HEADERS,
-            )
+                cached_bytes = getattr(page, "_thumbnail_original_bytes", None)
+                thumbnail_source = None
+                thumbnail_kind = "original"
+        else:
+            cached_bytes = None
+            thumbnail_source = None
+            thumbnail_kind = None
 
-        if not preview and image_type == "original" and page.file_path and os.path.exists(page.file_path):
+        if not thumbnail and not preview and image_type == "original" and page.file_path and os.path.exists(page.file_path):
             media_type = mimetypes.guess_type(page.file_path)[0] or "application/octet-stream"
             return FileResponse(
                 page.file_path,
@@ -58,26 +58,46 @@ def get_page_image_response(
                 headers=IMAGE_CACHE_HEADERS,
             )
 
-        response_kind = "inpainted" if (image_type == "inpainted" and page.inpainted_image is not None) else "original"
-        if preview:
-            cache_attr = f"_preview_{response_kind}_bytes"
-            media_type = "image/jpeg"
-        else:
-            cache_attr = f"_{response_kind}_response_bytes"
-            media_type = "image/jpeg" if response_kind == "inpainted" else "image/png"
+        if not thumbnail:
+            response_kind = "inpainted" if (image_type == "inpainted" and page.inpainted_image is not None) else "original"
+            if preview:
+                cache_attr = f"_preview_{response_kind}_bytes"
+                media_type = "image/jpeg"
+            else:
+                cache_attr = f"_{response_kind}_response_bytes"
+                media_type = "image/jpeg" if response_kind == "inpainted" else "image/png"
 
-        cached_bytes = getattr(page, cache_attr, None)
-        if cached_bytes is not None:
-            return StreamingResponse(io.BytesIO(cached_bytes), media_type=media_type, headers=IMAGE_CACHE_HEADERS)
+            cached_bytes = getattr(page, cache_attr, None)
+            if cached_bytes is not None:
+                return StreamingResponse(io.BytesIO(cached_bytes), media_type=media_type, headers=IMAGE_CACHE_HEADERS)
 
-        if response_kind == "inpainted":
-            source_img = page.inpainted_image
-            needs_disk_load = False
-        else:
-            loaded = getattr(page, "_loaded", True) and page.cv_image is not None and page.cv_image.size > 0
-            source_img = page.cv_image if loaded else None
-            needs_disk_load = not loaded
-        load_path = page.file_path
+            if response_kind == "inpainted":
+                source_img = page.inpainted_image
+                needs_disk_load = False
+            else:
+                loaded = getattr(page, "_loaded", True) and page.cv_image is not None and page.cv_image.size > 0
+                source_img = page.cv_image if loaded else None
+                needs_disk_load = not loaded
+            load_path = page.file_path
+
+    if thumbnail:
+        if cached_bytes is None:
+            if thumbnail_kind == "inpainted":
+                cached_bytes = encode_thumbnail_bytes(thumbnail_source)
+                with state.lock:
+                    if (
+                        0 <= page_idx < len(state.pages)
+                        and state.pages[page_idx] is page
+                        and page.inpainted_image is thumbnail_source
+                    ):
+                        page._thumbnail_inpainted_bytes = cached_bytes
+            else:
+                cached_bytes = ensure_original_thumbnail(page)
+        return StreamingResponse(
+            io.BytesIO(cached_bytes),
+            media_type="image/png",
+            headers=IMAGE_CACHE_HEADERS,
+        )
 
     # Disk load + encode can be expensive, so do it outside the lock.
     if needs_disk_load:

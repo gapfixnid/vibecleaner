@@ -7,6 +7,7 @@ import type {
   ExportOptionsDto,
   ExportPageResultDto,
   ExportResultDto,
+  ImportResultDto,
   JobStatusDto,
   LoadProjectResultDto,
   ModelStatusDto,
@@ -14,7 +15,7 @@ import type {
   vibeCleanerApi,
 } from "../types/api";
 import type { ProviderCatalogDto } from "../types/provider";
-import type { ProjectDto, PageDto, SettingsDto } from "../types/project";
+import type { ProjectDto, PageDto, PagesDto, SettingsDto } from "../types/project";
 import type { BubbleDto, BubblePatchDto } from "../types/bubble";
 
 async function callTauri<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -31,16 +32,20 @@ async function callTauri<T>(cmd: string, args?: Record<string, unknown>): Promis
 }
 
 export const tauriClient: vibeCleanerApi = {
-  async importImages(paths?: string[]): Promise<ProjectDto> {
-    return callTauri<ProjectDto>("import_images", { paths });
+  async importImages(paths?: string[]): Promise<ImportResultDto> {
+    return callTauri<ImportResultDto>("import_images", { paths });
   },
 
-  async importDirectory(directory: string): Promise<ProjectDto> {
-    return callTauri<ProjectDto>("import_directory", { directory });
+  async importDirectory(directory: string): Promise<ImportResultDto> {
+    return callTauri<ImportResultDto>("import_directory", { directory });
   },
 
   async getProject(): Promise<ProjectDto> {
     return callTauri<ProjectDto>("get_project");
+  },
+
+  async getPages(): Promise<PagesDto> {
+    return callTauri<PagesDto>("get_pages");
   },
 
   async getPage(pageId: string): Promise<PageDto> {

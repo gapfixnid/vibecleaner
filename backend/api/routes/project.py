@@ -13,7 +13,7 @@ from ...core.models import MangaPage
 from ...core.version import APP_NAME
 from ...core.container import AppContainer
 from ...infrastructure.image.encoding import encode_preview_jpeg_bytes
-from ...infrastructure.image.loading import load_cv_image, warm_original_thumbnail
+from ...infrastructure.image.loading import load_cv_image
 from ...infrastructure.storage.project_schema import (
     ProjectSchemaError,
     create_project_metadata,
@@ -49,19 +49,6 @@ def _warm_inpainted_response_caches(state, page_indices: list[int]) -> None:
             if page.inpainted_image is None:
                 continue
             page._preview_inpainted_bytes = preview_bytes
-
-
-def _warm_original_thumbnail_caches(pages: list[MangaPage]) -> None:
-    for page in pages:
-        warm_original_thumbnail(page)
-
-
-def _start_original_thumbnail_warmup(cache_tasks, pages: list[MangaPage]) -> None:
-    if not pages:
-        return
-
-    pages_snapshot = list(pages)
-    cache_tasks.submit(lambda: _warm_original_thumbnail_caches(pages_snapshot))
 
 
 def _start_project_cache_warmup(cache_tasks, state, page_count: int, current_index: int) -> None:
@@ -135,7 +122,6 @@ def open_directory(directory: str = Form(...), container: AppContainer = Depends
             "current_index": state.current_page_idx,
             "added": len(added),
         }
-    _start_original_thumbnail_warmup(container.cache_tasks, added)
     return result
 
 @router.post("/api/project/open-files")
@@ -185,7 +171,6 @@ def open_files(files_json: str = Form(...), container: AppContainer = Depends(ge
             "current_index": state.current_page_idx,
             "added": len(added),
         }
-    _start_original_thumbnail_warmup(container.cache_tasks, added)
     return result
 
 @router.post("/api/project/save")
@@ -443,7 +428,6 @@ def load_project(file_path: str = Form(...), container: AppContainer = Depends(g
             state.touch()
             page_count = len(state.pages)
             current_index = state.current_page_idx
-        _start_original_thumbnail_warmup(container.cache_tasks, loaded_pages)
         _start_project_cache_warmup(container.cache_tasks, state, page_count, current_index)
         return {
             "page_count": page_count,

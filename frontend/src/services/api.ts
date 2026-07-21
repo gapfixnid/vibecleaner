@@ -13,7 +13,7 @@ import type {
   LoadProjectResult,
   ProviderCatalogDto,
 } from "../types";
-import { toBubbleInfo, toBubbleUpdateDto, toPagesResponse } from "./mappers";
+import { toBubbleInfo, toBubbleUpdateDto } from "./mappers";
 
 let BACKEND_URL = "http://127.0.0.1:8000";
 
@@ -46,8 +46,7 @@ export const downloadRequiredModels = async (): Promise<JobStatus> => {
 };
 
 export const getPages = async (): Promise<PagesResponse> => {
-  const project = await api.getProject();
-  return toPagesResponse(project);
+  return api.getPages();
 };
 
 export const getBubbles = async (pageId: string): Promise<BubblesResponse> => {
@@ -86,13 +85,13 @@ export const renamePage = async (pageId: string, name: string): Promise<ActionRe
 };
 
 export const openDirectory = async (directory: string): Promise<ActionResult> => {
-  await api.importDirectory(directory);
-  return { status: "success" };
+  const result = await api.importDirectory(directory);
+  return { status: "success", ...result };
 };
 
 export const openFiles = async (files: string[]): Promise<ActionResult> => {
-  await api.importImages(files);
-  return { status: "success" };
+  const result = await api.importImages(files);
+  return { status: "success", ...result };
 };
 
 export const newProject = async (): Promise<ActionResult> => {

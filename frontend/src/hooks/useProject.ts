@@ -56,16 +56,15 @@ export function useProject({
             ],
           }));
         if (!files || files.length === 0) return; // Cancelled
-        const beforeData = await api.getPages();
-        const beforeCount = beforeData.pages.length;
         const data = await api.openFiles(files);
         if (data.status === "cancelled") return;
         await loadPagesFromServer();
-        const afterData = await api.getPages();
-        const addedCount = afterData.pages.length - beforeCount;
+        const afterCount = typeof data.page_count === "number" ? data.page_count : 0;
+        const addedCount = typeof data.added === "number" ? data.added : 0;
+        const beforeCount = Math.max(0, afterCount - addedCount);
         result = {
           beforeCount,
-          afterCount: afterData.pages.length,
+          afterCount,
           addedCount,
         };
         // Importing images mutates the project.

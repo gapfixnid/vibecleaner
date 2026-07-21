@@ -64,3 +64,20 @@ export interface ProjectDto {
   current_page_id: string | null;
   settings: SettingsDto;
 }
+
+export interface PagesDto {
+  pages: Array<{
+    page_id: string;
+    index: number;
+    file_path: string;
+    filename: string;
+    width: number;
+    height: number;
+    bubble_count: number;
+    translated_count: number;
+    has_inpaint: boolean;
+    status: string;
+    problems: string[];
+  }>;
+  current_index: number;
+}
