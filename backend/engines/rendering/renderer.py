@@ -335,6 +335,46 @@ class TextRenderer:
             reached_min_font=font_pixel_size(font) <= int(round(min_size)),
         )
 
+    def center_layout_vertically(
+        self,
+        layout: TextLayoutResult,
+        target_center_y: float,
+        bounds: QRectF,
+    ) -> TextLayoutResult:
+        """Move an existing line block vertically without changing its typesetting."""
+        if not layout.line_layouts:
+            return layout
+
+        block_top = min(line.y for line in layout.line_layouts)
+        block_bottom = max(line.y + line.height for line in layout.line_layouts)
+        block_center = (block_top + block_bottom) / 2.0
+        desired_shift = float(target_center_y) - block_center
+        min_shift = bounds.top() - block_top
+        max_shift = bounds.bottom() - block_bottom
+        shift = max(min_shift, min(max_shift, desired_shift))
+
+        if abs(shift) < 0.01:
+            return layout
+
+        return TextLayoutResult(
+            font=layout.font,
+            lines=list(layout.lines),
+            render_width=layout.render_width,
+            line_layouts=[
+                TextLineLayout(
+                    text=line.text,
+                    x=line.x,
+                    y=line.y + shift,
+                    width=line.width,
+                    height=line.height,
+                )
+                for line in layout.line_layouts
+            ],
+            score=layout.score,
+            is_overflow=layout.is_overflow,
+            reached_min_font=layout.reached_min_font,
+        )
+
     def make_ellipse_mask(self, width: int, height: int, inset: int = 0) -> np.ndarray:
         width = max(1, int(width))
         height = max(1, int(height))

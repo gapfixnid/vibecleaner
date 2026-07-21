@@ -56,7 +56,7 @@ class RenderService:
         layout_rect = self._text_layout_rect(bubble)
         mask = self._build_bubble_layout_mask(bubble, image)
         if mask is not None:
-            return self.renderer.find_optimal_font_size_for_mask(
+            layout = self.renderer.find_optimal_font_size_for_mask(
                 text,
                 _to_qrectf(bubble.box),
                 mask,
@@ -64,6 +64,14 @@ class RenderService:
                 min_size=self._min_font_size(),
                 max_size=self._max_font_size(),
             )
+            if bubble.text_box is not None and bubble.text_box.width > 1 and bubble.text_box.height > 1:
+                target_center_y = bubble.text_box.y + bubble.text_box.height / 2.0
+                return self.renderer.center_layout_vertically(
+                    layout,
+                    target_center_y=target_center_y,
+                    bounds=_to_qrectf(bubble.box),
+                )
+            return layout
 
         font, lines, render_width = self.renderer.find_optimal_font_size(
             text,

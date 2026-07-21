@@ -168,16 +168,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         .window-controls {
           display: flex;
-          align-self: stretch;
+          height: 100%;
           gap: 0;
           margin-left: 4px;
           margin-right: -12px;
-          align-items: center;
+          align-items: stretch;
           pointer-events: auto;
         }
 
         .win-btn {
-          width: 42px;
+          width: 46px;
+          flex: 0 0 46px;
           height: 100%;
           border-radius: 0;
           border: none;
@@ -221,6 +222,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         }
 
         .toolbar-right {
+          height: 100%;
           justify-content: flex-end;
           pointer-events: auto;
         }
