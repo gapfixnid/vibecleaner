@@ -1,6 +1,6 @@
 // frontend/src/components/Canvas.tsx
 import React, { useRef, useState } from "react";
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, ScanEye } from "lucide-react";
+import { ChevronLeft, ChevronRight, ScanEye } from "lucide-react";
 import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
 import { CanvasZoomControls } from "./canvas/CanvasZoomControls";
@@ -224,47 +224,39 @@ export const Canvas: React.FC<CanvasProps> = ({
         />
       )}
 
+      {displayImageUrl && (
+        <>
+          <button
+            type="button"
+            className="canvas-edge-toggle canvas-edge-toggle-left"
+            onClick={onToggleSidebar}
+            aria-label={t?.(isSidebarOpen ? "layout.hidePages" : "layout.showPages") || (isSidebarOpen ? "Hide pages panel" : "Show pages panel")}
+            aria-pressed={isSidebarOpen}
+            data-tooltip={t?.(isSidebarOpen ? "layout.hidePages" : "layout.showPages") || (isSidebarOpen ? "Hide pages panel" : "Show pages panel")}
+            data-tooltip-pos="bottom"
+          >
+            {isSidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+          </button>
+          <button
+            type="button"
+            className="canvas-edge-toggle canvas-edge-toggle-right"
+            onClick={onToggleInspector}
+            aria-label={t?.(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector") || (isInspectorOpen ? "Hide inspector" : "Show inspector")}
+            aria-pressed={isInspectorOpen}
+            data-tooltip={t?.(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector") || (isInspectorOpen ? "Hide inspector" : "Show inspector")}
+            data-tooltip-pos="bottom"
+          >
+            {isInspectorOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
+        </>
+      )}
+
       {/* Unified floating control bar */}
       {displayImageUrl && (
         <div className="canvas-floating-controls">
           <div className="actions-capsule">
-            <button
-              type="button"
-              className="canvas-panel-toggle"
-              onClick={onToggleSidebar}
-              aria-label={t?.(isSidebarOpen ? "layout.hidePages" : "layout.showPages") || (isSidebarOpen ? "Hide pages panel" : "Show pages panel")}
-              aria-pressed={isSidebarOpen}
-              data-tooltip={t?.(isSidebarOpen ? "layout.hidePages" : "layout.showPages") || (isSidebarOpen ? "Hide pages panel" : "Show pages panel")}
-              data-tooltip-pos="top"
-            >
-              {isSidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-            </button>
-            <div className="control-divider" aria-hidden="true" />
-            {!isMultiPageSelection && originalImageUrl && hasProcessedImage && (
-              <button
-                type="button"
-                className={`canvas-compare-button${showOriginal ? " active" : ""}`}
-                onPointerDown={() => setShowOriginal(true)}
-                onPointerUp={() => setShowOriginal(false)}
-                onPointerLeave={() => setShowOriginal(false)}
-                onPointerCancel={() => setShowOriginal(false)}
-                onKeyDown={(event) => {
-                  if (event.key === " " || event.key === "Enter") setShowOriginal(true);
-                }}
-                onKeyUp={() => setShowOriginal(false)}
-                aria-pressed={showOriginal}
-                data-tooltip={t?.("canvas.holdForOriginal") || "Hold to view original"}
-                data-tooltip-pos="top"
-              >
-                <ScanEye size={15} />
-                <span>{showOriginal ? (t?.("canvas.viewingOriginal") || "Original") : (t?.("canvas.compare") || "Compare")}</span>
-              </button>
-            )}
             {!isMultiPageSelection && (
               <>
-                {originalImageUrl && hasProcessedImage && (
-                  <div className="control-divider" aria-hidden="true" />
-                )}
                 <CanvasZoomControls
                   scale={scale}
                   onZoomIn={() => zoomBy(1.25)}
@@ -285,18 +277,32 @@ export const Canvas: React.FC<CanvasProps> = ({
               onCancel={onCancelJob}
               t={t}
             />
-            <div className="control-divider" aria-hidden="true" />
-            <button
-              type="button"
-              className="canvas-panel-toggle"
-              onClick={onToggleInspector}
-              aria-label={t?.(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector") || (isInspectorOpen ? "Hide inspector" : "Show inspector")}
-              aria-pressed={isInspectorOpen}
-              data-tooltip={t?.(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector") || (isInspectorOpen ? "Hide inspector" : "Show inspector")}
-              data-tooltip-pos="top"
-            >
-              {isInspectorOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
-            </button>
+            {!isMultiPageSelection && (
+              <>
+                <div className="control-divider" aria-hidden="true" />
+                <button
+                  type="button"
+                  className={`canvas-compare-button${showOriginal ? " active" : ""}`}
+                  disabled={!originalImageUrl || !hasProcessedImage}
+                  onPointerDown={() => setShowOriginal(true)}
+                  onPointerUp={() => setShowOriginal(false)}
+                  onPointerLeave={() => setShowOriginal(false)}
+                  onPointerCancel={() => setShowOriginal(false)}
+                  onKeyDown={(event) => {
+                    if (event.key === " " || event.key === "Enter") setShowOriginal(true);
+                  }}
+                  onKeyUp={() => setShowOriginal(false)}
+                  aria-pressed={showOriginal}
+                  data-tooltip={hasProcessedImage
+                    ? (t?.("canvas.holdForOriginal") || "Hold to view original")
+                    : (t?.("canvas.compareUnavailable") || "Available after translation")}
+                  data-tooltip-pos="top"
+                >
+                  <ScanEye size={15} />
+                  <span>{showOriginal ? (t?.("canvas.viewingOriginal") || "Original") : (t?.("canvas.compare") || "Compare")}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -467,6 +473,62 @@ export const Canvas: React.FC<CanvasProps> = ({
           pointer-events: none;
         }
 
+        .canvas-edge-toggle {
+          position: absolute;
+          top: 16px;
+          width: 32px;
+          height: 32px;
+          padding: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--overlay-border);
+          border-radius: 10px;
+          background: var(--overlay-bg);
+          color: var(--text-secondary);
+          backdrop-filter: var(--glass-blur);
+          -webkit-backdrop-filter: var(--glass-blur);
+          box-shadow: var(--overlay-shadow);
+          cursor: pointer;
+          z-index: 6;
+          transition: background var(--transition-slow), color var(--transition-slow), transform 0.1s ease;
+        }
+
+        .canvas-edge-toggle-left {
+          left: 16px;
+        }
+
+        .canvas-edge-toggle-right {
+          right: 16px;
+        }
+
+        .canvas-edge-toggle-left::after {
+          left: 0;
+          transform: translateY(-2px);
+        }
+
+        .canvas-edge-toggle-right::after {
+          left: auto;
+          right: 0;
+          transform: translateY(-2px);
+        }
+
+        .canvas-edge-toggle-left:hover::after,
+        .canvas-edge-toggle-left:focus-visible::after,
+        .canvas-edge-toggle-right:hover::after,
+        .canvas-edge-toggle-right:focus-visible::after {
+          transform: translateY(0);
+        }
+
+        .canvas-edge-toggle:hover {
+          background: var(--fill-hover);
+          color: var(--text-primary);
+        }
+
+        .canvas-edge-toggle:active {
+          transform: scale(0.94);
+        }
+
         .canvas-floating-controls {
           position: absolute;
           bottom: 24px;
@@ -531,9 +593,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           min-width: 46px;
         }
 
-        .actions-capsule button.canvas-panel-toggle {
-          min-width: 30px;
-          padding: 0 7px;
+        .actions-capsule button.canvas-compare-button {
+          min-width: 82px;
           justify-content: center;
         }
 

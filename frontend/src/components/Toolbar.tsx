@@ -1,6 +1,6 @@
 // frontend/src/components/Toolbar.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { FilePlus2, FolderOpen, Info, Menu, Minus, Save, Settings, Square, X } from "lucide-react";
+import { FilePlus2, FolderOpen, Info, Minus, Save, Settings, Square, X } from "lucide-react";
 import * as desktop from "../services/desktop";
 import { APP_NAME } from "../appMeta";
 
@@ -80,9 +80,53 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     <header className="toolbar-container">
       <div className="toolbar-left">
         <div className="app-logo" data-tauri-drag-region>
-          <span className="app-mark" aria-hidden="true">
-            <img className="app-icon" src="/favicon.svg" alt="" draggable={false} />
-          </span>
+          <div className="menu-wrapper app-menu-wrapper" ref={menuRef}>
+            <button
+              type="button"
+              className={`app-mark app-menu-button ${menuOpen ? "active" : ""}`}
+              aria-label={t("toolbar.menu")}
+              aria-haspopup="menu"
+              aria-controls="toolbar-dropdown-menu"
+              aria-expanded={menuOpen}
+              ref={menuButtonRef}
+              onClick={() => setMenuOpen((open) => !open)}
+              onKeyDown={(event) => {
+                if ((event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") && !menuOpen) {
+                  event.preventDefault();
+                  setMenuOpen(true);
+                }
+              }}
+            >
+              <img className="app-icon" src="/favicon.svg" alt="" draggable={false} />
+            </button>
+
+            {menuOpen && (
+              <div id="toolbar-dropdown-menu" className="toolbar-menu" role="menu" onKeyDown={handleMenuKeyDown}>
+                <button type="button" role="menuitem" onClick={runItem(onNewProject)}>
+                  <FilePlus2 size={14} />
+                  <span>{t("toolbar.newProject")}</span>
+                </button>
+                <button type="button" role="menuitem" onClick={runItem(onOpenProject)}>
+                  <FolderOpen size={14} />
+                  <span>{t("toolbar.openProject")}</span>
+                </button>
+                <button type="button" role="menuitem" onClick={runItem(onSaveProject)}>
+                  <Save size={14} />
+                  <span>{t("toolbar.saveProject")}</span>
+                  {isDirty && <span className="toolbar-unsaved-dot" aria-hidden="true" />}
+                </button>
+                <div className="toolbar-menu-separator" role="separator" />
+                <button type="button" role="menuitem" onClick={runItem(onPreferences)}>
+                  <Settings size={14} />
+                  <span>{t("toolbar.preferences")}</span>
+                </button>
+                <button type="button" role="menuitem" onClick={runItem(onAbout)}>
+                  <Info size={14} />
+                  <span>{t("toolbar.about")}</span>
+                </button>
+              </div>
+            )}
+          </div>
           <div className="app-title-stack" data-tauri-drag-region>
             <span className="logo-text" data-tauri-drag-region>{APP_NAME}</span>
             <span className="toolbar-subtitle" data-tauri-drag-region>{t("toolbar.subtitle")}</span>
@@ -93,54 +137,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       <div className="drag-spacer" data-tauri-drag-region />
 
       <div className="toolbar-right">
-        <div className="menu-wrapper" ref={menuRef}>
-          <button
-            type="button"
-            className={`toolbar-action menu-toggle ${menuOpen ? "active" : ""}`}
-            data-tooltip={t("toolbar.menu")}
-            aria-label={t("toolbar.menu")}
-            aria-haspopup="menu"
-            aria-controls="toolbar-dropdown-menu"
-            aria-expanded={menuOpen}
-            ref={menuButtonRef}
-            onClick={() => setMenuOpen((v) => !v)}
-            onKeyDown={(event) => {
-              if ((event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") && !menuOpen) {
-                event.preventDefault();
-                setMenuOpen(true);
-              }
-            }}
-          >
-            <Menu size={18} />
-          </button>
-
-          {menuOpen && (
-            <div id="toolbar-dropdown-menu" className="toolbar-menu" role="menu" onKeyDown={handleMenuKeyDown}>
-              <button type="button" role="menuitem" onClick={runItem(onNewProject)}>
-                <FilePlus2 size={14} />
-                <span>{t("toolbar.newProject")}</span>
-              </button>
-              <button type="button" role="menuitem" onClick={runItem(onOpenProject)}>
-                <FolderOpen size={14} />
-                <span>{t("toolbar.openProject")}</span>
-              </button>
-              <button type="button" role="menuitem" onClick={runItem(onSaveProject)}>
-                <Save size={14} />
-                <span>{t("toolbar.saveProject")}</span>
-                {isDirty && <span className="toolbar-unsaved-dot" aria-hidden="true" />}
-              </button>
-              <div className="toolbar-menu-separator" role="separator" />
-              <button type="button" role="menuitem" onClick={runItem(onPreferences)}>
-                <Settings size={14} />
-                <span>{t("toolbar.preferences")}</span>
-              </button>
-              <button type="button" role="menuitem" onClick={runItem(onAbout)}>
-                <Info size={14} />
-                <span>{t("toolbar.about")}</span>
-              </button>
-            </div>
-          )}
-        </div>
         <div className="window-controls">
           <button type="button" className="win-btn" onClick={() => desktop.minimizeWindow()} aria-label={t("toolbar.minimizeWindow")}>
             <Minus size={13} />
@@ -255,6 +251,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           border: 1px solid var(--overlay-border);
           box-shadow: var(--control-active-shadow);
           overflow: hidden;
+          padding: 0;
+          cursor: pointer;
+          transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.12s ease;
+        }
+
+        .app-menu-button:hover,
+        .app-menu-button.active {
+          background: var(--fill-hover);
+          border-color: var(--separator-strong);
+        }
+
+        .app-menu-button:active {
+          transform: scale(0.96);
+        }
+
+        .app-menu-button:focus-visible {
+          outline: 2px solid var(--system-blue);
+          outline-offset: 2px;
         }
 
         .app-icon {
@@ -295,66 +309,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           pointer-events: auto;
         }
 
-        .toolbar-action {
-          width: 26px;
-          height: 26px;
-          border: 1px solid transparent;
-          background: transparent;
-          color: var(--text-secondary);
-          cursor: pointer;
-          border-radius: 7px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0;
-          transition:
-            background-color 0.16s ease,
-            border-color 0.16s ease,
-            color 0.16s ease,
-            box-shadow 0.16s ease,
-            transform 0.12s ease;
-        }
-
-        .toolbar-action:hover {
-          background: var(--fill-hover);
-          border-color: var(--border-color);
-          color: var(--text-primary);
-        }
-
-        .toolbar-action:active {
-          transform: translateY(1px) scale(0.98);
-        }
-
-        .toolbar-action.primary {
-          background: var(--system-blue);
-          border-color: transparent;
-          color: white;
-          box-shadow: var(--accent-glow);
-        }
-
-        .toolbar-action.primary:hover {
-          background: var(--system-blue-hover);
-          color: white;
-        }
-
-        .toolbar-action.menu-toggle {
-          width: 30px;
-          height: 30px;
-          border-radius: 9px;
-          background: var(--fill-3);
-          border-color: var(--border-color);
-        }
-
-        .toolbar-action.active {
-          background: var(--control-active-bg);
-          color: var(--text-primary);
-          box-shadow: var(--control-active-shadow);
-        }
-
         .toolbar-menu {
           position: absolute;
           top: calc(100% + 8px);
-          right: 0;
+          left: 0;
           min-width: 184px;
           background:
             linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
@@ -367,7 +325,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           flex-direction: column;
           gap: 2px;
           z-index: 100;
-          transform-origin: top right;
+          transform-origin: top left;
           will-change: opacity, transform;
           animation: toolbarMenuEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -375,11 +333,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         @keyframes toolbarMenuEnter {
           0% {
             opacity: 0;
-            transform: translateX(14px) translateY(-4px) scale(0.96);
+            transform: translateX(-14px) translateY(-4px) scale(0.96);
           }
           62% {
             opacity: 1;
-            transform: translateX(-2px) translateY(0) scale(1.01);
+            transform: translateX(2px) translateY(0) scale(1.01);
           }
           100% {
             opacity: 1;

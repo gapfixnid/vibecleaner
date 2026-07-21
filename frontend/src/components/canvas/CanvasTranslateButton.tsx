@@ -40,10 +40,7 @@ export function CanvasTranslateButton({
     );
   }
 
-  const translateLabel = isProcessing ? t("toolbar.translating") : t("toolbar.translate");
-  const tooltip = isProcessing
-    ? t("toolbar.translating")
-    : (isMultiPageSelection ? translatePagesLabel : t("toolbar.translateCurrentPage"));
+  const tooltip = isMultiPageSelection ? translatePagesLabel : t("toolbar.translateCurrentPage");
 
   return (
     <button
@@ -57,7 +54,7 @@ export function CanvasTranslateButton({
       <span className="translate-btn-icon">
         <Sparkles size={14} />
       </span>
-      <span className="translate-btn-label">{translateLabel}</span>
+      <span className="translate-btn-label">{t("toolbar.translate")}</span>
     </button>
   );
 }

@@ -156,6 +156,7 @@ export type TranslationKey =
   | "canvas.emptyDescription"
   | "canvas.emptyDropHint"
   | "canvas.compare"
+  | "canvas.compareUnavailable"
   | "canvas.holdForOriginal"
   | "canvas.viewingOriginal"
   | "statusbar.stageDetect"
@@ -466,6 +467,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "canvas.emptyDescription": "Add one or more images to translate, review, and export them from a single workspace.",
     "canvas.emptyDropHint": "You can also drop PNG, JPEG, or WebP files anywhere in this window",
     "canvas.compare": "Compare",
+    "canvas.compareUnavailable": "Available after translation",
     "canvas.holdForOriginal": "Hold to view the original page",
     "canvas.viewingOriginal": "Original",
     "statusbar.stageDetect": "Detect",
@@ -775,6 +777,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "canvas.emptyDescription": "이미지를 추가하면 번역부터 검수, 내보내기까지 한 작업 공간에서 진행할 수 있습니다.",
     "canvas.emptyDropHint": "PNG, JPEG, WebP 파일을 이 창 어디에나 끌어다 놓을 수도 있습니다",
     "canvas.compare": "비교",
+    "canvas.compareUnavailable": "번역 후 사용할 수 있습니다",
     "canvas.holdForOriginal": "누르고 있는 동안 원본 페이지 보기",
     "canvas.viewingOriginal": "원본",
     "statusbar.stageDetect": "감지",

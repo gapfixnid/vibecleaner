@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, type CSSProperties, type KeyboardEvent } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type CSSProperties, type KeyboardEvent } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
 import { Canvas } from "./components/Canvas";
@@ -41,6 +41,14 @@ function App() {
   const [isDirty, setIsDirty] = useState(false);
   const markDirty = useCallback(() => setIsDirty(true), []);
   const markClean = useCallback(() => setIsDirty(false), []);
+  const persistedProjectRef = useRef(false);
+  const markPagesDeleted = useCallback((remainingPageCount: number) => {
+    if (remainingPageCount === 0 && !persistedProjectRef.current) {
+      markClean();
+      return;
+    }
+    markDirty();
+  }, [markClean, markDirty]);
   const { settings, setSettings, handleSaveSettings } = useAppSettings();
   const t = useMemo(() => createTranslator(settings.ui_language), [settings.ui_language]);
 
@@ -76,6 +84,7 @@ function App() {
     showError,
     showConfirm,
     markDirty,
+    markPagesDeleted,
     onBubbleDeleted,
     t,
   });
@@ -103,6 +112,9 @@ function App() {
     getSelectedIndices,
     t,
   });
+  useEffect(() => {
+    persistedProjectRef.current = projectApi.currentProjectPath !== null;
+  }, [projectApi.currentProjectPath]);
 
   const { bubbles, selectedBubbleId, setSelectedBubbleId, syncBubblesToBackend } =
     bubblesApi;
@@ -225,7 +237,7 @@ function App() {
     guardUnsaved,
     handleNewProject,
     handleOpenProject,
-    handleImportImages,
+    handleImportImages: importImages,
     handleDeletePage,
     handleRenamePage,
   } = useProjectActions({
@@ -248,6 +260,15 @@ function App() {
     setSelectedBubbleId,
     t,
   });
+
+  const handleImportImages = useCallback(async (paths?: string[]) => {
+    const imported = await importImages(paths);
+    if (imported) {
+      setIsSidebarOpen(true);
+      setIsInspectorOpen(true);
+    }
+    return imported;
+  }, [importImages]);
 
   useWindowCloseGuard(isDirty, guardUnsaved);
 

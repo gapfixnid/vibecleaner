@@ -21,6 +21,8 @@ interface UsePagesDeps {
   onPagesCleared: () => void;
   /** Mark the project dirty (duplicate / delete / reorder mutate pages). */
   markDirty: () => void;
+  /** Resolve dirty state after deletion, accounting for an unsaved empty project. */
+  markPagesDeleted: (remainingPageCount: number) => void;
   t?: (key: string) => string;
 }
 
@@ -33,6 +35,7 @@ export function usePages({
   onPageActivated,
   onPagesCleared,
   markDirty,
+  markPagesDeleted,
   t = (key) => key,
 }: UsePagesDeps) {
   const [pages, setPages] = useState<PageInfo[]>([]);
@@ -171,7 +174,8 @@ export function usePages({
                 const data = await api.deletePage(indices[0], pageId);
                 await loadPagesFromServer(data.current_index);
               }
-              markDirty();
+              const deletedCount = new Set(indices.filter((index) => index >= 0 && index < pages.length)).size;
+              markPagesDeleted(Math.max(0, pages.length - deletedCount));
             },
             { errorTitle: t("pages.failedToDeletePage") }
           );
@@ -181,7 +185,7 @@ export function usePages({
         true
       );
     },
-    [showConfirm, runTask, loadPagesFromServer, markDirty, pages, t]
+    [showConfirm, runTask, loadPagesFromServer, markPagesDeleted, pages, t]
   );
 
   const handleReorderPages = useCallback(
