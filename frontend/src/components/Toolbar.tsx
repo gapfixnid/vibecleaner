@@ -1,6 +1,6 @@
 // frontend/src/components/Toolbar.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { Download, FilePlus2, FolderOpen, ImagePlus, Info, Menu, Minus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Save, Settings, Square, X } from "lucide-react";
+import { FilePlus2, FolderOpen, Info, Menu, Minus, Save, Settings, Square, X } from "lucide-react";
 import * as desktop from "../services/desktop";
 import { APP_NAME } from "../appMeta";
 
@@ -8,16 +8,9 @@ interface ToolbarProps {
   onNewProject: () => void;
   onOpenProject: () => void;
   onSaveProject: () => void;
-  onImportImages: () => void;
-  onExport: () => void;
   onPreferences: () => void;
   onAbout: () => void;
-  onToggleSidebar: () => void;
-  isSidebarOpen: boolean;
-  onToggleInspector: () => void;
-  isInspectorOpen: boolean;
   isDirty: boolean;
-  canExport: boolean;
   t?: (key: string) => string;
 }
 
@@ -25,16 +18,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onNewProject,
   onOpenProject,
   onSaveProject,
-  onImportImages,
-  onExport,
   onPreferences,
   onAbout,
-  onToggleSidebar,
-  isSidebarOpen,
-  onToggleInspector,
-  isInspectorOpen,
   isDirty,
-  canExport,
   t = (key) => key,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -61,11 +47,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
   useEffect(() => {
     if (!menuOpen) return;
-    menuRef.current?.querySelector<HTMLButtonElement>("[role='menuitem']")?.focus();
+    menuRef.current?.querySelector<HTMLButtonElement>("[role='menuitem']:not(:disabled)")?.focus();
   }, [menuOpen]);
 
   const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>("[role='menuitem']") ?? []);
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>("[role='menuitem']:not(:disabled)") ?? []);
     if (items.length === 0) return;
     const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
     let nextIndex: number | null = null;
@@ -107,53 +93,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       <div className="drag-spacer" data-tauri-drag-region />
 
       <div className="toolbar-right">
-        <button type="button" className="toolbar-command" onClick={onImportImages}>
-          <ImagePlus size={15} />
-          <span>{t("toolbar.addImages")}</span>
-        </button>
-        <button
-          type="button"
-          className={`toolbar-command ${isDirty ? "has-change" : ""}`}
-          onClick={onSaveProject}
-          data-tooltip={isDirty ? t("statusbar.unsaved") : t("toolbar.saveProject")}
-        >
-          <Save size={15} />
-          <span>{t("toolbar.saveProject")}</span>
-          {isDirty && <span className="toolbar-unsaved-dot" aria-hidden="true" />}
-        </button>
-        <button type="button" className="toolbar-command" onClick={onExport} disabled={!canExport}>
-          <Download size={15} />
-          <span>{t("toolbar.export")}</span>
-        </button>
-        <button
-          type="button"
-          className="toolbar-action settings-shortcut"
-          onClick={onPreferences}
-          data-tooltip={t("toolbar.preferences")}
-          aria-label={t("toolbar.preferences")}
-        >
-          <Settings size={17} />
-        </button>
-        <button
-          type="button"
-          className="toolbar-action sidebar-toggle"
-          onClick={onToggleSidebar}
-          data-tooltip={t(isSidebarOpen ? "layout.hidePages" : "layout.showPages")}
-          aria-label={t(isSidebarOpen ? "layout.hidePages" : "layout.showPages")}
-          aria-pressed={isSidebarOpen}
-        >
-          {isSidebarOpen ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
-        </button>
-        <button
-          type="button"
-          className="toolbar-action inspector-toggle"
-          onClick={onToggleInspector}
-          data-tooltip={t(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector")}
-          aria-label={t(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector")}
-          aria-pressed={isInspectorOpen}
-        >
-          {isInspectorOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
-        </button>
         <div className="menu-wrapper" ref={menuRef}>
           <button
             type="button"
@@ -185,7 +124,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <FolderOpen size={14} />
                 <span>{t("toolbar.openProject")}</span>
               </button>
+              <button type="button" role="menuitem" onClick={runItem(onSaveProject)}>
+                <Save size={14} />
+                <span>{t("toolbar.saveProject")}</span>
+                {isDirty && <span className="toolbar-unsaved-dot" aria-hidden="true" />}
+              </button>
               <div className="toolbar-menu-separator" role="separator" />
+              <button type="button" role="menuitem" onClick={runItem(onPreferences)}>
+                <Settings size={14} />
+                <span>{t("toolbar.preferences")}</span>
+              </button>
               <button type="button" role="menuitem" onClick={runItem(onAbout)}>
                 <Info size={14} />
                 <span>{t("toolbar.about")}</span>
@@ -281,46 +229,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           pointer-events: auto;
         }
 
-        .toolbar-command {
-          height: 30px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          padding: 0 10px;
-          border: 1px solid transparent;
-          border-radius: 8px;
-          background: transparent;
-          color: var(--text-secondary);
-          font: 600 11.5px/1 var(--font-family);
-          cursor: pointer;
-          transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
-        }
-
-        .toolbar-command:hover:not(:disabled) {
-          background: var(--fill-hover);
-          border-color: var(--border-color);
-          color: var(--text-primary);
-        }
-
-        .toolbar-command:disabled {
-          opacity: 0.38;
-          cursor: default;
-        }
-
-        .toolbar-command.has-change {
-          color: var(--text-primary);
-        }
-
         .toolbar-unsaved-dot {
           width: 5px;
           height: 5px;
           border-radius: var(--radius-full);
           background: var(--system-orange);
-        }
-
-        .settings-shortcut {
-          margin-left: 2px;
         }
 
         .app-logo {
@@ -496,6 +409,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           background: var(--fill-hover, var(--bg-input));
         }
 
+        .toolbar-menu button:disabled {
+          opacity: 0.4;
+          cursor: default;
+        }
+
         .toolbar-menu button svg {
           color: var(--text-secondary);
           flex-shrink: 0;
@@ -510,15 +428,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         @media (max-width: 760px) {
           .toolbar-subtitle {
             display: none;
-          }
-
-          .toolbar-command span {
-            display: none;
-          }
-
-          .toolbar-command {
-            width: 30px;
-            padding: 0;
           }
         }
       `}</style>

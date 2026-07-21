@@ -297,15 +297,6 @@ function App() {
     [resolveContextTargets, handleExportPages]
   );
 
-  const handleToolbarExport = useCallback(() => {
-    const targets = selectedPageIds.length > 0
-      ? selectedPageIds
-      : currentIndex >= 0
-        ? [currentIndex]
-        : [];
-    handleExportPages(targets);
-  }, [currentIndex, handleExportPages, selectedPageIds]);
-
   return (
     <div
       className="app-container"
@@ -318,21 +309,14 @@ function App() {
         onNewProject={handleNewProject}
         onOpenProject={handleOpenProject}
         onSaveProject={projectApi.handleSaveProject}
-        onImportImages={handleImportImages}
-        onExport={handleToolbarExport}
         onPreferences={() => setIsSettingsOpen(true)}
         onAbout={() => setIsAboutOpen(true)}
-        onToggleSidebar={toggleSidebar}
-        isSidebarOpen={isSidebarOpen}
-        onToggleInspector={toggleInspector}
-        isInspectorOpen={isInspectorOpen}
         isDirty={isDirty}
-        canExport={pages.length > 0}
         t={t}
       />
 
       <div className="main-workspace">
-        {isSidebarOpen && (
+        {pages.length > 0 && isSidebarOpen && (
           <>
             <Sidebar
               pages={pages}
@@ -388,6 +372,10 @@ function App() {
           onImageLoaded={finishImageReload}
           onImportImages={handleImportImages}
           onOpenProject={handleOpenProject}
+          onToggleSidebar={toggleSidebar}
+          isSidebarOpen={isSidebarOpen}
+          onToggleInspector={toggleInspector}
+          isInspectorOpen={isInspectorOpen}
           isMultiPageSelection={isMultiPageSelection}
           selectedPageCount={selectedPageIds.length}
           isWaitingForImageReload={isWaitingForImageReload}
@@ -395,7 +383,7 @@ function App() {
           t={t}
         />
 
-        {isInspectorOpen && (
+        {pages.length > 0 && isInspectorOpen && (
           <>
             <div
               className="panel-resizer inspector-resizer"

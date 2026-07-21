@@ -1,6 +1,6 @@
 // frontend/src/components/Canvas.tsx
 import React, { useRef, useState } from "react";
-import { ScanEye } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, ScanEye } from "lucide-react";
 import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
 import { CanvasZoomControls } from "./canvas/CanvasZoomControls";
@@ -34,6 +34,10 @@ interface CanvasProps {
   onImageLoaded?: () => void;
   onImportImages: () => void;
   onOpenProject: () => void;
+  onToggleSidebar: () => void;
+  isSidebarOpen: boolean;
+  onToggleInspector: () => void;
+  isInspectorOpen: boolean;
   isMultiPageSelection?: boolean;
   selectedPageCount?: number;
   /** When true, page image is reloading — keep existing bubble overlay until new bubbles load. */
@@ -63,6 +67,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   onImageLoaded,
   onImportImages,
   onOpenProject,
+  onToggleSidebar,
+  isSidebarOpen,
+  onToggleInspector,
+  isInspectorOpen,
   isMultiPageSelection,
   selectedPageCount,
   isWaitingForImageReload,
@@ -220,6 +228,18 @@ export const Canvas: React.FC<CanvasProps> = ({
       {displayImageUrl && (
         <div className="canvas-floating-controls">
           <div className="actions-capsule">
+            <button
+              type="button"
+              className="canvas-panel-toggle"
+              onClick={onToggleSidebar}
+              aria-label={t?.(isSidebarOpen ? "layout.hidePages" : "layout.showPages") || (isSidebarOpen ? "Hide pages panel" : "Show pages panel")}
+              aria-pressed={isSidebarOpen}
+              data-tooltip={t?.(isSidebarOpen ? "layout.hidePages" : "layout.showPages") || (isSidebarOpen ? "Hide pages panel" : "Show pages panel")}
+              data-tooltip-pos="top"
+            >
+              {isSidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+            </button>
+            <div className="control-divider" aria-hidden="true" />
             {!isMultiPageSelection && originalImageUrl && hasProcessedImage && (
               <button
                 type="button"
@@ -265,6 +285,18 @@ export const Canvas: React.FC<CanvasProps> = ({
               onCancel={onCancelJob}
               t={t}
             />
+            <div className="control-divider" aria-hidden="true" />
+            <button
+              type="button"
+              className="canvas-panel-toggle"
+              onClick={onToggleInspector}
+              aria-label={t?.(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector") || (isInspectorOpen ? "Hide inspector" : "Show inspector")}
+              aria-pressed={isInspectorOpen}
+              data-tooltip={t?.(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector") || (isInspectorOpen ? "Hide inspector" : "Show inspector")}
+              data-tooltip-pos="top"
+            >
+              {isInspectorOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+            </button>
           </div>
         </div>
       )}
@@ -359,9 +391,12 @@ export const Canvas: React.FC<CanvasProps> = ({
           display: flex;
           align-items: center;
           gap: 8px;
+          width: min(100%, 336px);
         }
 
         .canvas-empty-actions button {
+          flex: 1 1 0;
+          min-width: 0;
           min-height: 38px;
           display: inline-flex;
           align-items: center;
@@ -496,10 +531,16 @@ export const Canvas: React.FC<CanvasProps> = ({
           min-width: 46px;
         }
 
+        .actions-capsule button.canvas-panel-toggle {
+          min-width: 30px;
+          padding: 0 7px;
+          justify-content: center;
+        }
+
         /* Prevent layout jitter when Translate ↔ Cancel morphs. */
         .actions-capsule button.primary,
         .actions-capsule button.cancel {
-          min-width: 90px;
+          min-width: 74px;
           justify-content: center;
         }
 
@@ -509,9 +550,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
 
         .actions-capsule button.primary {
-          background: var(--system-blue);
-          color: white;
-          box-shadow: 0 5px 14px color-mix(in srgb, var(--system-blue) 26%, transparent);
+          background: transparent;
+          color: var(--system-blue);
+          box-shadow: none;
+          font-weight: 600;
         }
 
         /* Smooth icon/label transition when morphing Translate ↔ Cancel */
@@ -532,23 +574,24 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
 
         .actions-capsule button.primary:hover:not(:disabled) {
-          background: var(--system-blue-hover);
-          box-shadow: 0 6px 18px color-mix(in srgb, var(--system-blue) 32%, transparent);
+          background: var(--fill-hover);
+          color: var(--system-blue-hover);
+          box-shadow: none;
         }
 
         .actions-capsule button.cancel {
-          background: var(--system-red);
-          color: white;
-          box-shadow: 0 5px 14px color-mix(in srgb, var(--system-red) 24%, transparent);
+          background: transparent;
+          color: var(--system-red);
+          box-shadow: none;
         }
 
-        /* Keep the resting red even when pointed at (override generic hover). */
         .actions-capsule button.cancel:hover:not(:disabled) {
-          background: color-mix(in srgb, var(--system-red) 88%, black);
-          color: white;
+          background: var(--fill-hover);
+          color: var(--system-red);
+          box-shadow: none;
         }
 
-          .actions-capsule button:disabled {
+        .actions-capsule button:disabled {
           opacity: 0.4;
           cursor: not-allowed;
         }
