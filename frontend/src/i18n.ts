@@ -138,6 +138,7 @@ export type TranslationKey =
   | "task.cancelled"
   | "statusbar.ready"
   | "statusbar.pageIndicator"
+  | "statusbar.selectedPageIndicator"
   | "statusbar.unsaved"
   | "setup.downloadingModels"
   | "setup.languageHelp"
@@ -451,6 +452,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "task.cancelled": "Task cancelled",
     "statusbar.ready": "Ready",
     "statusbar.pageIndicator": "Page {n} of {total}",
+    "statusbar.selectedPageIndicator": "{count} of {total} pages selected",
     "statusbar.unsaved": "Unsaved changes",
     "setup.downloadingModels": "Downloading models...",
     "setup.languageHelp": "Choose the language used in the source pages and the language you want to produce.",
@@ -763,6 +765,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "task.cancelled": "작업이 취소되었습니다",
     "statusbar.ready": "준비됨",
     "statusbar.pageIndicator": "{total}페이지 중 {n}페이지",
+    "statusbar.selectedPageIndicator": "{total}페이지 중 {count}페이지 선택",
     "statusbar.unsaved": "저장되지 않은 변경 사항",
     "setup.downloadingModels": "모델 다운로드 중...",
     "setup.languageHelp": "원본 페이지의 언어와 번역 결과로 사용할 언어를 선택하세요.",

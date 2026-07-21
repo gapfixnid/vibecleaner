@@ -439,6 +439,7 @@ function App() {
         onCancel={cancelCurrentJob}
         pageCount={pages.length}
         currentIndex={currentIndex}
+        selectedPageCount={selectedPageIds.length}
         isDirty={isDirty}
         t={t}
       />

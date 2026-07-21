@@ -8,15 +8,19 @@ interface StatusBarProps {
   pageCount: number;
   /** -1 when no page is selected. */
   currentIndex: number;
+  selectedPageCount: number;
   isDirty: boolean;
   t: (key: string) => string;
 }
 
-export function StatusBar({ activeJob, onCancel, pageCount, currentIndex, isDirty, t }: StatusBarProps) {
+export function StatusBar({ activeJob, onCancel, pageCount, currentIndex, selectedPageCount, isDirty, t }: StatusBarProps) {
   const jobText = activeJob ? activeJob.message || activeJob.label : t("statusbar.ready");
   const progress = activeJob?.progress ?? null;
-  const pageIndicator =
-    pageCount > 0 && currentIndex >= 0
+  const pageIndicator = pageCount > 0 && selectedPageCount > 1
+    ? t("statusbar.selectedPageIndicator")
+        .replace("{count}", String(selectedPageCount))
+        .replace("{total}", String(pageCount))
+    : pageCount > 0 && currentIndex >= 0
       ? t("statusbar.pageIndicator")
           .replace("{n}", String(currentIndex + 1))
           .replace("{total}", String(pageCount))
