@@ -45,7 +45,7 @@ def test_project_save_writes_the_versioned_envelope(tmp_path):
         metadata = json.loads(archive.read("project.json").decode("utf-8"))
     assert metadata["format"] == PROJECT_FORMAT
     assert metadata["schema_version"] == CURRENT_PROJECT_SCHEMA_VERSION
-    assert metadata["app_version"] == "0.1.0"
+    assert metadata["app_version"] == "0.2.0"
     assert metadata["selected_indices"] == [0]
     assert metadata["pages"][0]["page_id"] == "page-1"
 

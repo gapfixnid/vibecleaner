@@ -19,6 +19,7 @@ export type TranslationKey =
   | "toolbar.translating"
   | "toolbar.translateCurrentPage"
   | "toolbar.translatePageCount"
+  | "toolbar.selectedPageCount"
   | "toolbar.export"
   | "toolbar.settings"
   | "toolbar.preferences"
@@ -333,6 +334,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "toolbar.translating": "Translating...",
     "toolbar.translateCurrentPage": "Translate current page",
     "toolbar.translatePageCount": "Translate {count} pages",
+    "toolbar.selectedPageCount": "{count} pages selected",
     "toolbar.export": "Export",
     "toolbar.settings": "Settings",
     "toolbar.preferences": "Preferences",
@@ -646,6 +648,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "toolbar.translating": "번역 중...",
     "toolbar.translateCurrentPage": "현재 페이지 번역",
     "toolbar.translatePageCount": "{count}페이지 번역",
+    "toolbar.selectedPageCount": "{count}페이지 선택",
     "toolbar.export": "내보내기",
     "toolbar.settings": "설정",
     "toolbar.preferences": "환경설정",

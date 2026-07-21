@@ -68,7 +68,7 @@ def test_new_project_metadata_always_uses_current_version():
     assert metadata == {
         "format": PROJECT_FORMAT,
         "schema_version": CURRENT_PROJECT_SCHEMA_VERSION,
-        "app_version": "0.1.0",
+        "app_version": "0.2.0",
         "version": CURRENT_PROJECT_VERSION,
         "current_index": 0,
         "selected_indices": [],

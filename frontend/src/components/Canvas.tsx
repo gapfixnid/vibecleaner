@@ -1,6 +1,6 @@
 // frontend/src/components/Canvas.tsx
 import React, { useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, ScanEye } from "lucide-react";
+import { ChevronLeft, ChevronRight, Layers, ScanEye } from "lucide-react";
 import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
 import { CanvasZoomControls } from "./canvas/CanvasZoomControls";
@@ -83,6 +83,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [scale, setScale] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showOriginal, setShowOriginal] = useState(false);
+  const selectedPagesLabel = (t?.("toolbar.selectedPageCount") || "{count} pages selected")
+    .replace("{count}", String(selectedPageCount ?? 0));
+  const canCompare = Boolean(originalImageUrl && hasProcessedImage);
 
   // Tracks whether the user has manually zoomed/panned the current page, so
   // that container resizes don't reset their view.
@@ -254,36 +257,38 @@ export const Canvas: React.FC<CanvasProps> = ({
       {/* Unified floating control bar */}
       {displayImageUrl && (
         <div className="canvas-floating-controls">
-          <div className="actions-capsule">
-            {!isMultiPageSelection && (
-              <>
-                <CanvasZoomControls
-                  scale={scale}
-                  onZoomIn={() => zoomBy(1.25)}
-                  onZoomOut={() => zoomBy(1 / 1.25)}
-                  onZoomReset={() => zoomTo(1)}
-                  onZoomFit={fitToWindow}
-                  t={t}
-                />
-              </>
-            )}
-            {!isMultiPageSelection && <div className="control-divider" aria-hidden="true" />}
-            <CanvasTranslateButton
-              isProcessing={isProcessing}
-              isJobActive={isJobActive}
-              isMultiPageSelection={isMultiPageSelection}
-              selectedPageCount={selectedPageCount}
-              onTranslate={onTranslate}
-              onCancel={onCancelJob}
-              t={t}
-            />
-            {!isMultiPageSelection && (
-              <>
+          <div className={`actions-capsule ${isMultiPageSelection ? "multi-page" : canCompare ? "compare-ready" : "single-page"}`}>
+            <div
+              className={`floating-control-mode${isMultiPageSelection ? "" : " active"}`}
+              aria-hidden={isMultiPageSelection}
+              inert={isMultiPageSelection}
+            >
+              <CanvasZoomControls
+                scale={scale}
+                onZoomIn={() => zoomBy(1.25)}
+                onZoomOut={() => zoomBy(1 / 1.25)}
+                onZoomReset={() => zoomTo(1)}
+                onZoomFit={fitToWindow}
+                t={t}
+              />
+              <div className="control-divider" aria-hidden="true" />
+              <CanvasTranslateButton
+                isProcessing={isProcessing}
+                isJobActive={isJobActive}
+                selectedPageCount={selectedPageCount}
+                onTranslate={onTranslate}
+                onCancel={onCancelJob}
+                t={t}
+              />
+              <div
+                className={`compare-control-slot${canCompare ? " visible" : ""}`}
+                aria-hidden={!canCompare}
+                inert={!canCompare}
+              >
                 <div className="control-divider" aria-hidden="true" />
                 <button
                   type="button"
                   className={`canvas-compare-button${showOriginal ? " active" : ""}`}
-                  disabled={!originalImageUrl || !hasProcessedImage}
                   onPointerDown={() => setShowOriginal(true)}
                   onPointerUp={() => setShowOriginal(false)}
                   onPointerLeave={() => setShowOriginal(false)}
@@ -293,16 +298,34 @@ export const Canvas: React.FC<CanvasProps> = ({
                   }}
                   onKeyUp={() => setShowOriginal(false)}
                   aria-pressed={showOriginal}
-                  data-tooltip={hasProcessedImage
-                    ? (t?.("canvas.holdForOriginal") || "Hold to view original")
-                    : (t?.("canvas.compareUnavailable") || "Available after translation")}
+                  data-tooltip={t?.("canvas.holdForOriginal") || "Hold to view original"}
                   data-tooltip-pos="top"
                 >
                   <ScanEye size={15} />
                   <span>{showOriginal ? (t?.("canvas.viewingOriginal") || "Original") : (t?.("canvas.compare") || "Compare")}</span>
                 </button>
-              </>
-            )}
+              </div>
+            </div>
+            <div
+              className={`floating-control-mode floating-control-multi${isMultiPageSelection ? " active" : ""}`}
+              aria-hidden={!isMultiPageSelection}
+              inert={!isMultiPageSelection}
+            >
+              <div className="multi-page-summary" aria-label={selectedPagesLabel}>
+                <Layers size={15} aria-hidden="true" />
+                <span>{selectedPagesLabel}</span>
+              </div>
+              <div className="control-divider" aria-hidden="true" />
+              <CanvasTranslateButton
+                isProcessing={isProcessing}
+                isJobActive={isJobActive}
+                isMultiPageSelection
+                selectedPageCount={selectedPageCount}
+                onTranslate={onTranslate}
+                onCancel={onCancelJob}
+                t={t}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -547,9 +570,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
 
         .actions-capsule {
-          display: flex;
-          align-items: center;
-          gap: 2px;
+          position: relative;
+          width: 242px;
+          height: 40px;
+          box-sizing: border-box;
           padding: 5px;
           border: 1px solid var(--overlay-border);
           border-radius: var(--radius-lg);
@@ -557,6 +581,90 @@ export const Canvas: React.FC<CanvasProps> = ({
           backdrop-filter: var(--glass-blur);
           -webkit-backdrop-filter: var(--glass-blur);
           box-shadow: var(--overlay-shadow);
+          transition: width 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .actions-capsule.compare-ready {
+          width: 332px;
+        }
+
+        .actions-capsule.multi-page {
+          width: 270px;
+        }
+
+        .floating-control-mode {
+          position: absolute;
+          inset: 5px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+          opacity: 0;
+          transform: translateY(-5px);
+          pointer-events: none;
+          transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+        }
+
+        .floating-control-mode.active {
+          opacity: 1;
+          transform: translateY(0);
+          pointer-events: auto;
+        }
+
+        .floating-control-multi {
+          gap: 8px;
+          transform: translateY(5px);
+        }
+
+        .floating-control-multi.active {
+          transform: translateY(0);
+        }
+
+        .multi-page-summary {
+          min-width: 154px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          color: var(--text-secondary);
+          font-family: var(--font-family);
+          font-size: 12px;
+          font-weight: 600;
+          line-height: 1;
+          white-space: nowrap;
+        }
+
+        .multi-page-summary svg {
+          flex-shrink: 0;
+        }
+
+        .multi-page-summary span {
+          display: inline-flex;
+          align-items: center;
+          height: 28px;
+          line-height: 1;
+        }
+
+        .compare-control-slot {
+          width: 0;
+          display: flex;
+          align-items: center;
+          gap: 2px;
+          flex-shrink: 0;
+          opacity: 0;
+          transform: translateX(-4px) scale(0.96);
+          transform-origin: left center;
+          pointer-events: none;
+          overflow: hidden;
+          transition: width 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease-out, transform 0.18s ease-out;
+        }
+
+        .compare-control-slot.visible {
+          width: 85px;
+          opacity: 1;
+          transform: translateX(0) scale(1);
+          pointer-events: auto;
         }
 
         .actions-capsule button {
@@ -693,6 +801,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           .actions-capsule button {
             padding: 6px 12px;
           }
+
         }
       `}</style>
     </div>

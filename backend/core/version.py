@@ -6,4 +6,4 @@ Do not edit by hand — edit app.meta.json (the single source of truth) and run
 """
 
 APP_NAME = "vibecleaner"
-__version__ = "0.1.0"
+__version__ = "0.2.0"
