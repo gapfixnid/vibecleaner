@@ -79,7 +79,8 @@ class LocalOCR:
                 with self._lock:
                     if self.japanese_engine is None:
                         engine = MangaOCRMobileONNXEngine()
-                        engine.initialize()
+                        device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
+                        engine.initialize(device=device)
                         self.japanese_engine = engine
             return self.japanese_engine.process_image(
                 image,

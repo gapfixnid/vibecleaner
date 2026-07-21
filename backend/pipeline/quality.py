@@ -18,6 +18,8 @@ class QualityThresholds:
     detection: float = 0.75
     ocr: float = 0.80
     inpainting: float = 0.70
+    inpainting_min_target_change: float = 0.02
+    inpainting_min_outside_preserved: float = 0.97
     ocr_by_language: dict[str, float] = field(default_factory=lambda: {
         "Japanese": 0.80,
         "English": 0.75,
@@ -117,8 +119,17 @@ class AdaptiveQualityRouter:
             outside_preserved = 1.0
             if outside.any() and float(np.std(original.astype(np.float32)[outside])) > 1.0:
                 outside_preserved = float(np.mean(diff[outside] <= 2.0))
-            score = min(1.0, 0.6 * target_change + 0.4 * outside_preserved)
-            passed = score >= self.thresholds.inpainting and target_change > 0.0
+            # Only text strokes should change inside a rectangular text box;
+            # requiring most pixels in the box to change incorrectly rejects
+            # clean results dominated by whitespace. Normalize modest target
+            # change while independently enforcing outside preservation.
+            normalized_target_change = min(1.0, target_change / 0.15)
+            score = min(1.0, 0.7 * normalized_target_change + 0.3 * outside_preserved)
+            passed = (
+                score >= self.thresholds.inpainting
+                and target_change >= self.thresholds.inpainting_min_target_change
+                and outside_preserved >= self.thresholds.inpainting_min_outside_preserved
+            )
             return QualityScore(
                 "inpainting", round(score, 4), passed,
                 {"target_change_ratio": round(target_change, 4), "outside_preserved_ratio": round(outside_preserved, 4)},
@@ -161,8 +172,21 @@ class AdaptiveQualityRouter:
             profile for profile in profiles
             if profile.resource_classes.issubset(resources)
         ]
-        alternatives = [profile for profile in compatible if profile.selection_value != current_model]
-        candidates = alternatives or compatible
+        current_profile = next(
+            (profile for profile in compatible if profile.selection_value == current_model),
+            None,
+        )
+        if current_profile is None:
+            candidates = compatible
+        else:
+            # A quality retry must be an actual upgrade. Selecting a faster but
+            # lower-quality alternative after a failed quality check both wastes
+            # time and can replace a better result with a worse one.
+            candidates = [
+                profile for profile in compatible
+                if profile.selection_value != current_model
+                and profile.quality_score > current_profile.quality_score
+            ]
         if not candidates:
             return current_model
         return max(candidates, key=lambda profile: (profile.quality_score, profile.latency_score)).selection_value

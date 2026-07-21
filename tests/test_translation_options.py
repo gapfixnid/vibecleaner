@@ -1,4 +1,7 @@
 import unittest
+import sys
+import threading
+import types
 from unittest.mock import patch
 
 from backend.engines.translation import providers as translation_wrapper
@@ -58,6 +61,34 @@ class TranslationOptionsTests(unittest.TestCase):
 
         self.assertEqual(translator.max_retries, 4)
         self.assertEqual(translator.retry_backoff_seconds, 5)
+
+    def test_google_translates_blocks_concurrently_and_preserves_order(self):
+        barrier = threading.Barrier(3)
+
+        class FakeGoogleTranslator:
+            def __init__(self, source, target):
+                self.source = source
+                self.target = target
+
+            def translate(self, text):
+                barrier.wait(timeout=2)
+                return f"translated:{text}"
+
+        fake_module = types.SimpleNamespace(GoogleTranslator=FakeGoogleTranslator)
+        blocks = [TextBlock(text=f"台詞{i}") for i in range(3)]
+        translator = translation_wrapper.GoogleTranslatorWrapper(
+            max_retries=0,
+            retry_backoff_seconds=0,
+            max_workers=3,
+        )
+
+        with patch.dict(sys.modules, {"deep_translator": fake_module}):
+            translator.translate_blocks(blocks, "Japanese", "Korean")
+
+        self.assertEqual(
+            [block.translation for block in blocks],
+            ["translated:台詞0", "translated:台詞1", "translated:台詞2"],
+        )
 
 if __name__ == "__main__":
     unittest.main()

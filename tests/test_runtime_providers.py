@@ -21,5 +21,16 @@ def test_session_provider_helper_reports_attached_providers():
     assert session_providers(object()) is None
 
 
+def test_model_provider_helper_finds_nested_ocr_sessions():
+    class Model:
+        pass
+
+    engine = Model()
+    engine.model = Model()
+    engine.model.encoder = FakeSession(["CUDAExecutionProvider", "CPUExecutionProvider"])
+
+    assert model_session_providers(engine) == ["CPUExecutionProvider", "CUDAExecutionProvider"]
+
+
 def test_model_provider_helper_deduplicates_nested_sessions():
     assert model_session_providers(FakeModel()) == ["CPUExecutionProvider", "CUDAExecutionProvider"]

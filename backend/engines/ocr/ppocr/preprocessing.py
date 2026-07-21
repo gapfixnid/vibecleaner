@@ -113,3 +113,63 @@ def crop_quad(img: np.ndarray, quad: np.ndarray) -> np.ndarray:
 	if h > 0 and w > 0 and (h / float(w)) >= 1.5:
 		crop = np.rot90(crop)
 	return crop
+
+
+def crop_text_line(
+	img: np.ndarray,
+	line,
+	padding: int | None = None,
+	crop_scale: float | None = None,
+	adaptive_binarization: bool | None = None,
+	adaptive_binarization_strength: float | None = None,
+) -> np.ndarray | None:
+	"""Crop an OCR line, preserving rotation when a quadrilateral is available."""
+	base_padding = 8 if padding is None else int(padding)
+	scale = 1.5 if crop_scale is None else float(crop_scale or 1.5)
+	scale = max(0.5, min(3.0, scale))
+	adaptive_bin = True if adaptive_binarization is None else bool(adaptive_binarization)
+	strength = 2.0 if adaptive_binarization_strength is None else float(adaptive_binarization_strength)
+
+	arr = np.asarray(line)
+	if arr.ndim == 2 and arr.shape[0] >= 4 and arr.shape[1] == 2:
+		crop = crop_quad(img, arr[:4].astype(np.float32))
+		if crop is None or crop.size == 0:
+			return None
+		pad = _dynamic_crop_padding(crop.shape[0], base_padding, scale)
+		if pad > 0:
+			pad_width = ((pad, pad), (pad, pad))
+			if crop.ndim == 3:
+				pad_width += ((0, 0),)
+			crop = np.pad(crop, pad_width, mode="constant", constant_values=255)
+		if adaptive_bin:
+			crop = apply_adaptive_binarization(crop, strength=strength)
+		return crop
+
+	if arr.size != 4:
+		return None
+	x1, y1, x2, y2 = [int(round(float(value))) for value in arr.reshape(-1)[:4]]
+	pad = _dynamic_crop_padding(max(1, y2 - y1), base_padding, scale)
+	x1 = max(0, x1 - pad)
+	y1 = max(0, y1 - pad)
+	x2 = min(img.shape[1], x2 + pad)
+	y2 = min(img.shape[0], y2 + pad)
+	if x2 <= x1 or y2 <= y1:
+		return None
+
+	crop = img[y1:y2, x1:x2]
+	if adaptive_bin:
+		crop = apply_adaptive_binarization(crop, strength=strength)
+	h, w = crop.shape[:2]
+	if h > 0 and w > 0 and h / float(w) >= 1.5:
+		crop = np.rot90(crop)
+	return crop
+
+
+def _dynamic_crop_padding(region_height: int, base_padding: int, scale: float) -> int:
+	if region_height < 20:
+		value = base_padding + 8
+	elif region_height < 40:
+		value = base_padding + 4
+	else:
+		value = base_padding
+	return max(0, int(round(value * scale)))

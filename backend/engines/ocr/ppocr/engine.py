@@ -12,7 +12,7 @@ from ...common.language_utils import is_no_space_lang
 from ....infrastructure.runtime.device import get_providers
 from ....infrastructure.downloads import ModelDownloader, ModelID
 from ....infrastructure.runtime.onnx import make_session
-from .preprocessing import apply_adaptive_binarization, det_preprocess, crop_quad, rec_resize_norm
+from .preprocessing import apply_adaptive_binarization, crop_text_line, det_preprocess, crop_quad, rec_resize_norm
 from .postprocessing import DBPostProcessor, CTCLabelDecoder
 
 
@@ -244,47 +244,14 @@ def _crop_line(
 	adaptive_binarization: bool | None = None,
 	adaptive_binarization_strength: float | None = None,
 ) -> np.ndarray | None:
-	base_padding = 8 if padding is None else int(padding)
-	crop_scale = 1.5 if crop_scale is None else float(crop_scale or 1.5)
-	crop_scale = max(0.5, min(3.0, crop_scale))
-	adaptive_bin = True if adaptive_binarization is None else bool(adaptive_binarization)
-	strength = 2.0 if adaptive_binarization_strength is None else float(adaptive_binarization_strength)
-
-	arr = np.asarray(line)
-	if arr.ndim == 2 and arr.shape[0] >= 4 and arr.shape[1] == 2:
-		crop = crop_quad(img, arr.astype(np.float32))
-		if crop is not None and adaptive_bin:
-			crop = apply_adaptive_binarization(crop, strength=strength)
-		return crop
-	if arr.size != 4:
-		return None
-	x1, y1, x2, y2 = [int(round(float(v))) for v in arr.reshape(-1)[:4]]
-
-	# Dynamic padding: smaller text regions need more padding so the OCR
-	# engine has enough context around each character.
-	region_h = max(1, y2 - y1)
-	if region_h < 20:
-		padding = base_padding + 8  # tiny text (e.g. furigana)
-	elif region_h < 40:
-		padding = base_padding + 4  # small text
-	else:
-		padding = base_padding
-	padding = int(round(padding * crop_scale))
-
-	x1 = max(0, x1 - padding)
-	y1 = max(0, y1 - padding)
-	x2 = min(img.shape[1], x2 + padding)
-	y2 = min(img.shape[0], y2 + padding)
-
-	if x2 <= x1 or y2 <= y1:
-		return None
-	crop = img[y1:y2, x1:x2]
-	if adaptive_bin:
-		crop = apply_adaptive_binarization(crop, strength=strength)
-	h, w = crop.shape[:2]
-	if h > 0 and w > 0 and h / float(w) >= 1.5:
-		crop = np.rot90(crop)
-	return crop
+	return crop_text_line(
+		img,
+		line,
+		padding=padding,
+		crop_scale=crop_scale,
+		adaptive_binarization=adaptive_binarization,
+		adaptive_binarization_strength=adaptive_binarization_strength,
+	)
 
 
 def _rec_target_width(img: np.ndarray, img_shape=(3, 48, 320)) -> int:

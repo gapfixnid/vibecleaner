@@ -7,9 +7,12 @@ import onnxruntime as ort
 from PIL import Image
 
 from ...base import OCREngine
-from ...ppocr.preprocessing import apply_adaptive_binarization
+from ...ppocr.preprocessing import crop_text_line
 from .....infrastructure.downloads import ModelDownloader, ModelID
-from ....common.textblock import TextBlock, adjust_text_line_coordinates
+from .....infrastructure.runtime.device import get_providers
+from .....infrastructure.runtime.onnx import make_session
+from ....common.textblock import TextBlock
+from ....common.language_utils import is_no_space_lang
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +29,7 @@ SPECIAL_TOKEN_THRESHOLD = 5
 MAX_POSITION_ID = 127
 
 
-def _create_session(model_path: str) -> ort.InferenceSession:
+def _create_session(model_path: str, device: str = "cpu") -> ort.InferenceSession:
     so = ort.SessionOptions()
     so.log_severity_level = 3
     # This decoder makes many tiny step() calls; desktop ORT is faster with one thread.
@@ -36,7 +39,7 @@ def _create_session(model_path: str) -> ort.InferenceSession:
     so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
     so.enable_cpu_mem_arena = True
     so.enable_mem_pattern = True
-    return ort.InferenceSession(model_path, sess_options=so, providers=["CPUExecutionProvider"])
+    return make_session(model_path, sess_options=so, providers=get_providers(device))
 
 
 class MangaOCRMobileONNXEngine(OCREngine):
@@ -48,10 +51,10 @@ class MangaOCRMobileONNXEngine(OCREngine):
         self.expansion_percentage = 5
 
     def initialize(self, device: str = "cpu", expansion_percentage: int = 5) -> None:
-        self.device = "cpu"
+        self.device = device
         self.expansion_percentage = expansion_percentage
         if self.model is None:
-            self.model = MangaOCRMobileONNX()
+            self.model = MangaOCRMobileONNX(device=device)
 
     def process_image(
         self,
@@ -72,40 +75,24 @@ class MangaOCRMobileONNXEngine(OCREngine):
         crop_indices: list[int] = []
 
         for idx, blk in enumerate(blk_list):
-            if blk.xyxy is not None:
-                x1, y1, x2, y2 = blk.xyxy
-            elif blk.bubble_xyxy is not None:
-                x1, y1, x2, y2 = blk.bubble_xyxy
-            else:
-                x1, y1, x2, y2 = adjust_text_line_coordinates(
-                    blk.xyxy,
-                    self.expansion_percentage,
-                    self.expansion_percentage,
+            regions = list(getattr(blk, "lines", None) or [])
+            if not regions:
+                region = blk.xyxy if blk.xyxy is not None else blk.bubble_xyxy
+                regions = [region] if region is not None else []
+
+            for region in regions:
+                crop = crop_text_line(
                     img,
+                    region,
+                    padding=base_padding,
+                    crop_scale=crop_scale,
+                    adaptive_binarization=adaptive_bin,
+                    adaptive_binarization_strength=strength,
                 )
-
-            # Dynamic padding: smaller text regions need more padding
-            region_h = max(1, y2 - y1)
-            if region_h < 20:
-                padding = base_padding + 8  # tiny text (e.g. furigana)
-            elif region_h < 40:
-                padding = base_padding + 4  # small text
-            else:
-                padding = base_padding
-            padding = int(round(padding * crop_scale))
-
-            x1 = max(0, x1 - padding)
-            y1 = max(0, y1 - padding)
-            x2 = min(img.shape[1], x2 + padding)
-            y2 = min(img.shape[0], y2 + padding)
-
-            if x1 < x2 and y1 < y2:
-                crop = img[y1:y2, x1:x2]
-                if adaptive_bin:
-                    crop = apply_adaptive_binarization(crop, strength=strength)
-                crops.append(crop)
-                crop_indices.append(idx)
-            else:
+                if crop is not None and crop.size > 0:
+                    crops.append(crop)
+                    crop_indices.append(idx)
+            if not regions:
                 blk.text = ""
 
         if not crops:
@@ -119,23 +106,32 @@ class MangaOCRMobileONNXEngine(OCREngine):
                 blk_list[idx].text = ""
             return blk_list
 
-        for idx, text in zip(crop_indices, texts):
-            blk_list[idx].text = text
+        texts_by_block: dict[int, list[str]] = {}
+        for idx, value in zip(crop_indices, texts):
+            text = value.strip() if value else ""
+            if text:
+                texts_by_block.setdefault(idx, []).append(text)
+        for idx in set(crop_indices):
+            block_texts = texts_by_block.get(idx, [])
+            blk_list[idx].texts = block_texts
+            separator = "" if is_no_space_lang(getattr(blk_list[idx], "source_lang", "")) else " "
+            blk_list[idx].text = separator.join(block_texts)
 
         return blk_list
 
 
 class MangaOCRMobileONNX:
-    def __init__(self):
+    def __init__(self, device: str = "cpu"):
         ModelDownloader.get(ModelID.MANGA_OCR_MOBILE_ONNX)
         encoder_path = ModelDownloader.get_file_path(ModelID.MANGA_OCR_MOBILE_ONNX, "encoder.onnx")
         decoder_init_path = ModelDownloader.get_file_path(ModelID.MANGA_OCR_MOBILE_ONNX, "decoder_init.onnx")
         decoder_step_path = ModelDownloader.get_file_path(ModelID.MANGA_OCR_MOBILE_ONNX, "decoder_step.onnx")
         vocab_path = ModelDownloader.get_file_path(ModelID.MANGA_OCR_MOBILE_ONNX, "vocab.txt")
 
-        self.encoder = _create_session(encoder_path)
-        self.decoder_init = _create_session(decoder_init_path)
-        self.decoder_step = _create_session(decoder_step_path)
+        self.device = device
+        self.encoder = _create_session(encoder_path, device)
+        self.decoder_init = _create_session(decoder_init_path, device)
+        self.decoder_step = _create_session(decoder_step_path, device)
         self.vocab = self._load_vocab(vocab_path)
         self.vocab_size = len(self.vocab)
 
@@ -157,7 +153,7 @@ class MangaOCRMobileONNX:
 
         # Dynamically set max workers based on CPU core counts to prevent CPU thrashing
         from .....infrastructure.runtime.onnx import get_optimal_cpu_threads
-        max_workers = min(len(imgs), get_optimal_cpu_threads())
+        max_workers = 1 if self.device == "cuda" else min(len(imgs), get_optimal_cpu_threads())
 
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="manga-ocr-worker") as executor:

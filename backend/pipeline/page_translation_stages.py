@@ -391,19 +391,20 @@ class PageInpaintingStage:
                 retry_engine = self.quality_router.select_model(
                     "inpainting", current_engine, quality_score, self.provider_manifest
                 )
-                inpainted_image = self.inpainting_service.clean_background(
-                    image,
-                    boxes,
-                    bubble_clip_boxes(local_bubbles),
-                    source_polygons=bubble_source_polygons(local_bubbles),
-                    protect_edges=True,
-                    engine=retry_engine,
-                    mask_dilation=max(1, int(getattr(config, "inpaint_mask_dilation", 2)) + 2),
-                )
-                quality_score = self.quality_router.evaluate_inpainting(image, inpainted_image, boxes)
-                context.artifacts.setdefault("quality_replans", []).append({
-                    "stage": "inpainting", "engine": retry_engine, "passed": quality_score.passed
-                })
+                if retry_engine != current_engine:
+                    inpainted_image = self.inpainting_service.clean_background(
+                        image,
+                        boxes,
+                        bubble_clip_boxes(local_bubbles),
+                        source_polygons=bubble_source_polygons(local_bubbles),
+                        protect_edges=True,
+                        engine=retry_engine,
+                        mask_dilation=max(1, int(getattr(config, "inpaint_mask_dilation", 2)) + 2),
+                    )
+                    quality_score = self.quality_router.evaluate_inpainting(image, inpainted_image, boxes)
+                    context.artifacts.setdefault("quality_replans", []).append({
+                        "stage": "inpainting", "engine": retry_engine, "passed": quality_score.passed
+                    })
             context.artifacts.setdefault("quality_scores", {})["inpainting"] = quality_score
             if inpainted_image is None or getattr(inpainted_image, "shape", None) != getattr(image, "shape", None):
                 raise RuntimeError("Inpainting did not produce a valid page image")
