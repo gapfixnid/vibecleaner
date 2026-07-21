@@ -6,6 +6,8 @@ export type TranslationKey =
   | "app.title"
   | "layout.resizePages"
   | "layout.resizeInspector"
+  | "layout.hideInspector"
+  | "layout.showInspector"
   | "toolbar.addImages"
   | "toolbar.menu"
   | "toolbar.newProject"
@@ -311,6 +313,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "app.title": "VibeCleaner",
     "layout.resizePages": "Resize pages panel",
     "layout.resizeInspector": "Resize inspector panel",
+    "layout.hideInspector": "Hide inspector (Alt+I)",
+    "layout.showInspector": "Show inspector (Alt+I)",
     "toolbar.addImages": "Add Images",
     "toolbar.menu": "Menu",
     "toolbar.newProject": "New Project",
@@ -615,6 +619,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "app.title": "VibeCleaner",
     "layout.resizePages": "페이지 패널 크기 조절",
     "layout.resizeInspector": "인스펙터 패널 크기 조절",
+    "layout.hideInspector": "인스펙터 숨기기 (Alt+I)",
+    "layout.showInspector": "인스펙터 표시 (Alt+I)",
     "toolbar.addImages": "이미지 추가",
     "toolbar.menu": "메뉴",
     "toolbar.newProject": "새 프로젝트",

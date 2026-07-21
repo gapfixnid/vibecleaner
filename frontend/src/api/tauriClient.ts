@@ -17,12 +17,15 @@ import type { ProviderCatalogDto } from "../types/provider";
 import type { ProjectDto, PageDto, SettingsDto } from "../types/project";
 import type { BubbleDto, BubblePatchDto } from "../types/bubble";
 
-async function callTauri<T>(cmd: string, args?: Record<string, any>): Promise<T> {
+async function callTauri<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   try {
     return await invoke<T>(cmd, args);
-  } catch (err: any) {
-    const msg = typeof err === "string" ? err : err?.message || String(err);
-    const code = err?.code || "TAURI_ERROR";
+  } catch (err: unknown) {
+    const details = typeof err === "object" && err !== null ? err as Record<string, unknown> : null;
+    const msg = typeof err === "string"
+      ? err
+      : typeof details?.message === "string" ? details.message : String(err);
+    const code = typeof details?.code === "string" ? details.code : "TAURI_ERROR";
     throw new ApiError(code, msg, err);
   }
 }

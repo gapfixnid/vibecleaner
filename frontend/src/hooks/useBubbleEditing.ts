@@ -77,8 +77,12 @@ export function useBubbleEditing({
   // the browser's blur fires.
   const currentId = selectedBubble?.id ?? null;
   if (currentId !== syncedBubbleId) {
+    // This intentionally uses React's render-time state adjustment pattern so
+    // a pending textarea blur cannot write into the newly selected bubble.
+    // eslint-disable-next-line react-hooks/refs
     const prevBubble = lastBubbleRef.current;
     if (prevBubble && hasBubbleTextEdits(prevBubble, origText, transText)) {
+      // eslint-disable-next-line react-hooks/refs
       pendingSaveRef.current = { bubble: prevBubble, text: origText, translated: transText };
     }
     setSyncedBubbleId(currentId);
@@ -87,6 +91,7 @@ export function useBubbleEditing({
     setFontSizeDraft(selectedBubble ? draftFontSize(selectedBubble, settings) : 18);
     setColorDraft(selectedBubble?.color || "#000000");
   }
+  // eslint-disable-next-line react-hooks/refs
   lastBubbleRef.current = selectedBubble;
 
   // Flush a pending save queued by the reset above. useLayoutEffect runs
@@ -106,6 +111,8 @@ export function useBubbleEditing({
   // the id-change case above.
   useEffect(() => {
     if (!selectedBubble || selectedBubble.id !== syncedBubbleId) return;
+    // Backend results replace all four drafts atomically after the request.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOrigText(selectedBubble.text || "");
     setTransText(selectedBubble.translated || "");
     setFontSizeDraft(draftFontSize(selectedBubble, settings));

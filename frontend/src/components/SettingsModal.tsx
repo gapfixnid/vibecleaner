@@ -20,6 +20,7 @@ import type { ProviderCatalogDto, ProviderConfigFieldDto, ProviderManifestDto } 
 import type { ThemeMeta } from "../themes";
 import { NumberStepper } from "./NumberStepper";
 import { getSafeTargetLanguage, getTargetLanguageOptions, SUPPORTED_TRANSLATION_LANGUAGES } from "../languageOptions";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -150,18 +151,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const contentRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    contentRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
+  useFocusTrap(contentRef, isOpen, onClose);
 
   if (!isOpen) return null;
 

@@ -25,7 +25,10 @@ interface UseFileDropImportDeps {
 export function useFileDropImport({ enabled, onDropImages }: UseFileDropImportDeps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const depsRef = useRef({ enabled, onDropImages });
-  depsRef.current = { enabled, onDropImages };
+
+  useEffect(() => {
+    depsRef.current = { enabled, onDropImages };
+  }, [enabled, onDropImages]);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;

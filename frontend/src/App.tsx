@@ -139,6 +139,7 @@ function App() {
   // --- Local UI state ---
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(() => localStorage.getItem("vibecleaner.inspectorOpen") !== "false");
   const { theme, setTheme, themes } = useTheme();
   const {
     sidebarWidth,
@@ -148,6 +149,24 @@ function App() {
     adjustSidebarWidth,
     adjustInspectorWidth,
   } = usePanelWidths();
+
+  const toggleInspector = useCallback(() => {
+    setIsInspectorOpen((open) => {
+      const next = !open;
+      localStorage.setItem("vibecleaner.inspectorOpen", String(next));
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleInspectorShortcut = (event: globalThis.KeyboardEvent) => {
+      if (!event.altKey || event.key.toLowerCase() !== "i") return;
+      event.preventDefault();
+      toggleInspector();
+    };
+    window.addEventListener("keydown", handleInspectorShortcut);
+    return () => window.removeEventListener("keydown", handleInspectorShortcut);
+  }, [toggleInspector]);
 
   const handlePanelResizeKey = (
     event: KeyboardEvent<HTMLDivElement>,
@@ -302,6 +321,8 @@ function App() {
         onExport={handleToolbarExport}
         onPreferences={() => setIsSettingsOpen(true)}
         onAbout={() => setIsAboutOpen(true)}
+        onToggleInspector={toggleInspector}
+        isInspectorOpen={isInspectorOpen}
         isDirty={isDirty}
         canExport={pages.length > 0}
         t={t}
@@ -366,30 +387,34 @@ function App() {
           t={t}
         />
 
-        <div
-          className="panel-resizer inspector-resizer"
-          role="separator"
-          aria-label={t("layout.resizeInspector")}
-          aria-orientation="vertical"
-          tabIndex={0}
-          onPointerDown={startInspectorResize}
-          onKeyDown={(event) => handlePanelResizeKey(event, "inspector")}
-        />
+        {isInspectorOpen && (
+          <>
+            <div
+              className="panel-resizer inspector-resizer"
+              role="separator"
+              aria-label={t("layout.resizeInspector")}
+              aria-orientation="vertical"
+              tabIndex={0}
+              onPointerDown={startInspectorResize}
+              onKeyDown={(event) => handlePanelResizeKey(event, "inspector")}
+            />
 
-        <Inspector
-          selectedBubble={activeBubble}
-          settings={settings}
-          onUpdateBubble={bubblesApi.handleUpdateBubble}
-          onReOcrBubble={bubblesApi.handleReOcrBubble}
-          onReTranslateBubble={bubblesApi.handleReTranslateBubble}
-          isProcessing={isProcessing}
-          isMultiPageSelection={isMultiPageSelection}
-          reviewProblemCount={reviewBubbleIds.length}
-          reviewProblemPosition={selectedReviewIndex >= 0 ? selectedReviewIndex + 1 : 0}
-          onPreviousProblem={() => selectReviewProblem(-1)}
-          onNextProblem={() => selectReviewProblem(1)}
-          t={t}
-        />
+            <Inspector
+              selectedBubble={activeBubble}
+              settings={settings}
+              onUpdateBubble={bubblesApi.handleUpdateBubble}
+              onReOcrBubble={bubblesApi.handleReOcrBubble}
+              onReTranslateBubble={bubblesApi.handleReTranslateBubble}
+              isProcessing={isProcessing}
+              isMultiPageSelection={isMultiPageSelection}
+              reviewProblemCount={reviewBubbleIds.length}
+              reviewProblemPosition={selectedReviewIndex >= 0 ? selectedReviewIndex + 1 : 0}
+              onPreviousProblem={() => selectReviewProblem(-1)}
+              onNextProblem={() => selectReviewProblem(1)}
+              t={t}
+            />
+          </>
+        )}
       </div>
 
       <StatusBar
@@ -446,6 +471,7 @@ function App() {
 
       <style>{`
         .main-workspace {
+          position: relative;
           display: flex;
           flex: 1;
           height: calc(100vh - var(--toolbar-height) - var(--statusbar-height));
@@ -478,6 +504,19 @@ function App() {
         body.panel-resizing * {
           cursor: col-resize !important;
           user-select: none !important;
+        }
+
+        @media (max-width: 1100px) {
+          .main-workspace .inspector-container {
+            position: absolute;
+            inset: 0 0 0 auto;
+            z-index: 8;
+            box-shadow: var(--shadow-lg);
+          }
+
+          .main-workspace .inspector-resizer {
+            display: none;
+          }
         }
 
         .drop-veil {

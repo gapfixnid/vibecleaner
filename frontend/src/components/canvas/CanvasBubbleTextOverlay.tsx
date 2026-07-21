@@ -1,4 +1,4 @@
-import React from "react";
+import React, { type CSSProperties } from "react";
 import type { BubbleInfo } from "../../types";
 
 interface CanvasBubbleTextOverlayProps {
@@ -43,7 +43,7 @@ export const CanvasBubbleTextOverlay = React.memo(({ bubbles, selectedBubbleId }
                     fontWeight: bubble.bold ? "bold" : "normal",
                     fontStyle: bubble.italic ? "italic" : "normal",
                     color: bubble.color || "#000000",
-                    textAlign: bubble.alignment as any,
+                    textAlign: bubble.alignment as CSSProperties["textAlign"],
                     lineHeight: `${line.height}px`,
                     whiteSpace: "nowrap",
                     textShadow: "0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff",

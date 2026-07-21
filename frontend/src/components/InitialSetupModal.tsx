@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Download, Loader2 } from "lucide-react";
 import { AppleSelect } from "./AppleSelect";
 import * as api from "../services/api";
@@ -6,6 +6,7 @@ import { createTranslator } from "../i18n";
 import type { WaitForJob } from "../hooks/useProcessingTask";
 import type { ModelStatus, Settings } from "../types";
 import { getSafeTargetLanguage, getTargetLanguageOptions, SUPPORTED_TRANSLATION_LANGUAGES } from "../languageOptions";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 interface InitialSetupModalProps {
   isOpen: boolean;
@@ -80,7 +81,9 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [progressPct, setProgressPct] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [setupStep, setSetupStep] = useState(0);
+  const panelRef = useRef<HTMLDivElement>(null);
   const uiT = useMemo(() => createTranslator(localSettings.ui_language), [localSettings.ui_language]);
+  useFocusTrap(panelRef, isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -154,7 +157,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
   return (
     <div className="setup-overlay" role="dialog" aria-modal="true" aria-label={uiT("setup.title")}>
-      <div className="setup-panel">
+      <div className="setup-panel" ref={panelRef} tabIndex={-1}>
         <div className="setup-header">
           <div>
             <h1>{uiT("setup.title")}</h1>

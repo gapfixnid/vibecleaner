@@ -1,6 +1,6 @@
 // frontend/src/components/Toolbar.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { Download, FilePlus2, FolderOpen, ImagePlus, Info, Menu, Minus, Save, Settings, Square, X } from "lucide-react";
+import { Download, FilePlus2, FolderOpen, ImagePlus, Info, Menu, Minus, PanelRightClose, PanelRightOpen, Save, Settings, Square, X } from "lucide-react";
 import * as desktop from "../services/desktop";
 import { APP_NAME } from "../appMeta";
 
@@ -12,6 +12,8 @@ interface ToolbarProps {
   onExport: () => void;
   onPreferences: () => void;
   onAbout: () => void;
+  onToggleInspector: () => void;
+  isInspectorOpen: boolean;
   isDirty: boolean;
   canExport: boolean;
   t?: (key: string) => string;
@@ -25,12 +27,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onExport,
   onPreferences,
   onAbout,
+  onToggleInspector,
+  isInspectorOpen,
   isDirty,
   canExport,
   t = (key) => key,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -49,6 +54,32 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       window.removeEventListener("keydown", onKey);
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    menuRef.current?.querySelector<HTMLButtonElement>("[role='menuitem']")?.focus();
+  }, [menuOpen]);
+
+  const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>("[role='menuitem']") ?? []);
+    if (items.length === 0) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % items.length;
+    else if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + items.length) % items.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = items.length - 1;
+    else if (event.key === "Escape") {
+      event.preventDefault();
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
+      return;
+    }
+    if (nextIndex !== null) {
+      event.preventDefault();
+      items[nextIndex].focus();
+    }
+  };
 
   const runItem = (fn: () => void) => () => {
     setMenuOpen(false);
@@ -99,6 +130,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         >
           <Settings size={17} />
         </button>
+        <button
+          type="button"
+          className="toolbar-action inspector-toggle"
+          onClick={onToggleInspector}
+          data-tooltip={t(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector")}
+          aria-label={t(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector")}
+          aria-pressed={isInspectorOpen}
+        >
+          {isInspectorOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
+        </button>
         <div className="menu-wrapper" ref={menuRef}>
           <button
             type="button"
@@ -108,13 +149,20 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             aria-haspopup="menu"
             aria-controls="toolbar-dropdown-menu"
             aria-expanded={menuOpen}
+            ref={menuButtonRef}
             onClick={() => setMenuOpen((v) => !v)}
+            onKeyDown={(event) => {
+              if ((event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") && !menuOpen) {
+                event.preventDefault();
+                setMenuOpen(true);
+              }
+            }}
           >
             <Menu size={18} />
           </button>
 
           {menuOpen && (
-            <div id="toolbar-dropdown-menu" className="toolbar-menu" role="menu">
+            <div id="toolbar-dropdown-menu" className="toolbar-menu" role="menu" onKeyDown={handleMenuKeyDown}>
               <button type="button" role="menuitem" onClick={runItem(onNewProject)}>
                 <FilePlus2 size={14} />
                 <span>{t("toolbar.newProject")}</span>
@@ -123,7 +171,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <FolderOpen size={14} />
                 <span>{t("toolbar.openProject")}</span>
               </button>
-              <div className="toolbar-menu-separator" />
+              <div className="toolbar-menu-separator" role="separator" />
               <button type="button" role="menuitem" onClick={runItem(onAbout)}>
                 <Info size={14} />
                 <span>{t("toolbar.about")}</span>
