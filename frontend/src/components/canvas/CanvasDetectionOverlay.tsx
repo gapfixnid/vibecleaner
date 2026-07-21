@@ -1,3 +1,4 @@
+import React from "react";
 import type { BubbleInfo } from "../../types";
 
 interface CanvasDetectionOverlayProps {
@@ -6,7 +7,7 @@ interface CanvasDetectionOverlayProps {
 }
 
 /** Visualizes the boxes produced by detection/OCR without intercepting canvas input. */
-export function CanvasDetectionOverlay({ bubbles, scale }: CanvasDetectionOverlayProps) {
+export const CanvasDetectionOverlay = React.memo(({ bubbles, scale }: CanvasDetectionOverlayProps) => {
   return (
     <svg
       className="canvas-detection-overlay"
@@ -68,4 +69,6 @@ export function CanvasDetectionOverlay({ bubbles, scale }: CanvasDetectionOverla
       })}
     </svg>
   );
-}
+});
+
+CanvasDetectionOverlay.displayName = "CanvasDetectionOverlay";

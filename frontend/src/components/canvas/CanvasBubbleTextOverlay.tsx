@@ -1,3 +1,4 @@
+import React from "react";
 import type { BubbleInfo } from "../../types";
 
 interface CanvasBubbleTextOverlayProps {
@@ -5,7 +6,7 @@ interface CanvasBubbleTextOverlayProps {
   selectedBubbleId: number | null;
 }
 
-export function CanvasBubbleTextOverlay({ bubbles, selectedBubbleId }: CanvasBubbleTextOverlayProps) {
+export const CanvasBubbleTextOverlay = React.memo(({ bubbles, selectedBubbleId }: CanvasBubbleTextOverlayProps) => {
   return (
     <div className="canvas-text-overlay" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
       {bubbles.map((bubble) => {
@@ -57,4 +58,6 @@ export function CanvasBubbleTextOverlay({ bubbles, selectedBubbleId }: CanvasBub
       })}
     </div>
   );
-}
+});
+
+CanvasBubbleTextOverlay.displayName = "CanvasBubbleTextOverlay";

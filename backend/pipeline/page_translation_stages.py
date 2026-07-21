@@ -432,12 +432,15 @@ class PageRenderingStage:
         state = context.artifacts["state"]
         job = context.artifacts["job"]
         job_manager = context.artifacts["job_manager"]
+        show_progress = context.artifacts["show_progress"]
         page_id = context.page_id
         inpainted_image = context.artifacts["inpainted_image"]
         local_bubbles = context.artifacts["local_bubbles"]
         bubble_counter = context.artifacts["bubble_counter"]
         start_revision = context.artifacts["start_revision"]
 
+        if show_progress:
+            job_manager.update(job, progress=80, message=msg_from_context("page_translation.rendering", context))
         job_manager.ensure_not_cancelled(job)
         inpainted_preview_bytes = self.encode_preview_jpeg_bytes(inpainted_image) if inpainted_image is not None else None
         job_manager.ensure_not_cancelled(job)

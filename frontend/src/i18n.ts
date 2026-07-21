@@ -4,6 +4,8 @@ export const UI_LANGUAGE_STORAGE_KEY = "vibecleaner_ui_language";
 
 export type TranslationKey =
   | "app.title"
+  | "layout.resizePages"
+  | "layout.resizeInspector"
   | "toolbar.addImages"
   | "toolbar.menu"
   | "toolbar.newProject"
@@ -34,6 +36,12 @@ export type TranslationKey =
   | "sidebar.saveImageEllipsis"
   | "sidebar.saveImagesEllipsis"
   | "sidebar.selectAll"
+  | "sidebar.selectedPages"
+  | "sidebar.selectedCount"
+  | "sidebar.status.not-started"
+  | "sidebar.status.in-progress"
+  | "sidebar.status.needs-review"
+  | "sidebar.status.complete"
   | "inspector.header"
   | "inspector.text"
   | "inspector.style"
@@ -60,6 +68,10 @@ export type TranslationKey =
   | "inspector.category"
   | "inspector.reviewStatus"
   | "inspector.unknown"
+  | "inspector.reviewQueue"
+  | "inspector.previousProblem"
+  | "inspector.nextProblem"
+  | "inspector.reviewProblems"
   | "dialog.cancel"
   | "dialog.confirm"
   | "dialog.ok"
@@ -124,12 +136,29 @@ export type TranslationKey =
   | "statusbar.pageIndicator"
   | "statusbar.unsaved"
   | "setup.downloadingModels"
+  | "setup.languageHelp"
+  | "setup.profileHelp"
+  | "setup.reviewHelp"
+  | "setup.back"
+  | "setup.continue"
   | "canvas.zoomIn"
   | "canvas.zoomOut"
   | "canvas.zoomFit"
   | "canvas.zoomActual"
   | "canvas.showDetection"
   | "canvas.hideDetection"
+  | "canvas.emptyEyebrow"
+  | "canvas.emptyTitle"
+  | "canvas.emptyDescription"
+  | "canvas.emptyDropHint"
+  | "canvas.compare"
+  | "canvas.holdForOriginal"
+  | "canvas.viewingOriginal"
+  | "statusbar.stageDetect"
+  | "statusbar.stageAnalyze"
+  | "statusbar.stageTranslate"
+  | "statusbar.stageClean"
+  | "statusbar.stageRender"
   | "dnd.dropToImport"
   | "dnd.skippedFiles"
   | "toast.bubbleDeleted"
@@ -161,6 +190,9 @@ export type TranslationKey =
   | "export.successMultiMessage"
   | "export.failedTitle"
   | "settings.preferences"
+  | "settings.basicMode"
+  | "settings.advancedMode"
+  | "settings.advancedHint"
   | "settings.general"
   | "settings.translation"
   | "settings.detection"
@@ -277,6 +309,8 @@ export type TranslationKey =
 const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
   en: {
     "app.title": "VibeCleaner",
+    "layout.resizePages": "Resize pages panel",
+    "layout.resizeInspector": "Resize inspector panel",
     "toolbar.addImages": "Add Images",
     "toolbar.menu": "Menu",
     "toolbar.newProject": "New Project",
@@ -307,6 +341,12 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "sidebar.saveImageEllipsis": "Save Image...",
     "sidebar.saveImagesEllipsis": "Save Images...",
     "sidebar.selectAll": "Select All",
+    "sidebar.selectedPages": "Selected page actions",
+    "sidebar.selectedCount": "{count} selected",
+    "sidebar.status.not-started": "Not translated",
+    "sidebar.status.in-progress": "Partially translated",
+    "sidebar.status.needs-review": "Needs review",
+    "sidebar.status.complete": "Translation complete",
     "inspector.header": "Inspector - Bubble #{id}",
     "inspector.text": "Text",
     "inspector.style": "Style",
@@ -333,6 +373,10 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "inspector.category": "Category",
     "inspector.reviewStatus": "Review Status",
     "inspector.unknown": "unknown",
+    "inspector.reviewQueue": "Review queue",
+    "inspector.previousProblem": "Previous review issue",
+    "inspector.nextProblem": "Next review issue",
+    "inspector.reviewProblems": "Review {count} issues",
     "dialog.cancel": "Cancel",
     "dialog.confirm": "Confirm",
     "dialog.ok": "OK",
@@ -397,12 +441,29 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "statusbar.pageIndicator": "Page {n} of {total}",
     "statusbar.unsaved": "Unsaved changes",
     "setup.downloadingModels": "Downloading models...",
+    "setup.languageHelp": "Choose the language used in the source pages and the language you want to produce.",
+    "setup.profileHelp": "Balanced is recommended for most projects. Choose Fast when turnaround matters more than maximum quality.",
+    "setup.reviewHelp": "Review the models required by your choices. Installed models will not be downloaded again.",
+    "setup.back": "Back",
+    "setup.continue": "Continue",
     "canvas.zoomIn": "Zoom in",
     "canvas.zoomOut": "Zoom out",
     "canvas.zoomFit": "Fit to window",
     "canvas.zoomActual": "Actual size (100%)",
     "canvas.showDetection": "Show detection boxes",
     "canvas.hideDetection": "Hide detection boxes",
+    "canvas.emptyEyebrow": "START A NEW WORKSPACE",
+    "canvas.emptyTitle": "Bring your manga pages into focus",
+    "canvas.emptyDescription": "Add one or more images to translate, review, and export them from a single workspace.",
+    "canvas.emptyDropHint": "You can also drop PNG, JPEG, or WebP files anywhere in this window",
+    "canvas.compare": "Compare",
+    "canvas.holdForOriginal": "Hold to view the original page",
+    "canvas.viewingOriginal": "Original",
+    "statusbar.stageDetect": "Detect",
+    "statusbar.stageAnalyze": "Read",
+    "statusbar.stageTranslate": "Translate",
+    "statusbar.stageClean": "Clean",
+    "statusbar.stageRender": "Render",
     "dnd.dropToImport": "Drop images to import",
     "dnd.skippedFiles": "{count} unsupported file(s) skipped",
     "toast.bubbleDeleted": "Bubble deleted",
@@ -434,12 +495,15 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "export.successMultiMessage": "Saved {count} images to:\n{path}",
     "export.failedTitle": "Export Failed",
     "settings.preferences": "Preferences",
+    "settings.basicMode": "Basic settings",
+    "settings.advancedMode": "Advanced settings",
+    "settings.advancedHint": "These options tune connection reliability and processing behavior. The defaults are recommended for most projects.",
     "settings.general": "General",
     "settings.translation": "Translation",
     "settings.detection": "Detection",
     "settings.inpainting": "Inpainting",
     "settings.generalTitle": "General Settings",
-    "settings.generalDesc": "Manage general preferences, font size boundaries, and timeouts.",
+    "settings.generalDesc": "Manage language, appearance, and workspace defaults.",
     "settings.translationTitle": "Translation Engine",
     "settings.translationDesc": "Select from offline, local, or cloud API translation engines.",
     "settings.detectionTitle": "Detection & OCR",
@@ -549,6 +613,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
   },
   ko: {
     "app.title": "VibeCleaner",
+    "layout.resizePages": "페이지 패널 크기 조절",
+    "layout.resizeInspector": "인스펙터 패널 크기 조절",
     "toolbar.addImages": "이미지 추가",
     "toolbar.menu": "메뉴",
     "toolbar.newProject": "새 프로젝트",
@@ -579,6 +645,12 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "sidebar.saveImageEllipsis": "이미지 저장...",
     "sidebar.saveImagesEllipsis": "이미지들 저장...",
     "sidebar.selectAll": "전체 선택",
+    "sidebar.selectedPages": "선택한 페이지 작업",
+    "sidebar.selectedCount": "{count}개 선택",
+    "sidebar.status.not-started": "번역 전",
+    "sidebar.status.in-progress": "일부 번역됨",
+    "sidebar.status.needs-review": "검수 필요",
+    "sidebar.status.complete": "번역 완료",
     "inspector.header": "인스펙터 - 말풍선 #{id}",
     "inspector.text": "텍스트",
     "inspector.style": "스타일",
@@ -605,6 +677,10 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "inspector.category": "분류",
     "inspector.reviewStatus": "검토 상태",
     "inspector.unknown": "알 수 없음",
+    "inspector.reviewQueue": "검수 대기열",
+    "inspector.previousProblem": "이전 검수 문제",
+    "inspector.nextProblem": "다음 검수 문제",
+    "inspector.reviewProblems": "문제 {count}개 검수",
     "dialog.cancel": "취소",
     "dialog.confirm": "확인",
     "dialog.ok": "확인",
@@ -669,12 +745,29 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "statusbar.pageIndicator": "{total}페이지 중 {n}페이지",
     "statusbar.unsaved": "저장되지 않은 변경 사항",
     "setup.downloadingModels": "모델 다운로드 중...",
+    "setup.languageHelp": "원본 페이지의 언어와 번역 결과로 사용할 언어를 선택하세요.",
+    "setup.profileHelp": "대부분의 프로젝트에는 균형 모드를 권장합니다. 최고 품질보다 처리 속도가 중요할 때 고속을 선택하세요.",
+    "setup.reviewHelp": "선택한 설정에 필요한 모델을 확인하세요. 이미 설치된 모델은 다시 다운로드하지 않습니다.",
+    "setup.back": "이전",
+    "setup.continue": "계속",
     "canvas.zoomIn": "확대",
     "canvas.zoomOut": "축소",
     "canvas.zoomFit": "창에 맞추기",
     "canvas.zoomActual": "실제 크기 (100%)",
     "canvas.showDetection": "검출 박스 표시",
     "canvas.hideDetection": "검출 박스 숨기기",
+    "canvas.emptyEyebrow": "새 작업 시작",
+    "canvas.emptyTitle": "만화 이미지를 불러와 시작하세요",
+    "canvas.emptyDescription": "이미지를 추가하면 번역부터 검수, 내보내기까지 한 작업 공간에서 진행할 수 있습니다.",
+    "canvas.emptyDropHint": "PNG, JPEG, WebP 파일을 이 창 어디에나 끌어다 놓을 수도 있습니다",
+    "canvas.compare": "비교",
+    "canvas.holdForOriginal": "누르고 있는 동안 원본 페이지 보기",
+    "canvas.viewingOriginal": "원본",
+    "statusbar.stageDetect": "감지",
+    "statusbar.stageAnalyze": "인식",
+    "statusbar.stageTranslate": "번역",
+    "statusbar.stageClean": "정리",
+    "statusbar.stageRender": "렌더링",
     "dnd.dropToImport": "이미지를 놓아 가져오기",
     "dnd.skippedFiles": "지원되지 않는 파일 {count}개를 건너뛰었습니다",
     "toast.bubbleDeleted": "말풍선이 삭제되었습니다",
@@ -706,12 +799,15 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "export.successMultiMessage": "{count}개 이미지를 저장했습니다:\n{path}",
     "export.failedTitle": "내보내기 실패",
     "settings.preferences": "환경설정",
+    "settings.basicMode": "기본 설정",
+    "settings.advancedMode": "고급 설정",
+    "settings.advancedHint": "연결 안정성과 처리 방식을 세밀하게 조정하는 옵션입니다. 대부분의 프로젝트에는 기본값을 권장합니다.",
     "settings.general": "일반",
     "settings.translation": "번역",
     "settings.detection": "감지",
     "settings.inpainting": "인페인팅",
     "settings.generalTitle": "일반 설정",
-    "settings.generalDesc": "기본 표시, 글꼴 크기 범위, 요청 시간 제한을 설정합니다.",
+    "settings.generalDesc": "언어와 화면 표시, 작업 공간의 기본 동작을 설정합니다.",
     "settings.translationTitle": "번역 엔진",
     "settings.translationDesc": "오프라인, 로컬, 클라우드 API 번역 엔진을 선택합니다.",
     "settings.detectionTitle": "감지 및 OCR",

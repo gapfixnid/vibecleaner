@@ -28,6 +28,10 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "en": "Cleaning backgrounds",
         "ko": "배경 정리 중",
     },
+    "page_translation.rendering": {
+        "en": "Rendering translated page",
+        "ko": "번역된 페이지 렌더링 중",
+    },
     # Batch translation
     "batch_translation.translating_page": {
         "en": "Translating page {current}/{total}...",

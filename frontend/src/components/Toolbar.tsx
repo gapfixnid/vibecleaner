@@ -1,6 +1,6 @@
 // frontend/src/components/Toolbar.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { FilePlus2, FolderOpen, Info, Menu, Save, Settings } from "lucide-react";
+import { Download, FilePlus2, FolderOpen, ImagePlus, Info, Menu, Minus, Save, Settings, Square, X } from "lucide-react";
 import * as desktop from "../services/desktop";
 import { APP_NAME } from "../appMeta";
 
@@ -8,9 +8,12 @@ interface ToolbarProps {
   onNewProject: () => void;
   onOpenProject: () => void;
   onSaveProject: () => void;
+  onImportImages: () => void;
+  onExport: () => void;
   onPreferences: () => void;
   onAbout: () => void;
   isDirty: boolean;
+  canExport: boolean;
   t?: (key: string) => string;
 }
 
@@ -18,8 +21,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onNewProject,
   onOpenProject,
   onSaveProject,
+  onImportImages,
+  onExport,
   onPreferences,
   onAbout,
+  isDirty,
+  canExport,
   t = (key) => key,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -51,12 +58,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   return (
     <header className="toolbar-container">
       <div className="toolbar-left">
-        <div className="window-controls">
-          <button type="button" className="win-btn close" onClick={() => desktop.closeWindow()} aria-label={t("toolbar.closeWindow")} />
-          <button type="button" className="win-btn minimize" onClick={() => desktop.minimizeWindow()} aria-label={t("toolbar.minimizeWindow")} />
-          <button type="button" className="win-btn maximize" onClick={() => desktop.toggleMaximizeWindow()} aria-label={t("toolbar.maximizeWindow")} />
-        </div>
-
         <div className="app-logo" data-tauri-drag-region>
           <span className="app-mark" aria-hidden="true">
             <img className="app-icon" src="/favicon.svg" alt="" draggable={false} />
@@ -71,6 +72,33 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       <div className="drag-spacer" data-tauri-drag-region />
 
       <div className="toolbar-right">
+        <button type="button" className="toolbar-command" onClick={onImportImages}>
+          <ImagePlus size={15} />
+          <span>{t("toolbar.addImages")}</span>
+        </button>
+        <button
+          type="button"
+          className={`toolbar-command ${isDirty ? "has-change" : ""}`}
+          onClick={onSaveProject}
+          data-tooltip={isDirty ? t("statusbar.unsaved") : t("toolbar.saveProject")}
+        >
+          <Save size={15} />
+          <span>{t("toolbar.saveProject")}</span>
+          {isDirty && <span className="toolbar-unsaved-dot" aria-hidden="true" />}
+        </button>
+        <button type="button" className="toolbar-command" onClick={onExport} disabled={!canExport}>
+          <Download size={15} />
+          <span>{t("toolbar.export")}</span>
+        </button>
+        <button
+          type="button"
+          className="toolbar-action settings-shortcut"
+          onClick={onPreferences}
+          data-tooltip={t("toolbar.preferences")}
+          aria-label={t("toolbar.preferences")}
+        >
+          <Settings size={17} />
+        </button>
         <div className="menu-wrapper" ref={menuRef}>
           <button
             type="button"
@@ -95,15 +123,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <FolderOpen size={14} />
                 <span>{t("toolbar.openProject")}</span>
               </button>
-              <button type="button" role="menuitem" onClick={runItem(onSaveProject)}>
-                <Save size={14} />
-                <span>{t("toolbar.saveProject")}</span>
-              </button>
               <div className="toolbar-menu-separator" />
-              <button type="button" role="menuitem" onClick={runItem(onPreferences)}>
-                <Settings size={14} />
-                <span>{t("toolbar.preferences")}</span>
-              </button>
               <button type="button" role="menuitem" onClick={runItem(onAbout)}>
                 <Info size={14} />
                 <span>{t("toolbar.about")}</span>
@@ -111,18 +131,26 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             </div>
           )}
         </div>
+        <div className="window-controls">
+          <button type="button" className="win-btn" onClick={() => desktop.minimizeWindow()} aria-label={t("toolbar.minimizeWindow")}>
+            <Minus size={13} />
+          </button>
+          <button type="button" className="win-btn" onClick={() => desktop.toggleMaximizeWindow()} aria-label={t("toolbar.maximizeWindow")}>
+            <Square size={10} />
+          </button>
+          <button type="button" className="win-btn close" onClick={() => desktop.closeWindow()} aria-label={t("toolbar.closeWindow")}>
+            <X size={13} />
+          </button>
+        </div>
       </div>
 
       <style>{`
         .toolbar-container {
           height: var(--toolbar-height);
-          background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)),
-            var(--bg-toolbar);
+          background: var(--bg-toolbar);
           backdrop-filter: var(--glass-blur);
           -webkit-backdrop-filter: var(--glass-blur);
           border-bottom: 1px solid var(--border-color);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -134,22 +162,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         .window-controls {
           display: flex;
-          gap: 8px;
-          margin-right: 14px;
+          align-self: stretch;
+          gap: 0;
+          margin-left: 4px;
+          margin-right: -12px;
           align-items: center;
           pointer-events: auto;
         }
 
         .win-btn {
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
+          width: 42px;
+          height: 100%;
+          border-radius: 0;
           border: none;
+          background: transparent;
+          color: var(--text-secondary);
           cursor: pointer;
           position: relative;
           padding: 0;
-          box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18);
-          transition: filter 0.12s ease, transform 0.12s ease;
+          transition: background-color 0.12s ease, color 0.12s ease;
           pointer-events: auto;
           display: flex;
           align-items: center;
@@ -157,23 +188,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         }
 
         .win-btn:hover {
-          filter: brightness(0.85);
+          background: var(--fill-hover);
+          color: var(--text-primary);
         }
 
         .win-btn:active {
-          transform: scale(0.92);
+          background: var(--fill-1);
         }
 
-        .win-btn.close {
-          background-color: #ff5f56;
-        }
-
-        .win-btn.minimize {
-          background-color: #ffbd2e;
-        }
-
-        .win-btn.maximize {
-          background-color: #27c93f;
+        .win-btn.close:hover {
+          background: #c42b1c;
+          color: #fff;
         }
 
         .drag-spacer {
@@ -194,6 +219,48 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           pointer-events: auto;
         }
 
+        .toolbar-command {
+          height: 30px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 0 10px;
+          border: 1px solid transparent;
+          border-radius: 8px;
+          background: transparent;
+          color: var(--text-secondary);
+          font: 600 11.5px/1 var(--font-family);
+          cursor: pointer;
+          transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+        }
+
+        .toolbar-command:hover:not(:disabled) {
+          background: var(--fill-hover);
+          border-color: var(--border-color);
+          color: var(--text-primary);
+        }
+
+        .toolbar-command:disabled {
+          opacity: 0.38;
+          cursor: default;
+        }
+
+        .toolbar-command.has-change {
+          color: var(--text-primary);
+        }
+
+        .toolbar-unsaved-dot {
+          width: 5px;
+          height: 5px;
+          border-radius: var(--radius-full);
+          background: var(--system-orange);
+        }
+
+        .settings-shortcut {
+          margin-left: 2px;
+        }
+
         .app-logo {
           display: flex;
           align-items: center;
@@ -209,9 +276,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           align-items: center;
           justify-content: center;
           flex: 0 0 auto;
-          background:
-            linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04)),
-            var(--fill-2);
+          background: var(--fill-2);
           border: 1px solid var(--overlay-border);
           box-shadow: var(--control-active-shadow);
           overflow: hidden;
@@ -383,6 +448,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         @media (max-width: 760px) {
           .toolbar-subtitle {
             display: none;
+          }
+
+          .toolbar-command span {
+            display: none;
+          }
+
+          .toolbar-command {
+            width: 30px;
+            padding: 0;
           }
         }
       `}</style>

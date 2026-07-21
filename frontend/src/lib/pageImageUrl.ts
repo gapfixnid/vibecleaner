@@ -6,6 +6,7 @@ interface BuildPageImageUrlOptions {
   pageVersion?: number;
   preview?: boolean;
   thumbnail?: boolean;
+  imageType?: "auto" | "original" | "inpainted";
 }
 
 export function buildPageImageUrl({
@@ -14,10 +15,13 @@ export function buildPageImageUrl({
   pageVersion = 0,
   preview = true,
   thumbnail = false,
+  imageType = "auto",
 }: BuildPageImageUrlOptions): string {
   const pageId = encodeURIComponent(page.page_id || String(page.index));
   const params = new URLSearchParams({
-    type: thumbnail || !page.has_inpaint ? "original" : "inpainted",
+    type: thumbnail || imageType === "original" || (imageType === "auto" && !page.has_inpaint)
+      ? "original"
+      : "inpainted",
     v: String(pageVersion),
   });
 

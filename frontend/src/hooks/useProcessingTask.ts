@@ -48,6 +48,7 @@ export type WaitForJob = (
  *  progress readout and the Translate→Cancel button morph. */
 export interface ActiveJobInfo {
   jobId: string;
+  kind: string | null;
   /** Caller-supplied label (always shown; backend message may refine it). */
   label: string;
   /** Latest backend `job.message`, unless the caller opted out. */
@@ -88,7 +89,10 @@ export function useProcessingTask(
   /** Exposed so callers can branch after runTask returns. Reset after each runTask. */
   const wasCancelledRef = useRef(false);
   const notifyCancelledRef = useRef(notifyCancelled);
-  notifyCancelledRef.current = notifyCancelled;
+
+  useEffect(() => {
+    notifyCancelledRef.current = notifyCancelled;
+  }, [notifyCancelled]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -117,6 +121,7 @@ export function useProcessingTask(
         if (!isMountedRef.current) return;
         setActiveJob({
           jobId: job.job_id,
+          kind: job.kind || null,
           label: fallbackStatus,
           message: options?.ignoreBackendMessage ? null : job.message || null,
           progress: typeof job.progress === "number" ? job.progress : null,

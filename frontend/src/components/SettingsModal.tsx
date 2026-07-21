@@ -51,10 +51,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [providerCatalog, setProviderCatalog] = useState<ProviderCatalogDto | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("general");
-
-  useEffect(() => {
-    setLocalSettings({ ...settings });
-  }, [settings, isOpen]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const LLM_PROVIDERS: string[] = [...LLM_TRANSLATION_PROVIDERS];
   const translationProviderManifests = (providerCatalog?.providers || [])
@@ -139,12 +136,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen && providerSupportsModelPicker(localSettings.translation_provider)) {
-      fetchProviderModels();
-    } else {
-      setProviderModels([]);
-      setModelsError(null);
-    }
+    const timer = window.setTimeout(() => {
+      if (isOpen && providerSupportsModelPicker(localSettings.translation_provider)) {
+        fetchProviderModels();
+      } else {
+        setProviderModels([]);
+        setModelsError(null);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, localSettings.translation_provider, providerCatalog]);
 
@@ -411,6 +411,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const toggleAdvanced = () => {
+    setShowAdvanced((current) => {
+      const next = !current;
+      if (!next && (activeTab === "detection" || activeTab === "inpainting")) {
+        setActiveTab("general");
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
@@ -429,7 +439,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <h3>{t("settings.preferences")}</h3>
           </div>
           <div className="sidebar-menu-pref">
-            <button 
+            <button
               type="button" 
               className={`menu-btn-pref ${activeTab === "general" ? "active" : ""}`}
               onClick={() => setActiveTab("general")}
@@ -439,7 +449,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
               <span>{t("settings.general")}</span>
             </button>
-            <button 
+            <button
               type="button" 
               className={`menu-btn-pref ${activeTab === "translation" ? "active" : ""}`}
               onClick={() => setActiveTab("translation")}
@@ -449,7 +459,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
               <span>{t("settings.translation")}</span>
             </button>
-            <button 
+            {showAdvanced && <button
               type="button" 
               className={`menu-btn-pref ${activeTab === "detection" ? "active" : ""}`}
               onClick={() => setActiveTab("detection")}
@@ -458,8 +468,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Scan size={14} />
               </div>
               <span>{t("settings.detection")}</span>
-            </button>
-            <button 
+            </button>}
+            {showAdvanced && <button
               type="button" 
               className={`menu-btn-pref ${activeTab === "inpainting" ? "active" : ""}`}
               onClick={() => setActiveTab("inpainting")}
@@ -468,8 +478,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Eraser size={14} />
               </div>
               <span>{t("settings.inpainting")}</span>
-            </button>
+            </button>}
           </div>
+          <button
+            type="button"
+            className={`advanced-mode-toggle ${showAdvanced ? "active" : ""}`}
+            onClick={toggleAdvanced}
+            aria-pressed={showAdvanced}
+          >
+            <Sliders size={14} />
+            <span>{showAdvanced ? t("settings.basicMode") : t("settings.advancedMode")}</span>
+          </button>
         </div>
 
         {/* Right Settings Form Area */}
@@ -542,8 +561,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
 
-                  <div className="section-title-label">{t("settings.connectionDefaults")}</div>
-                  <div className="settings-card">
+                  {showAdvanced && <>
+                    <div className="advanced-settings-note">{t("settings.advancedHint")}</div>
+                    <div className="section-title-label">{t("settings.connectionDefaults")}</div>
+                    <div className="settings-card">
                     <div className="form-row-group">
                       <label className="pref-label">{t("settings.requestTimeout")}</label>
                       <div className="pref-control-right">
@@ -608,7 +629,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
                       </div>
                     )}
-                  </div>
+                    </div>
+                  </>}
                 </div>
               )}
 
@@ -865,7 +887,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
                   </div>
 
-                  {providerCapabilities.llmOptions && (
+                  {showAdvanced && providerCapabilities.llmOptions && (
                     <>
                       <div className="section-title-label">{t("settings.llmOptions")}</div>
                       <div className="settings-card">
@@ -1184,6 +1206,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           animation: scaleUp 0.18s var(--ease-standard);
         }
 
+        .modal-content:focus,
+        .modal-content:focus-visible {
+          outline: none;
+        }
+
         @keyframes scaleUp {
           from { transform: scale(0.96); opacity: 0; }
           to { transform: scale(1); opacity: 1; }
@@ -1215,6 +1242,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           display: flex;
           flex-direction: column;
           gap: 3px;
+        }
+
+        .advanced-mode-toggle {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: calc(100% - 16px);
+          min-height: 34px;
+          margin: auto 8px 0;
+          padding: 0 10px;
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+          background: var(--fill-3);
+          color: var(--text-secondary);
+          font: 600 11.5px/1 var(--font-family);
+          cursor: pointer;
+        }
+
+        .advanced-mode-toggle:hover,
+        .advanced-mode-toggle.active {
+          background: var(--fill-hover);
+          color: var(--text-primary);
         }
 
         .menu-btn-pref {
@@ -1325,6 +1374,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           display: flex;
           flex-direction: column;
           gap: 12px;
+        }
+
+        .advanced-settings-note {
+          padding: 9px 11px;
+          border: 1px solid var(--accent-border-subtle);
+          border-radius: var(--radius-md);
+          background: var(--accent-bg-subtle);
+          color: var(--text-secondary);
+          font-size: 11px;
+          line-height: 1.45;
         }
 
         .section-title-label {

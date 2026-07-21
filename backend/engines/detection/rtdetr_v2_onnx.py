@@ -12,11 +12,12 @@ from .base import DetectionEngine
 
 
 def _make_rtdetr_session_options():
+    from ...infrastructure.runtime.onnx import get_optimal_cpu_threads
     so = ort.SessionOptions()
     so.log_severity_level = 3
     # Small CPU RT-DETR runs benefit from explicit sequential execution
     # and a modest intra-op thread count instead of ORT defaults.
-    so.intra_op_num_threads = 4
+    so.intra_op_num_threads = get_optimal_cpu_threads()
     so.inter_op_num_threads = 1
     so.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
     so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL

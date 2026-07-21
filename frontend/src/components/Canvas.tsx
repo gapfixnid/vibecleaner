@@ -1,11 +1,12 @@
 // frontend/src/components/Canvas.tsx
 import React, { useRef, useState } from "react";
-import { Bug } from "lucide-react";
+import { Bug, ScanEye } from "lucide-react";
 import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
 import { CanvasZoomControls } from "./canvas/CanvasZoomControls";
 import { CanvasMultiSelectEmpty } from "./canvas/CanvasMultiSelectEmpty";
 import { CanvasImageStage } from "./canvas/CanvasImageStage";
+import { CanvasEmptyState } from "./canvas/CanvasEmptyState";
 import { useCanvasKeyboardGuards } from "./canvas/useCanvasKeyboardGuards";
 import { useCanvasImageLoader } from "./canvas/useCanvasImageLoader";
 import { useCanvasViewport } from "./canvas/useCanvasViewport";
@@ -14,6 +15,8 @@ import { useBubbleDrag } from "./canvas/useBubbleDrag";
 interface CanvasProps {
   imageUrl: string;
   fullResImageUrl?: string;
+  originalImageUrl?: string;
+  hasProcessedImage?: boolean;
   imageWidth?: number;
   imageHeight?: number;
   pageIndex: number;
@@ -29,6 +32,8 @@ interface CanvasProps {
   onCancelJob?: () => void;
   onDeleteBubble: (id: number) => void;
   onImageLoaded?: () => void;
+  onImportImages: () => void;
+  onOpenProject: () => void;
   isMultiPageSelection?: boolean;
   selectedPageCount?: number;
   /** When true, page image is reloading — keep existing bubble overlay until new bubbles load. */
@@ -39,6 +44,8 @@ interface CanvasProps {
 export const Canvas: React.FC<CanvasProps> = ({
   imageUrl,
   fullResImageUrl,
+  originalImageUrl,
+  hasProcessedImage,
   imageWidth,
   imageHeight,
   pageIndex,
@@ -53,16 +60,20 @@ export const Canvas: React.FC<CanvasProps> = ({
   onCancelJob,
   onDeleteBubble,
   onImageLoaded,
+  onImportImages,
+  onOpenProject,
   isMultiPageSelection,
   selectedPageCount,
   isWaitingForImageReload,
   t,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const [scale, setScale] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showDetectionOverlay, setShowDetectionOverlay] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
 
   // Tracks whether the user has manually zoomed/panned the current page, so
   // that container resizes don't reset their view.
@@ -101,6 +112,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     fitToWindow,
   } = useCanvasViewport({
     containerRef,
+    viewportRef,
     imageRef,
     imageWidth,
     imageHeight,
@@ -181,9 +193,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     >
       {isMultiPageSelection ? (
         <CanvasMultiSelectEmpty selectedPageCount={selectedPageCount} />
+      ) : !displayImageUrl ? (
+        <CanvasEmptyState onImportImages={onImportImages} onOpenProject={onOpenProject} t={t ?? ((key) => key)} />
       ) : (
         <CanvasImageStage
-          displayImageUrl={displayImageUrl}
+          ref={viewportRef}
+          displayImageUrl={showOriginal && originalImageUrl ? originalImageUrl : displayImageUrl}
           imageRef={imageRef}
           imageDimensions={imageDimensions}
           pan={pan}
@@ -196,6 +211,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           onImageError={handleImageError}
           onStartBubbleDrag={startBubbleDrag}
           showDetectionOverlay={showDetectionOverlay}
+          hideOverlays={showOriginal}
         />
       )}
 
@@ -215,6 +231,26 @@ export const Canvas: React.FC<CanvasProps> = ({
       {displayImageUrl && (
         <div className="canvas-floating-controls">
           <div className="actions-capsule">
+            {originalImageUrl && hasProcessedImage && (
+              <button
+                type="button"
+                className={`canvas-compare-button${showOriginal ? " active" : ""}`}
+                onPointerDown={() => setShowOriginal(true)}
+                onPointerUp={() => setShowOriginal(false)}
+                onPointerLeave={() => setShowOriginal(false)}
+                onPointerCancel={() => setShowOriginal(false)}
+                onKeyDown={(event) => {
+                  if (event.key === " " || event.key === "Enter") setShowOriginal(true);
+                }}
+                onKeyUp={() => setShowOriginal(false)}
+                aria-pressed={showOriginal}
+                data-tooltip={t?.("canvas.holdForOriginal") || "Hold to view original"}
+                data-tooltip-pos="top"
+              >
+                <ScanEye size={15} />
+                <span>{showOriginal ? (t?.("canvas.viewingOriginal") || "Original") : (t?.("canvas.compare") || "Compare")}</span>
+              </button>
+            )}
             <button
               type="button"
               className={`canvas-debug-button${showDetectionOverlay ? " active" : ""}`}
@@ -250,6 +286,131 @@ export const Canvas: React.FC<CanvasProps> = ({
           will-change: transform;
           width: max-content;
           height: max-content;
+        }
+
+        .canvas-empty-state {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 18px;
+          padding: 32px;
+          text-align: center;
+          color: var(--text-primary);
+        }
+
+        .canvas-empty-art {
+          position: relative;
+          width: 92px;
+          height: 92px;
+          margin-bottom: 2px;
+        }
+
+        .canvas-empty-page {
+          position: absolute;
+          width: 62px;
+          height: 78px;
+          border: 1px solid var(--separator-strong);
+          border-radius: 12px;
+          background: var(--bg-panel);
+          box-shadow: var(--shadow-md);
+        }
+
+        .canvas-empty-page-back {
+          top: 3px;
+          left: 10px;
+          transform: rotate(-8deg);
+          opacity: 0.58;
+        }
+
+        .canvas-empty-page-front {
+          right: 8px;
+          bottom: 0;
+          display: grid;
+          place-items: center;
+          color: var(--system-blue);
+        }
+
+        .canvas-empty-copy {
+          max-width: 420px;
+        }
+
+        .canvas-empty-eyebrow {
+          margin-bottom: 7px;
+          color: var(--system-blue);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+        }
+
+        .canvas-empty-copy h1 {
+          margin: 0;
+          font-size: 21px;
+          font-weight: 680;
+          letter-spacing: -0.02em;
+        }
+
+        .canvas-empty-copy > p:last-child {
+          margin-top: 8px;
+          color: var(--text-secondary);
+          font-size: 13px;
+          line-height: 1.55;
+        }
+
+        .canvas-empty-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .canvas-empty-actions button {
+          min-height: 38px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          padding: 0 15px;
+          border-radius: var(--radius-md);
+          font: 600 12.5px/1 var(--font-family);
+          cursor: pointer;
+          transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+        }
+
+        .canvas-empty-actions button:active {
+          transform: translateY(1px);
+        }
+
+        .canvas-empty-primary {
+          border: 1px solid var(--system-blue);
+          background: var(--system-blue);
+          color: #fff;
+          box-shadow: 0 6px 18px color-mix(in srgb, var(--system-blue) 24%, transparent);
+        }
+
+        .canvas-empty-primary:hover {
+          background: var(--system-blue-hover);
+          border-color: var(--system-blue-hover);
+        }
+
+        .canvas-empty-secondary {
+          border: 1px solid var(--border-color);
+          background: var(--bg-panel);
+          color: var(--text-primary);
+        }
+
+        .canvas-empty-secondary:hover {
+          background: var(--fill-hover);
+          border-color: var(--separator-strong);
+        }
+
+        .canvas-empty-drop-hint {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          color: var(--text-tertiary);
+          font-size: 11px;
         }
 
         .canvas-image-wrapper {
@@ -352,21 +513,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
 
         .actions-capsule button.primary {
-          background: linear-gradient(
-            90deg,
-            var(--system-blue) 0%,
-            var(--accent-tint) 40%,
-            var(--accent-tint-strong) 50%,
-            var(--accent-tint) 60%,
-            var(--system-blue) 100%
-          );
-          background-size: 200% 100%;
-          background-position: 100% 0;
+          background: var(--system-blue);
           color: white;
-          box-shadow:
-            var(--accent-glow),
-            inset 0 1px 0 rgba(255, 255, 255, 0.15);
-          animation: shimmer-bg 3s ease-in-out infinite;
+          box-shadow: 0 5px 14px color-mix(in srgb, var(--system-blue) 26%, transparent);
         }
 
         /* Smooth icon/label transition when morphing Translate ↔ Cancel */
@@ -380,61 +529,26 @@ export const Canvas: React.FC<CanvasProps> = ({
           transform: rotate(90deg);
         }
 
-        @keyframes shimmer-bg {
-          0% { background-position: 100% 0; }
-          100% { background-position: -100% 0; }
-        }
-
-        /* Processing state: faded but still shimmering */
+        /* Processing state stays calm while progress is shown in the status bar. */
         .actions-capsule button.primary.processing {
           opacity: 0.5;
           cursor: not-allowed;
         }
 
         .actions-capsule button.primary:hover:not(:disabled) {
-          background: linear-gradient(
-            90deg,
-            var(--system-blue-hover) 0%,
-            var(--accent-tint) 40%,
-            var(--accent-tint-strong) 50%,
-            var(--accent-tint) 60%,
-            var(--system-blue-hover) 100%
-          );
-          background-size: 200% 100%;
-          box-shadow:
-            var(--accent-glow-strong),
-            inset 0 1px 0 rgba(255, 255, 255, 0.2);
+          background: var(--system-blue-hover);
+          box-shadow: 0 6px 18px color-mix(in srgb, var(--system-blue) 32%, transparent);
         }
 
         .actions-capsule button.cancel {
-          background: linear-gradient(
-            90deg,
-            var(--system-red) 0%,
-            var(--danger-tint) 40%,
-            var(--danger-tint-strong) 50%,
-            var(--danger-tint) 60%,
-            var(--system-red) 100%
-          );
-          background-size: 200% 100%;
-          background-position: 100% 0;
+          background: var(--system-red);
           color: white;
-          box-shadow:
-            var(--danger-glow),
-            inset 0 1px 0 rgba(255, 255, 255, 0.15);
-          animation: shimmer-bg 3s ease-in-out infinite;
+          box-shadow: 0 5px 14px color-mix(in srgb, var(--system-red) 24%, transparent);
         }
 
         /* Keep the resting red even when pointed at (override generic hover). */
         .actions-capsule button.cancel:hover:not(:disabled) {
-          background: linear-gradient(
-            90deg,
-            var(--system-red) 0%,
-            var(--danger-tint) 40%,
-            var(--danger-tint-strong) 50%,
-            var(--danger-tint) 60%,
-            var(--system-red) 100%
-          );
-          background-size: 200% 100%;
+          background: color-mix(in srgb, var(--system-red) 88%, black);
           color: white;
         }
 

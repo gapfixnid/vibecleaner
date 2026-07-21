@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, type CSSProperties, type KeyboardEvent } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
 import { Canvas } from "./components/Canvas";
@@ -27,6 +27,7 @@ import { useProjectActions } from "./hooks/useProjectActions";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useWorkspacePages } from "./hooks/useWorkspacePages";
 import { createTranslator } from "./i18n";
+import { usePanelWidths } from "./hooks/usePanelWidths";
 
 function App() {
   // --- Cross-cutting concerns (dialog + processing) ---
@@ -105,11 +106,59 @@ function App() {
 
   const { bubbles, selectedBubbleId, setSelectedBubbleId, syncBubblesToBackend } =
     bubblesApi;
+  const reviewBubbleIds = useMemo(
+    () => bubbles
+      .filter((bubble) => (
+        bubble.problems.length > 0
+        || bubble.layout_overflow
+        || (Boolean(activePage?.has_inpaint) && !bubble.translated.trim())
+      ))
+      .map((bubble) => bubble.id),
+    [activePage?.has_inpaint, bubbles]
+  );
+  const selectedReviewIndex = selectedBubbleId === null ? -1 : reviewBubbleIds.indexOf(selectedBubbleId);
+  const selectReviewProblem = useCallback((delta: number) => {
+    if (reviewBubbleIds.length === 0) return;
+    const nextIndex = selectedReviewIndex < 0
+      ? delta >= 0 ? 0 : reviewBubbleIds.length - 1
+      : (selectedReviewIndex + delta + reviewBubbleIds.length) % reviewBubbleIds.length;
+    setSelectedBubbleId(reviewBubbleIds[nextIndex]);
+  }, [reviewBubbleIds, selectedReviewIndex, setSelectedBubbleId]);
+
+  useEffect(() => {
+    if (reviewBubbleIds.length === 0) return;
+    const handleReviewShortcut = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "F8") return;
+      event.preventDefault();
+      selectReviewProblem(event.shiftKey ? -1 : 1);
+    };
+    window.addEventListener("keydown", handleReviewShortcut);
+    return () => window.removeEventListener("keydown", handleReviewShortcut);
+  }, [reviewBubbleIds.length, selectReviewProblem]);
 
   // --- Local UI state ---
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const { theme, setTheme, themes } = useTheme();
+  const {
+    sidebarWidth,
+    inspectorWidth,
+    startSidebarResize,
+    startInspectorResize,
+    adjustSidebarWidth,
+    adjustInspectorWidth,
+  } = usePanelWidths();
+
+  const handlePanelResizeKey = (
+    event: KeyboardEvent<HTMLDivElement>,
+    side: "sidebar" | "inspector",
+  ) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    if (side === "sidebar") adjustSidebarWidth(direction * 12);
+    else adjustInspectorWidth(direction * -12);
+  };
 
   const {
     selectedPageIds,
@@ -228,15 +277,33 @@ function App() {
     [resolveContextTargets, handleExportPages]
   );
 
+  const handleToolbarExport = useCallback(() => {
+    const targets = selectedPageIds.length > 0
+      ? selectedPageIds
+      : currentIndex >= 0
+        ? [currentIndex]
+        : [];
+    handleExportPages(targets);
+  }, [currentIndex, handleExportPages, selectedPageIds]);
+
   return (
-    <div className="app-container">
+    <div
+      className="app-container"
+      style={{
+        "--sidebar-width": `${sidebarWidth}px`,
+        "--inspector-width": `${inspectorWidth}px`,
+      } as CSSProperties}
+    >
       <Toolbar
         onNewProject={handleNewProject}
         onOpenProject={handleOpenProject}
         onSaveProject={projectApi.handleSaveProject}
+        onImportImages={handleImportImages}
+        onExport={handleToolbarExport}
         onPreferences={() => setIsSettingsOpen(true)}
         onAbout={() => setIsAboutOpen(true)}
         isDirty={isDirty}
+        canExport={pages.length > 0}
         t={t}
       />
 
@@ -262,9 +329,21 @@ function App() {
           t={t}
         />
 
+        <div
+          className="panel-resizer sidebar-resizer"
+          role="separator"
+          aria-label={t("layout.resizePages")}
+          aria-orientation="vertical"
+          tabIndex={0}
+          onPointerDown={startSidebarResize}
+          onKeyDown={(event) => handlePanelResizeKey(event, "sidebar")}
+        />
+
         <Canvas
           imageUrl={currentIndex >= 0 && activePage ? buildPageImageUrl(activePage) : ""}
           fullResImageUrl={currentIndex >= 0 && activePage ? buildPageImageUrl(activePage, false) : ""}
+          originalImageUrl={currentIndex >= 0 && activePage ? buildPageImageUrl(activePage, true, "original") : ""}
+          hasProcessedImage={Boolean(activePage?.has_inpaint)}
           imageWidth={activePage?.width}
           imageHeight={activePage?.height}
           pageIndex={currentIndex}
@@ -279,10 +358,22 @@ function App() {
           onCancelJob={cancelCurrentJob}
           onDeleteBubble={bubblesApi.handleDeleteBubble}
           onImageLoaded={finishImageReload}
+          onImportImages={handleImportImages}
+          onOpenProject={handleOpenProject}
           isMultiPageSelection={isMultiPageSelection}
           selectedPageCount={selectedPageIds.length}
           isWaitingForImageReload={isWaitingForImageReload}
           t={t}
+        />
+
+        <div
+          className="panel-resizer inspector-resizer"
+          role="separator"
+          aria-label={t("layout.resizeInspector")}
+          aria-orientation="vertical"
+          tabIndex={0}
+          onPointerDown={startInspectorResize}
+          onKeyDown={(event) => handlePanelResizeKey(event, "inspector")}
         />
 
         <Inspector
@@ -293,6 +384,10 @@ function App() {
           onReTranslateBubble={bubblesApi.handleReTranslateBubble}
           isProcessing={isProcessing}
           isMultiPageSelection={isMultiPageSelection}
+          reviewProblemCount={reviewBubbleIds.length}
+          reviewProblemPosition={selectedReviewIndex >= 0 ? selectedReviewIndex + 1 : 0}
+          onPreviousProblem={() => selectReviewProblem(-1)}
+          onNextProblem={() => selectReviewProblem(1)}
           t={t}
         />
       </div>
@@ -306,24 +401,28 @@ function App() {
         t={t}
       />
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        onSave={handleSaveSettings}
-        backendUrl={currentBackendUrl}
-        theme={theme}
-        setTheme={setTheme}
-        themes={themes}
-        t={t}
-      />
+      {isSettingsOpen && (
+        <SettingsModal
+          isOpen
+          onClose={() => setIsSettingsOpen(false)}
+          settings={settings}
+          onSave={handleSaveSettings}
+          backendUrl={currentBackendUrl}
+          theme={theme}
+          setTheme={setTheme}
+          themes={themes}
+          t={t}
+        />
+      )}
 
-      <InitialSetupModal
-        isOpen={!backendError && settings.setup_completed === false}
-        settings={settings}
-        onComplete={setSettings}
-        waitForJob={waitForJob}
-      />
+      {!backendError && settings.setup_completed === false && (
+        <InitialSetupModal
+          isOpen
+          settings={settings}
+          onComplete={setSettings}
+          waitForJob={waitForJob}
+        />
+      )}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
@@ -351,6 +450,34 @@ function App() {
           flex: 1;
           height: calc(100vh - var(--toolbar-height) - var(--statusbar-height));
           overflow: hidden;
+        }
+
+        .panel-resizer {
+          position: relative;
+          width: 1px;
+          flex: 0 0 1px;
+          z-index: 6;
+          background: transparent;
+          cursor: col-resize;
+          touch-action: none;
+        }
+
+        .panel-resizer::after {
+          content: "";
+          position: absolute;
+          inset: 0 -3px;
+          transition: background-color var(--transition-fast);
+        }
+
+        .panel-resizer:hover::after,
+        .panel-resizer:focus-visible::after {
+          background: color-mix(in srgb, var(--system-blue) 54%, transparent);
+        }
+
+        body.panel-resizing,
+        body.panel-resizing * {
+          cursor: col-resize !important;
+          user-select: none !important;
         }
 
         .drop-veil {

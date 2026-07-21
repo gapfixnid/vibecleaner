@@ -1,7 +1,10 @@
 // frontend/src/components/Inspector.tsx
 import React, { useState } from "react";
 import {
+  AlertTriangle,
   Baseline,
+  ChevronLeft,
+  ChevronRight,
   Sparkles,
   Type
 } from "lucide-react";
@@ -21,6 +24,10 @@ interface InspectorProps {
   onReTranslateBubble: (id: number) => void;
   isProcessing: boolean;
   isMultiPageSelection?: boolean;
+  reviewProblemCount?: number;
+  reviewProblemPosition?: number;
+  onPreviousProblem?: () => void;
+  onNextProblem?: () => void;
   t?: (key: string) => string;
 }
 
@@ -32,6 +39,10 @@ export const Inspector: React.FC<InspectorProps> = ({
   onReTranslateBubble,
   isProcessing,
   isMultiPageSelection,
+  reviewProblemCount = 0,
+  reviewProblemPosition = 0,
+  onPreviousProblem,
+  onNextProblem,
   t = (key) => key,
 }) => {
   const [activeTab, setActiveTab] = useState<"text" | "style">("text");
@@ -57,14 +68,37 @@ export const Inspector: React.FC<InspectorProps> = ({
   }
 
   if (!selectedBubble) {
-    return <InspectorEmptyState variant="no-selection" t={t} />;
+    return (
+      <InspectorEmptyState
+        variant="no-selection"
+        reviewProblemCount={reviewProblemCount}
+        onNextProblem={onNextProblem}
+        t={t}
+      />
+    );
   }
 
   return (
     <aside className="inspector-container">
       <div className="inspector-header">
-        <Baseline size={14} className="header-icon" />
-        <span>{t("inspector.header").replace("{id}", String(selectedBubble.id))}</span>
+        <div className="inspector-header-title">
+          <Baseline size={14} className="header-icon" />
+          <span>{t("inspector.header").replace("{id}", String(selectedBubble.id))}</span>
+        </div>
+        {reviewProblemCount > 0 && (
+          <div className="review-navigation" aria-label={t("inspector.reviewQueue")}>
+            <span className="review-position">
+              <AlertTriangle size={11} />
+              {reviewProblemPosition > 0 ? `${reviewProblemPosition}/${reviewProblemCount}` : reviewProblemCount}
+            </span>
+            <button type="button" onClick={onPreviousProblem} aria-label={`${t("inspector.previousProblem")} (Shift+F8)`}>
+              <ChevronLeft size={13} />
+            </button>
+            <button type="button" onClick={onNextProblem} aria-label={`${t("inspector.nextProblem")} (F8)`}>
+              <ChevronRight size={13} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="inspector-segmented-control">

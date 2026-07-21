@@ -21,6 +21,24 @@ export function StatusBar({ activeJob, onCancel, pageCount, currentIndex, isDirt
           .replace("{n}", String(currentIndex + 1))
           .replace("{total}", String(pageCount))
       : null;
+  const translationStages = [
+    t("statusbar.stageDetect"),
+    t("statusbar.stageAnalyze"),
+    t("statusbar.stageTranslate"),
+    t("statusbar.stageClean"),
+    t("statusbar.stageRender"),
+  ];
+  const activeTranslationStage = progress === null
+    ? 0
+    : progress < 30
+      ? 0
+      : progress < 45
+        ? 1
+        : progress < 60
+          ? 2
+          : progress < 80
+            ? 3
+            : 4;
 
   return (
     <div className="status-bar">
@@ -51,6 +69,20 @@ export function StatusBar({ activeJob, onCancel, pageCount, currentIndex, isDirt
               <X size={11} />
             </button>
           </>
+        )}
+        {activeJob?.kind === "page-translation" && (
+          <ol className="status-bar-stages" aria-label={jobText}>
+            {translationStages.map((stage, index) => (
+              <li
+                key={stage}
+                className={index < activeTranslationStage ? "complete" : index === activeTranslationStage ? "active" : ""}
+                aria-current={index === activeTranslationStage ? "step" : undefined}
+              >
+                <span className="status-stage-dot" aria-hidden="true" />
+                <span>{stage}</span>
+              </li>
+            ))}
+          </ol>
         )}
       </div>
       <div className="status-bar-right">
