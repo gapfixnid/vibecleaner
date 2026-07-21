@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type CSSProperties, type KeyboardEvent } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
 import { Canvas } from "./components/Canvas";
@@ -27,6 +27,7 @@ import { useProjectActions } from "./hooks/useProjectActions";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useWorkspacePages } from "./hooks/useWorkspacePages";
 import { createTranslator } from "./i18n";
+import { usePanelWidths } from "./hooks/usePanelWidths";
 
 function App() {
   // --- Cross-cutting concerns (dialog + processing) ---
@@ -40,6 +41,14 @@ function App() {
   const [isDirty, setIsDirty] = useState(false);
   const markDirty = useCallback(() => setIsDirty(true), []);
   const markClean = useCallback(() => setIsDirty(false), []);
+  const persistedProjectRef = useRef(false);
+  const markPagesDeleted = useCallback((remainingPageCount: number) => {
+    if (remainingPageCount === 0 && !persistedProjectRef.current) {
+      markClean();
+      return;
+    }
+    markDirty();
+  }, [markClean, markDirty]);
   const { settings, setSettings, handleSaveSettings } = useAppSettings();
   const t = useMemo(() => createTranslator(settings.ui_language), [settings.ui_language]);
 
@@ -75,6 +84,7 @@ function App() {
     showError,
     showConfirm,
     markDirty,
+    markPagesDeleted,
     onBubbleDeleted,
     t,
   });
@@ -102,14 +112,85 @@ function App() {
     getSelectedIndices,
     t,
   });
+  useEffect(() => {
+    persistedProjectRef.current = projectApi.currentProjectPath !== null;
+  }, [projectApi.currentProjectPath]);
 
   const { bubbles, selectedBubbleId, setSelectedBubbleId, syncBubblesToBackend } =
     bubblesApi;
+  const reviewBubbleIds = useMemo(
+    () => bubbles
+      .filter((bubble) => (
+        bubble.problems.length > 0
+        || bubble.layout_overflow
+        || (Boolean(activePage?.has_inpaint) && !bubble.translated.trim())
+      ))
+      .map((bubble) => bubble.id),
+    [activePage?.has_inpaint, bubbles]
+  );
+  const selectedReviewIndex = selectedBubbleId === null ? -1 : reviewBubbleIds.indexOf(selectedBubbleId);
+  const selectReviewProblem = useCallback((delta: number) => {
+    if (reviewBubbleIds.length === 0) return;
+    const nextIndex = selectedReviewIndex < 0
+      ? delta >= 0 ? 0 : reviewBubbleIds.length - 1
+      : (selectedReviewIndex + delta + reviewBubbleIds.length) % reviewBubbleIds.length;
+    setSelectedBubbleId(reviewBubbleIds[nextIndex]);
+  }, [reviewBubbleIds, selectedReviewIndex, setSelectedBubbleId]);
+
+  useEffect(() => {
+    if (reviewBubbleIds.length === 0) return;
+    const handleReviewShortcut = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "F8") return;
+      event.preventDefault();
+      selectReviewProblem(event.shiftKey ? -1 : 1);
+    };
+    window.addEventListener("keydown", handleReviewShortcut);
+    return () => window.removeEventListener("keydown", handleReviewShortcut);
+  }, [reviewBubbleIds.length, selectReviewProblem]);
 
   // --- Local UI state ---
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const { theme, setTheme, themes } = useTheme();
+  const {
+    sidebarWidth,
+    inspectorWidth,
+    startSidebarResize,
+    startInspectorResize,
+    adjustSidebarWidth,
+    adjustInspectorWidth,
+  } = usePanelWidths();
+
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((open) => !open);
+  }, []);
+
+  const toggleInspector = useCallback(() => {
+    setIsInspectorOpen((open) => !open);
+  }, []);
+
+  useEffect(() => {
+    const handleInspectorShortcut = (event: globalThis.KeyboardEvent) => {
+      if (!event.altKey || event.key.toLowerCase() !== "i") return;
+      event.preventDefault();
+      toggleInspector();
+    };
+    window.addEventListener("keydown", handleInspectorShortcut);
+    return () => window.removeEventListener("keydown", handleInspectorShortcut);
+  }, [toggleInspector]);
+
+  const handlePanelResizeKey = (
+    event: KeyboardEvent<HTMLDivElement>,
+    side: "sidebar" | "inspector",
+  ) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    if (side === "sidebar") adjustSidebarWidth(direction * 12);
+    else adjustInspectorWidth(direction * -12);
+  };
 
   const {
     selectedPageIds,
@@ -156,7 +237,7 @@ function App() {
     guardUnsaved,
     handleNewProject,
     handleOpenProject,
-    handleImportImages,
+    handleImportImages: importImages,
     handleDeletePage,
     handleRenamePage,
   } = useProjectActions({
@@ -179,6 +260,15 @@ function App() {
     setSelectedBubbleId,
     t,
   });
+
+  const handleImportImages = useCallback(async (paths?: string[]) => {
+    const imported = await importImages(paths);
+    if (imported) {
+      setIsSidebarOpen(true);
+      setIsInspectorOpen(true);
+    }
+    return imported;
+  }, [importImages]);
 
   useWindowCloseGuard(isDirty, guardUnsaved);
 
@@ -229,7 +319,13 @@ function App() {
   );
 
   return (
-    <div className="app-container">
+    <div
+      className="app-container"
+      style={{
+        "--sidebar-width": `${sidebarWidth}px`,
+        "--inspector-width": `${inspectorWidth}px`,
+      } as CSSProperties}
+    >
       <Toolbar
         onNewProject={handleNewProject}
         onOpenProject={handleOpenProject}
@@ -241,30 +337,46 @@ function App() {
       />
 
       <div className="main-workspace">
-        <Sidebar
-          pages={pages}
-          currentIndex={currentIndex}
-          selectedPageIds={selectedPageIds}
-          pageVersions={pagesApi.pageVersions}
-          onSelectPage={pagesApi.handleSelectPage}
-          onPageClick={handlePageSelection}
-          onSelectAllPages={handleSelectAllPages}
-          onDuplicatePage={(idx) => pagesApi.handleDuplicatePages(resolveContextTargets(idx))}
-          onDeletePage={handleDeletePage}
-          onReorderPages={pagesApi.handleReorderPages}
-          onImportImages={handleImportImages}
-          onExportSelectedImages={() => handleExportPages(selectedPageIds)}
-          onRenamePage={handleRenamePage}
-          onTranslatePages={handleContextTranslate}
-          onSaveImages={handleContextSaveImages}
-          backendUrl={currentBackendUrl}
-          isLoading={isBootstrapping}
-          t={t}
-        />
+        {pages.length > 0 && isSidebarOpen && (
+          <>
+            <Sidebar
+              pages={pages}
+              currentIndex={currentIndex}
+              selectedPageIds={selectedPageIds}
+              pageVersions={pagesApi.pageVersions}
+              onSelectPage={pagesApi.handleSelectPage}
+              onPageClick={handlePageSelection}
+              onSelectAllPages={handleSelectAllPages}
+              onDuplicatePage={(idx) => pagesApi.handleDuplicatePages(resolveContextTargets(idx))}
+              onDeletePage={handleDeletePage}
+              onReorderPages={pagesApi.handleReorderPages}
+              onImportImages={handleImportImages}
+              onExportSelectedImages={() => handleExportPages(selectedPageIds)}
+              onRenamePage={handleRenamePage}
+              onTranslatePages={handleContextTranslate}
+              onSaveImages={handleContextSaveImages}
+              backendUrl={currentBackendUrl}
+              isLoading={isBootstrapping}
+              t={t}
+            />
+
+            <div
+              className="panel-resizer sidebar-resizer"
+              role="separator"
+              aria-label={t("layout.resizePages")}
+              aria-orientation="vertical"
+              tabIndex={0}
+              onPointerDown={startSidebarResize}
+              onKeyDown={(event) => handlePanelResizeKey(event, "sidebar")}
+            />
+          </>
+        )}
 
         <Canvas
           imageUrl={currentIndex >= 0 && activePage ? buildPageImageUrl(activePage) : ""}
           fullResImageUrl={currentIndex >= 0 && activePage ? buildPageImageUrl(activePage, false) : ""}
+          originalImageUrl={currentIndex >= 0 && activePage ? buildPageImageUrl(activePage, true, "original") : ""}
+          hasProcessedImage={Boolean(activePage?.has_inpaint)}
           imageWidth={activePage?.width}
           imageHeight={activePage?.height}
           pageIndex={currentIndex}
@@ -279,22 +391,47 @@ function App() {
           onCancelJob={cancelCurrentJob}
           onDeleteBubble={bubblesApi.handleDeleteBubble}
           onImageLoaded={finishImageReload}
+          onImportImages={handleImportImages}
+          onOpenProject={handleOpenProject}
+          onToggleSidebar={toggleSidebar}
+          isSidebarOpen={isSidebarOpen}
+          onToggleInspector={toggleInspector}
+          isInspectorOpen={isInspectorOpen}
           isMultiPageSelection={isMultiPageSelection}
           selectedPageCount={selectedPageIds.length}
           isWaitingForImageReload={isWaitingForImageReload}
+          showDetectionOverlay={settings.show_detection_overlay}
           t={t}
         />
 
-        <Inspector
-          selectedBubble={activeBubble}
-          settings={settings}
-          onUpdateBubble={bubblesApi.handleUpdateBubble}
-          onReOcrBubble={bubblesApi.handleReOcrBubble}
-          onReTranslateBubble={bubblesApi.handleReTranslateBubble}
-          isProcessing={isProcessing}
-          isMultiPageSelection={isMultiPageSelection}
-          t={t}
-        />
+        {pages.length > 0 && isInspectorOpen && (
+          <>
+            <div
+              className="panel-resizer inspector-resizer"
+              role="separator"
+              aria-label={t("layout.resizeInspector")}
+              aria-orientation="vertical"
+              tabIndex={0}
+              onPointerDown={startInspectorResize}
+              onKeyDown={(event) => handlePanelResizeKey(event, "inspector")}
+            />
+
+            <Inspector
+              selectedBubble={activeBubble}
+              settings={settings}
+              onUpdateBubble={bubblesApi.handleUpdateBubble}
+              onReOcrBubble={bubblesApi.handleReOcrBubble}
+              onReTranslateBubble={bubblesApi.handleReTranslateBubble}
+              isProcessing={isProcessing}
+              isMultiPageSelection={isMultiPageSelection}
+              reviewProblemCount={reviewBubbleIds.length}
+              reviewProblemPosition={selectedReviewIndex >= 0 ? selectedReviewIndex + 1 : 0}
+              onPreviousProblem={() => selectReviewProblem(-1)}
+              onNextProblem={() => selectReviewProblem(1)}
+              t={t}
+            />
+          </>
+        )}
       </div>
 
       <StatusBar
@@ -306,24 +443,28 @@ function App() {
         t={t}
       />
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        onSave={handleSaveSettings}
-        backendUrl={currentBackendUrl}
-        theme={theme}
-        setTheme={setTheme}
-        themes={themes}
-        t={t}
-      />
+      {isSettingsOpen && (
+        <SettingsModal
+          isOpen
+          onClose={() => setIsSettingsOpen(false)}
+          settings={settings}
+          onSave={handleSaveSettings}
+          backendUrl={currentBackendUrl}
+          theme={theme}
+          setTheme={setTheme}
+          themes={themes}
+          t={t}
+        />
+      )}
 
-      <InitialSetupModal
-        isOpen={!backendError && settings.setup_completed === false}
-        settings={settings}
-        onComplete={setSettings}
-        waitForJob={waitForJob}
-      />
+      {!backendError && settings.setup_completed === false && (
+        <InitialSetupModal
+          isOpen
+          settings={settings}
+          onComplete={setSettings}
+          waitForJob={waitForJob}
+        />
+      )}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
@@ -347,10 +488,52 @@ function App() {
 
       <style>{`
         .main-workspace {
+          position: relative;
           display: flex;
           flex: 1;
           height: calc(100vh - var(--toolbar-height) - var(--statusbar-height));
           overflow: hidden;
+        }
+
+        .panel-resizer {
+          position: relative;
+          width: 1px;
+          flex: 0 0 1px;
+          z-index: 6;
+          background: transparent;
+          cursor: col-resize;
+          touch-action: none;
+        }
+
+        .panel-resizer::after {
+          content: "";
+          position: absolute;
+          inset: 0 -3px;
+          transition: background-color var(--transition-fast);
+        }
+
+        .panel-resizer:hover::after,
+        .panel-resizer:focus-visible::after {
+          background: color-mix(in srgb, var(--system-blue) 54%, transparent);
+        }
+
+        body.panel-resizing,
+        body.panel-resizing * {
+          cursor: col-resize !important;
+          user-select: none !important;
+        }
+
+        @media (max-width: 1100px) {
+          .main-workspace .inspector-container {
+            position: absolute;
+            inset: 0 0 0 auto;
+            z-index: 8;
+            box-shadow: var(--shadow-lg);
+          }
+
+          .main-workspace .inspector-resizer {
+            display: none;
+          }
         }
 
         .drop-veil {

@@ -1,5 +1,6 @@
 # engines/translation/providers.py
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import logging
 import re
 import time
@@ -438,12 +439,13 @@ class OllamaTranslator(OpenAICompatibleTranslator):
 
 
 class GoogleTranslatorWrapper(BaseTranslator):
-    def __init__(self, max_retries: int = 2, retry_backoff_seconds: int = 2):
+    def __init__(self, max_retries: int = 2, retry_backoff_seconds: int = 2, max_workers: int = 3):
         self.model = "google"
         self.is_online = True
         self.last_error = None
         self.max_retries = max_retries
         self.retry_backoff_seconds = retry_backoff_seconds
+        self.max_workers = max(1, min(4, int(max_workers)))
 
     def check_connection(self) -> bool:
         return True
@@ -479,29 +481,46 @@ class GoogleTranslatorWrapper(BaseTranslator):
         try:
             from deep_translator import GoogleTranslator
 
-            translator = GoogleTranslator(source=from_code, target=to_code)
-            for block in blocks:
-                if block.text.strip():
-                    cleaned_text = block.text.replace("\n", " ").strip()
-                    if from_code == "ja":
-                        cleaned_text = _clean_japanese_ocr(cleaned_text)
-                    if not cleaned_text:
-                        block.translation = ""
-                        continue
-                    for attempt in range(max(0, int(self.max_retries)) + 1):
-                        try:
-                            block.translation = translator.translate(cleaned_text)
-                            break
-                        except Exception as block_err:
-                            self.last_error = str(block_err)
-                            if attempt < max(0, int(self.max_retries)):
-                                time.sleep(max(0, int(self.retry_backoff_seconds)))
-                                continue
-                            logger.warning("Failed to translate block '%s': %s", cleaned_text, block_err)
-                            block.translation = block.text
-                else:
-                    block.translation = ""
-            self.last_error = None
+            def translate_one(item: tuple[int, TextBlock]) -> tuple[int, str, str | None]:
+                index, block = item
+                if not block.text.strip():
+                    return index, "", None
+                cleaned_text = block.text.replace("\n", " ").strip()
+                if from_code == "ja":
+                    cleaned_text = _clean_japanese_ocr(cleaned_text)
+                if not cleaned_text:
+                    return index, "", None
+
+                error: str | None = None
+                for attempt in range(max(0, int(self.max_retries)) + 1):
+                    try:
+                        # deep-translator keeps request state, so workers must not
+                        # share one translator instance.
+                        translator = GoogleTranslator(source=from_code, target=to_code)
+                        return index, translator.translate(cleaned_text), None
+                    except Exception as block_err:
+                        error = str(block_err)
+                        if attempt < max(0, int(self.max_retries)):
+                            time.sleep(max(0, int(self.retry_backoff_seconds)))
+                logger.warning("Failed to translate block '%s': %s", cleaned_text, error)
+                return index, block.text, error
+
+            worker_count = min(self.max_workers, len(blocks))
+            if worker_count <= 1:
+                results = [translate_one(item) for item in enumerate(blocks)]
+            else:
+                with ThreadPoolExecutor(
+                    max_workers=worker_count,
+                    thread_name_prefix="google-translate",
+                ) as executor:
+                    results = list(executor.map(translate_one, enumerate(blocks)))
+
+            errors: list[str] = []
+            for index, translated, error in results:
+                blocks[index].translation = translated
+                if error:
+                    errors.append(error)
+            self.last_error = errors[0] if errors else None
             return blocks
         except Exception as e:
             logger.exception("Google Translate API failed")

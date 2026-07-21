@@ -1,8 +1,9 @@
 // frontend/src/components/AboutModal.tsx
 // Minimal About dialog: program icon, name, and version.
 // NOTE: intentionally minimal for now — to be expanded later (license, links, credits).
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { APP_NAME, APP_VERSION } from "../appMeta";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -13,18 +14,7 @@ interface AboutModalProps {
 export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, t = (key) => key }) => {
   const boxRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    boxRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
+  useFocusTrap(boxRef, isOpen, onClose);
 
   if (!isOpen) return null;
 

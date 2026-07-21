@@ -7,9 +7,12 @@ import onnxruntime as ort
 from PIL import Image
 
 from ...base import OCREngine
-from ...ppocr.preprocessing import apply_adaptive_binarization
+from ...ppocr.preprocessing import crop_text_line
 from .....infrastructure.downloads import ModelDownloader, ModelID
-from ....common.textblock import TextBlock, adjust_text_line_coordinates
+from .....infrastructure.runtime.device import get_providers
+from .....infrastructure.runtime.onnx import make_session
+from ....common.textblock import TextBlock
+from ....common.language_utils import is_no_space_lang
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +29,7 @@ SPECIAL_TOKEN_THRESHOLD = 5
 MAX_POSITION_ID = 127
 
 
-def _create_session(model_path: str) -> ort.InferenceSession:
+def _create_session(model_path: str, device: str = "cpu") -> ort.InferenceSession:
     so = ort.SessionOptions()
     so.log_severity_level = 3
     # This decoder makes many tiny step() calls; desktop ORT is faster with one thread.
@@ -36,7 +39,7 @@ def _create_session(model_path: str) -> ort.InferenceSession:
     so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
     so.enable_cpu_mem_arena = True
     so.enable_mem_pattern = True
-    return ort.InferenceSession(model_path, sess_options=so, providers=["CPUExecutionProvider"])
+    return make_session(model_path, sess_options=so, providers=get_providers(device))
 
 
 class MangaOCRMobileONNXEngine(OCREngine):
@@ -48,10 +51,10 @@ class MangaOCRMobileONNXEngine(OCREngine):
         self.expansion_percentage = 5
 
     def initialize(self, device: str = "cpu", expansion_percentage: int = 5) -> None:
-        self.device = "cpu"
+        self.device = device
         self.expansion_percentage = expansion_percentage
         if self.model is None:
-            self.model = MangaOCRMobileONNX()
+            self.model = MangaOCRMobileONNX(device=device)
 
     def process_image(
         self,
@@ -72,40 +75,24 @@ class MangaOCRMobileONNXEngine(OCREngine):
         crop_indices: list[int] = []
 
         for idx, blk in enumerate(blk_list):
-            if blk.xyxy is not None:
-                x1, y1, x2, y2 = blk.xyxy
-            elif blk.bubble_xyxy is not None:
-                x1, y1, x2, y2 = blk.bubble_xyxy
-            else:
-                x1, y1, x2, y2 = adjust_text_line_coordinates(
-                    blk.xyxy,
-                    self.expansion_percentage,
-                    self.expansion_percentage,
+            regions = list(getattr(blk, "lines", None) or [])
+            if not regions:
+                region = blk.xyxy if blk.xyxy is not None else blk.bubble_xyxy
+                regions = [region] if region is not None else []
+
+            for region in regions:
+                crop = crop_text_line(
                     img,
+                    region,
+                    padding=base_padding,
+                    crop_scale=crop_scale,
+                    adaptive_binarization=adaptive_bin,
+                    adaptive_binarization_strength=strength,
                 )
-
-            # Dynamic padding: smaller text regions need more padding
-            region_h = max(1, y2 - y1)
-            if region_h < 20:
-                padding = base_padding + 8  # tiny text (e.g. furigana)
-            elif region_h < 40:
-                padding = base_padding + 4  # small text
-            else:
-                padding = base_padding
-            padding = int(round(padding * crop_scale))
-
-            x1 = max(0, x1 - padding)
-            y1 = max(0, y1 - padding)
-            x2 = min(img.shape[1], x2 + padding)
-            y2 = min(img.shape[0], y2 + padding)
-
-            if x1 < x2 and y1 < y2:
-                crop = img[y1:y2, x1:x2]
-                if adaptive_bin:
-                    crop = apply_adaptive_binarization(crop, strength=strength)
-                crops.append(crop)
-                crop_indices.append(idx)
-            else:
+                if crop is not None and crop.size > 0:
+                    crops.append(crop)
+                    crop_indices.append(idx)
+            if not regions:
                 blk.text = ""
 
         if not crops:
@@ -119,23 +106,32 @@ class MangaOCRMobileONNXEngine(OCREngine):
                 blk_list[idx].text = ""
             return blk_list
 
-        for idx, text in zip(crop_indices, texts):
-            blk_list[idx].text = text
+        texts_by_block: dict[int, list[str]] = {}
+        for idx, value in zip(crop_indices, texts):
+            text = value.strip() if value else ""
+            if text:
+                texts_by_block.setdefault(idx, []).append(text)
+        for idx in set(crop_indices):
+            block_texts = texts_by_block.get(idx, [])
+            blk_list[idx].texts = block_texts
+            separator = "" if is_no_space_lang(getattr(blk_list[idx], "source_lang", "")) else " "
+            blk_list[idx].text = separator.join(block_texts)
 
         return blk_list
 
 
 class MangaOCRMobileONNX:
-    def __init__(self):
+    def __init__(self, device: str = "cpu"):
         ModelDownloader.get(ModelID.MANGA_OCR_MOBILE_ONNX)
         encoder_path = ModelDownloader.get_file_path(ModelID.MANGA_OCR_MOBILE_ONNX, "encoder.onnx")
         decoder_init_path = ModelDownloader.get_file_path(ModelID.MANGA_OCR_MOBILE_ONNX, "decoder_init.onnx")
         decoder_step_path = ModelDownloader.get_file_path(ModelID.MANGA_OCR_MOBILE_ONNX, "decoder_step.onnx")
         vocab_path = ModelDownloader.get_file_path(ModelID.MANGA_OCR_MOBILE_ONNX, "vocab.txt")
 
-        self.encoder = _create_session(encoder_path)
-        self.decoder_init = _create_session(decoder_init_path)
-        self.decoder_step = _create_session(decoder_step_path)
+        self.device = device
+        self.encoder = _create_session(encoder_path, device)
+        self.decoder_init = _create_session(decoder_init_path, device)
+        self.decoder_step = _create_session(decoder_step_path, device)
         self.vocab = self._load_vocab(vocab_path)
         self.vocab_size = len(self.vocab)
 
@@ -143,40 +139,47 @@ class MangaOCRMobileONNX:
         self.decoder_init_inputs = [inp.name for inp in self.decoder_init.get_inputs()]
         self.decoder_step_inputs = [inp.name for inp in self.decoder_step.get_inputs()]
 
-        self.image_buffer = np.empty((1, 3, IMAGE_SIZE, IMAGE_SIZE), dtype=np.float32)
-        self.token_buffer = np.empty((1, 1), dtype=np.int64)
-        self.position_buffer = np.empty((1, 1), dtype=np.int64)
-        self.self_k_cache = np.zeros((NUM_LAYERS, 1, NUM_HEADS, MAX_SEQUENCE_LENGTH, HEAD_DIM), dtype=np.float32)
-        self.self_v_cache = np.zeros((NUM_LAYERS, 1, NUM_HEADS, MAX_SEQUENCE_LENGTH, HEAD_DIM), dtype=np.float32)
+        # Removed thread-unsafe instance buffers to support parallel batch processing.
 
     def _load_vocab(self, vocab_file: str) -> list[str]:
         with open(vocab_file, "r", encoding="utf-8") as handle:
             return handle.read().splitlines()
 
     def process_batch(self, imgs: list[np.ndarray]) -> list[str]:
-        texts: list[str] = []
-        for img in imgs:
-            texts.append(self.process_single(img))
-        return texts
+        if not imgs:
+            return []
+        if len(imgs) == 1:
+            return [self.process_single(imgs[0])]
+
+        # Dynamically set max workers based on CPU core counts to prevent CPU thrashing
+        from .....infrastructure.runtime.onnx import get_optimal_cpu_threads
+        max_workers = 1 if self.device == "cuda" else min(len(imgs), get_optimal_cpu_threads())
+
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="manga-ocr-worker") as executor:
+            return list(executor.map(self.process_single, imgs))
 
     def process_single(self, img: np.ndarray) -> str:
-        self._preprocess_into(img)
-        encoder_hidden = self.encoder.run(None, {self.encoder_input: self.image_buffer})[0]
+        image_buffer = self._preprocess(img)
+        encoder_hidden = self.encoder.run(None, {self.encoder_input: image_buffer})[0]
 
-        self.self_k_cache.fill(0)
-        self.self_v_cache.fill(0)
-        self.token_buffer[0, 0] = START_TOKEN_ID
+        self_k_cache = np.zeros((NUM_LAYERS, 1, NUM_HEADS, MAX_SEQUENCE_LENGTH, HEAD_DIM), dtype=np.float32)
+        self_v_cache = np.zeros((NUM_LAYERS, 1, NUM_HEADS, MAX_SEQUENCE_LENGTH, HEAD_DIM), dtype=np.float32)
+        token_buffer = np.empty((1, 1), dtype=np.int64)
+        position_buffer = np.empty((1, 1), dtype=np.int64)
+
+        token_buffer[0, 0] = START_TOKEN_ID
 
         init_out = self.decoder_init.run(
             None,
             {
                 self.decoder_init_inputs[0]: encoder_hidden,
-                self.decoder_init_inputs[1]: self.token_buffer,
+                self.decoder_init_inputs[1]: token_buffer,
             },
         )
 
-        self.self_k_cache[:, :, :, :1, :] = init_out[1]
-        self.self_v_cache[:, :, :, :1, :] = init_out[2]
+        self_k_cache[:, :, :, :1, :] = init_out[1]
+        self_v_cache[:, :, :, :1, :] = init_out[2]
         cross_k_cache = init_out[3]
         cross_v_cache = init_out[4]
 
@@ -188,23 +191,23 @@ class MangaOCRMobileONNX:
             current_token = next_token
 
             while len(token_ids) < MAX_SEQUENCE_LENGTH and cache_len < MAX_SEQUENCE_LENGTH:
-                self.token_buffer[0, 0] = current_token
-                self.position_buffer[0, 0] = min(cache_len + 1, MAX_POSITION_ID)
+                token_buffer[0, 0] = current_token
+                position_buffer[0, 0] = min(cache_len + 1, MAX_POSITION_ID)
                 step_out = self.decoder_step.run(
                     None,
                     {
                         self.decoder_step_inputs[0]: encoder_hidden,
-                        self.decoder_step_inputs[1]: self.token_buffer,
-                        self.decoder_step_inputs[2]: self.position_buffer,
-                        self.decoder_step_inputs[3]: self.self_k_cache,
-                        self.decoder_step_inputs[4]: self.self_v_cache,
+                        self.decoder_step_inputs[1]: token_buffer,
+                        self.decoder_step_inputs[2]: position_buffer,
+                        self.decoder_step_inputs[3]: self_k_cache,
+                        self.decoder_step_inputs[4]: self_v_cache,
                         self.decoder_step_inputs[5]: cross_k_cache,
                         self.decoder_step_inputs[6]: cross_v_cache,
                     },
                 )
 
-                self.self_k_cache[:, :, :, cache_len : cache_len + 1, :] = step_out[1]
-                self.self_v_cache[:, :, :, cache_len : cache_len + 1, :] = step_out[2]
+                self_k_cache[:, :, :, cache_len : cache_len + 1, :] = step_out[1]
+                self_v_cache[:, :, :, cache_len : cache_len + 1, :] = step_out[2]
                 cache_len += 1
 
                 next_token = int(np.argmax(step_out[0][0][:self.vocab_size]))
@@ -216,7 +219,7 @@ class MangaOCRMobileONNX:
 
         return self._postprocess(self._decode(token_ids))
 
-    def _preprocess_into(self, img: np.ndarray) -> None:
+    def _preprocess(self, img: np.ndarray) -> np.ndarray:
         if img is None or getattr(img, "size", 0) == 0:
             raise ValueError("Empty image passed to MangaOCRMobileONNX")
 
@@ -231,7 +234,9 @@ class MangaOCRMobileONNX:
         canvas.paste(resized, ((IMAGE_SIZE - dst_w) // 2, (IMAGE_SIZE - dst_h) // 2))
 
         arr = np.asarray(canvas, dtype=np.float32) / 255.0
-        np.copyto(self.image_buffer[0], arr.transpose((2, 0, 1)))
+        buf = np.empty((1, 3, IMAGE_SIZE, IMAGE_SIZE), dtype=np.float32)
+        np.copyto(buf[0], arr.transpose((2, 0, 1)))
+        return buf
 
     def _decode(self, token_ids: list[int]) -> str:
         pieces: list[str] = []

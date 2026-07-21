@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Download, Loader2 } from "lucide-react";
 import { AppleSelect } from "./AppleSelect";
 import * as api from "../services/api";
@@ -6,6 +6,7 @@ import { createTranslator } from "../i18n";
 import type { WaitForJob } from "../hooks/useProcessingTask";
 import type { ModelStatus, Settings } from "../types";
 import { getSafeTargetLanguage, getTargetLanguageOptions, SUPPORTED_TRANSLATION_LANGUAGES } from "../languageOptions";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 interface InitialSetupModalProps {
   isOpen: boolean;
@@ -43,17 +44,22 @@ function getPreviewModels(settings: Settings, status: ModelStatus | null): Previ
     installed
   );
 
-  const ppocrRecognition =
-    sourceLanguage === "english" || sourceLanguage === "en"
-      ? { id: "ppocr-v5-rec-en-mobile", category: "OCR", label: "PP-OCRv5 English Recognition" }
-      : sourceLanguage === "korean" || sourceLanguage === "ko"
-        ? { id: "ppocr-v5-rec-korean-mobile", category: "OCR", label: "PP-OCRv5 Korean Recognition" }
-        : { id: "ppocr-v5-rec-ch-mobile", category: "OCR", label: "PP-OCRv5 Chinese/Japanese Recognition" };
+  const ppocrRecognition = {
+    id: "ppocr-v6-rec-medium",
+    category: "OCR",
+    label: "PP-OCRv6 Medium Recognition",
+  };
 
   if (ocrEngine === "fast" || ocrEngine === "ppocr") {
     appendUnique(items, { id: "ppocr-v5-det-mobile", category: "OCR", label: "PP-OCRv5 Mobile Detector" }, installed);
     appendUnique(items, ppocrRecognition, installed);
-  } else if (sourceLanguage === "japanese" || sourceLanguage === "ja" || sourceLanguage === "日本語") {
+  } else if (
+    ocrEngine === "manga_ocr"
+    || ocrEngine === "manga-ocr"
+    || sourceLanguage === "japanese"
+    || sourceLanguage === "ja"
+    || sourceLanguage === "日本語"
+  ) {
     appendUnique(items, { id: "manga-ocr-mobile-onnx", category: "OCR", label: "Manga OCR Mobile ONNX" }, installed);
   } else {
     appendUnique(items, { id: "ppocr-v5-det-mobile", category: "OCR", label: "PP-OCRv5 Mobile Detector" }, installed);
@@ -79,16 +85,15 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [progressText, setProgressText] = useState("");
   const [progressPct, setProgressPct] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [setupStep, setSetupStep] = useState(0);
+  const panelRef = useRef<HTMLDivElement>(null);
   const uiT = useMemo(() => createTranslator(localSettings.ui_language), [localSettings.ui_language]);
+  useFocusTrap(panelRef, isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
-    setLocalSettings({ ...settings });
-    setError(null);
-    setProgressText("");
-    setProgressPct(null);
     api.getModelStatus().then(setModelStatus).catch(() => setModelStatus(null));
-  }, [isOpen, settings]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -157,7 +162,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
   return (
     <div className="setup-overlay" role="dialog" aria-modal="true" aria-label={uiT("setup.title")}>
-      <div className="setup-panel">
+      <div className="setup-panel" ref={panelRef} tabIndex={-1}>
         <div className="setup-header">
           <div>
             <h1>{uiT("setup.title")}</h1>
@@ -165,9 +170,19 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           </div>
         </div>
 
-        <div className="setup-grid">
-          <section className="setup-section">
+        <ol className="setup-stepper" aria-label={uiT("setup.title")}>
+          {[uiT("setup.languages"), uiT("setup.models"), uiT("setup.requiredModels")].map((label, index) => (
+            <li key={label} className={index < setupStep ? "complete" : index === setupStep ? "active" : ""} aria-current={index === setupStep ? "step" : undefined}>
+              <span className="setup-step-number">{index < setupStep ? <CheckCircle2 size={14} /> : index + 1}</span>
+              <span>{label}</span>
+            </li>
+          ))}
+        </ol>
+
+        <div className="setup-stage">
+          {setupStep === 0 && <section className="setup-section">
             <div className="setup-section-title">{uiT("setup.languages")}</div>
+            <p className="setup-stage-help">{uiT("setup.languageHelp")}</p>
             <div className="setup-row">
               <label>{uiT("settings.uiLanguage")}</label>
               <AppleSelect
@@ -195,10 +210,11 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 options={[...getTargetLanguageOptions(localSettings.source_language)]}
               />
             </div>
-          </section>
+          </section>}
 
-          <section className="setup-section">
+          {setupStep === 1 && <section className="setup-section">
             <div className="setup-section-title">{uiT("setup.models")}</div>
+            <p className="setup-stage-help">{uiT("setup.profileHelp")}</p>
             <div className="setup-row">
               <label>{uiT("settings.detectionModel")}</label>
               <AppleSelect
@@ -217,7 +233,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 onChange={(value) => updateLocal("ocr_engine", value)}
                 options={[
                   { value: "balanced", label: uiT("settings.ocrEngineBalanced") },
-                  { value: "fast", label: uiT("settings.ocrEngineFast") },
+                  { value: "manga_ocr", label: uiT("settings.ocrEngineManga") },
+                  { value: "ppocr", label: uiT("settings.ocrEnginePpocr") },
                 ]}
               />
             </div>
@@ -232,26 +249,29 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 ]}
               />
             </div>
-          </section>
-        </div>
+          </section>}
 
-        <section className="setup-model-list">
-          <div className="setup-section-title">{uiT("setup.requiredModels")}</div>
-          {previewModels.length ? (
-            previewModels.map((model) => (
-              <div className="setup-model-item" key={model.id}>
-                <span className={`setup-model-dot ${model.downloaded ? "ready" : ""}`} />
-                <div>
-                  <strong>{model.label}</strong>
-                  <span>{model.category}</span>
-                </div>
-                <span>{model.downloaded ? uiT("setup.installed") : uiT("setup.required")}</span>
-              </div>
-            ))
-          ) : (
-            <div className="setup-empty">{uiT("setup.modelsWillBeChecked")}</div>
-          )}
-        </section>
+          {setupStep === 2 && <>
+            <p className="setup-stage-help setup-review-help">{uiT("setup.reviewHelp")}</p>
+            <section className="setup-model-list">
+              <div className="setup-section-title">{uiT("setup.requiredModels")}</div>
+              {previewModels.length ? (
+                previewModels.map((model) => (
+                  <div className="setup-model-item" key={model.id}>
+                    <span className={`setup-model-dot ${model.downloaded ? "ready" : ""}`} />
+                    <div>
+                      <strong>{model.label}</strong>
+                      <span>{model.category}</span>
+                    </div>
+                    <span>{model.downloaded ? uiT("setup.installed") : uiT("setup.required")}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="setup-empty">{uiT("setup.modelsWillBeChecked")}</div>
+              )}
+            </section>
+          </>}
+        </div>
 
         {progressText && (
           <div className="setup-progress">
@@ -273,13 +293,30 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         {error && <div className="setup-error">{error}</div>}
 
         <div className="setup-actions">
-          <button type="button" className="setup-secondary" onClick={completeWithoutDownload} disabled={isWorking}>
-            {uiT("setup.skip")}
-          </button>
-          <button type="button" className="setup-primary" onClick={saveAndDownload} disabled={isWorking}>
-            {previewReady ? <CheckCircle2 size={16} /> : <Download size={16} />}
-            <span>{previewReady ? uiT("setup.saveAndContinue") : uiT("setup.saveAndDownload")}</span>
-          </button>
+          <div>
+            {setupStep > 0 && (
+              <button type="button" className="setup-secondary" onClick={() => setSetupStep((step) => step - 1)} disabled={isWorking}>
+                {uiT("setup.back")}
+              </button>
+            )}
+          </div>
+          <div>
+            {setupStep < 2 ? (
+              <button type="button" className="setup-primary" onClick={() => setSetupStep((step) => step + 1)}>
+                <span>{uiT("setup.continue")}</span>
+              </button>
+            ) : (
+              <>
+                <button type="button" className="setup-secondary" onClick={completeWithoutDownload} disabled={isWorking}>
+                  {uiT("setup.skip")}
+                </button>
+                <button type="button" className="setup-primary" onClick={saveAndDownload} disabled={isWorking}>
+                  {previewReady ? <CheckCircle2 size={16} /> : <Download size={16} />}
+                  <span>{previewReady ? uiT("setup.saveAndContinue") : uiT("setup.saveAndDownload")}</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -316,11 +353,63 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           color: var(--text-secondary);
           font-size: 13px;
         }
-        .setup-grid {
+        .setup-stepper {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 16px;
-          margin-top: 22px;
+          grid-template-columns: repeat(3, 1fr);
+          margin: 24px 0 20px;
+          padding: 0;
+          list-style: none;
+        }
+        .setup-stepper li {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          color: var(--text-tertiary);
+          font-size: 11.5px;
+          font-weight: 600;
+        }
+        .setup-stepper li:not(:last-child)::after {
+          content: "";
+          position: absolute;
+          top: 50%;
+          left: calc(50% + 58px);
+          right: calc(-50% + 58px);
+          height: 1px;
+          background: var(--separator-strong);
+        }
+        .setup-stepper li.active {
+          color: var(--text-primary);
+        }
+        .setup-stepper li.complete {
+          color: var(--system-green);
+        }
+        .setup-step-number {
+          width: 23px;
+          height: 23px;
+          display: grid;
+          place-items: center;
+          border: 1px solid var(--separator-strong);
+          border-radius: var(--radius-full);
+          background: var(--bg-panel);
+          font-size: 10px;
+          font-variant-numeric: tabular-nums;
+          z-index: 1;
+        }
+        .setup-stepper li.active .setup-step-number {
+          border-color: var(--system-blue);
+          background: var(--accent-bg-subtle);
+          color: var(--system-blue);
+        }
+        .setup-stage {
+          min-height: 294px;
+        }
+        .setup-stage-help {
+          margin: -2px 0 12px;
+          color: var(--text-secondary);
+          font-size: 12px;
+          line-height: 1.5;
         }
         .setup-section,
         .setup-model-list {
@@ -330,7 +419,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           background: var(--fill-4);
         }
         .setup-model-list {
-          margin-top: 16px;
+          margin-top: 0;
         }
         .setup-section-title {
           font-size: 11px;
@@ -428,9 +517,13 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         }
         .setup-actions {
           display: flex;
-          justify-content: flex-end;
+          justify-content: space-between;
           gap: 10px;
           margin-top: 20px;
+        }
+        .setup-actions > div {
+          display: flex;
+          gap: 8px;
         }
         .setup-primary,
         .setup-secondary {
@@ -464,14 +557,11 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           to { transform: rotate(360deg); }
         }
         @media (max-width: 760px) {
-          .setup-grid {
-            grid-template-columns: 1fr;
-          }
           .setup-row {
             grid-template-columns: 1fr;
           }
           .setup-actions {
-            flex-direction: column-reverse;
+            gap: 8px;
           }
           .setup-primary,
           .setup-secondary {

@@ -45,6 +45,7 @@ class SettingsSchema(BaseModel):
     smart_direction: bool = True
     text_direction_override: str = "auto"
     bubbles_only: bool
+    show_detection_overlay: bool = False
     min_font_size: float
     max_font_size: float
     default_font_size: float
@@ -91,6 +92,7 @@ def get_settings_payload(config, translation_service):
         "smart_direction": config.smart_direction,
         "text_direction_override": config.text_direction_override,
         "bubbles_only": config.bubbles_only,
+        "show_detection_overlay": config.show_detection_overlay,
         "min_font_size": config.min_font_size,
         "max_font_size": config.max_font_size,
         "default_font_size": config.default_font_size,
@@ -145,6 +147,7 @@ def update_settings_payload(settings: SettingsSchema, config, translation_servic
     config.smart_direction = settings.smart_direction
     config.text_direction_override = settings.text_direction_override
     config.bubbles_only = settings.bubbles_only
+    config.show_detection_overlay = settings.show_detection_overlay
     config.min_font_size = settings.min_font_size
     config.max_font_size = settings.max_font_size
     config.default_font_size = settings.default_font_size

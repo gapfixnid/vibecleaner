@@ -96,11 +96,11 @@ export function useProjectActions({
     });
   }, [guardUnsaved, loadProject, resetPageVersions, setSelectedPageIds, setSelectedBubbleId]);
 
-  const handleImportImages = useCallback(async (paths?: string[]) => {
+  const handleImportImages = useCallback(async (paths?: string[]): Promise<boolean> => {
     // Guard: this is also used directly as a click handler, where the first
     // argument would be a MouseEvent rather than a paths array.
     const result = await openFiles(Array.isArray(paths) ? paths : undefined);
-    if (!result) return;
+    if (!result || result.addedCount <= 0) return false;
     const { beforeCount, afterCount, addedCount } = result;
     if (beforeCount === 0 && addedCount > 0) {
       selectPage(0);
@@ -110,6 +110,7 @@ export function useProjectActions({
       selectPage(newIndex);
       setSelectedPageIds([newIndex]);
     }
+    return true;
   }, [openFiles, selectPage, setSelectedPageIds]);
 
   const handleDeletePage = useCallback(

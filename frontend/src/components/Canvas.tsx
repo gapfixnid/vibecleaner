@@ -1,11 +1,12 @@
 // frontend/src/components/Canvas.tsx
 import React, { useRef, useState } from "react";
-import { Bug } from "lucide-react";
+import { ChevronLeft, ChevronRight, ScanEye } from "lucide-react";
 import type { BubbleInfo } from "../types";
 import { CanvasTranslateButton } from "./canvas/CanvasTranslateButton";
 import { CanvasZoomControls } from "./canvas/CanvasZoomControls";
 import { CanvasMultiSelectEmpty } from "./canvas/CanvasMultiSelectEmpty";
 import { CanvasImageStage } from "./canvas/CanvasImageStage";
+import { CanvasEmptyState } from "./canvas/CanvasEmptyState";
 import { useCanvasKeyboardGuards } from "./canvas/useCanvasKeyboardGuards";
 import { useCanvasImageLoader } from "./canvas/useCanvasImageLoader";
 import { useCanvasViewport } from "./canvas/useCanvasViewport";
@@ -14,6 +15,8 @@ import { useBubbleDrag } from "./canvas/useBubbleDrag";
 interface CanvasProps {
   imageUrl: string;
   fullResImageUrl?: string;
+  originalImageUrl?: string;
+  hasProcessedImage?: boolean;
   imageWidth?: number;
   imageHeight?: number;
   pageIndex: number;
@@ -29,16 +32,25 @@ interface CanvasProps {
   onCancelJob?: () => void;
   onDeleteBubble: (id: number) => void;
   onImageLoaded?: () => void;
+  onImportImages: () => void;
+  onOpenProject: () => void;
+  onToggleSidebar: () => void;
+  isSidebarOpen: boolean;
+  onToggleInspector: () => void;
+  isInspectorOpen: boolean;
   isMultiPageSelection?: boolean;
   selectedPageCount?: number;
   /** When true, page image is reloading — keep existing bubble overlay until new bubbles load. */
   isWaitingForImageReload?: boolean;
+  showDetectionOverlay?: boolean;
   t?: (key: string) => string;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
   imageUrl,
   fullResImageUrl,
+  originalImageUrl,
+  hasProcessedImage,
   imageWidth,
   imageHeight,
   pageIndex,
@@ -53,16 +65,24 @@ export const Canvas: React.FC<CanvasProps> = ({
   onCancelJob,
   onDeleteBubble,
   onImageLoaded,
+  onImportImages,
+  onOpenProject,
+  onToggleSidebar,
+  isSidebarOpen,
+  onToggleInspector,
+  isInspectorOpen,
   isMultiPageSelection,
   selectedPageCount,
   isWaitingForImageReload,
+  showDetectionOverlay = false,
   t,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const [scale, setScale] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [showDetectionOverlay, setShowDetectionOverlay] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
 
   // Tracks whether the user has manually zoomed/panned the current page, so
   // that container resizes don't reset their view.
@@ -101,6 +121,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     fitToWindow,
   } = useCanvasViewport({
     containerRef,
+    viewportRef,
     imageRef,
     imageWidth,
     imageHeight,
@@ -181,9 +202,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     >
       {isMultiPageSelection ? (
         <CanvasMultiSelectEmpty selectedPageCount={selectedPageCount} />
+      ) : !displayImageUrl ? (
+        <CanvasEmptyState onImportImages={onImportImages} onOpenProject={onOpenProject} t={t ?? ((key) => key)} />
       ) : (
         <CanvasImageStage
-          displayImageUrl={displayImageUrl}
+          ref={viewportRef}
+          displayImageUrl={showOriginal && originalImageUrl ? originalImageUrl : displayImageUrl}
           imageRef={imageRef}
           imageDimensions={imageDimensions}
           pan={pan}
@@ -196,34 +220,54 @@ export const Canvas: React.FC<CanvasProps> = ({
           onImageError={handleImageError}
           onStartBubbleDrag={startBubbleDrag}
           showDetectionOverlay={showDetectionOverlay}
+          hideOverlays={showOriginal}
         />
       )}
 
-      {/* Floating zoom cluster */}
-      {displayImageUrl && !isMultiPageSelection && (
-        <CanvasZoomControls
-          scale={scale}
-          onZoomIn={() => zoomBy(1.25)}
-          onZoomOut={() => zoomBy(1 / 1.25)}
-          onZoomReset={() => zoomTo(1)}
-          onZoomFit={fitToWindow}
-          t={t}
-        />
+      {displayImageUrl && (
+        <>
+          <button
+            type="button"
+            className="canvas-edge-toggle canvas-edge-toggle-left"
+            onClick={onToggleSidebar}
+            aria-label={t?.(isSidebarOpen ? "layout.hidePages" : "layout.showPages") || (isSidebarOpen ? "Hide pages panel" : "Show pages panel")}
+            aria-pressed={isSidebarOpen}
+            data-tooltip={t?.(isSidebarOpen ? "layout.hidePages" : "layout.showPages") || (isSidebarOpen ? "Hide pages panel" : "Show pages panel")}
+            data-tooltip-pos="bottom"
+          >
+            {isSidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+          </button>
+          <button
+            type="button"
+            className="canvas-edge-toggle canvas-edge-toggle-right"
+            onClick={onToggleInspector}
+            aria-label={t?.(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector") || (isInspectorOpen ? "Hide inspector" : "Show inspector")}
+            aria-pressed={isInspectorOpen}
+            data-tooltip={t?.(isInspectorOpen ? "layout.hideInspector" : "layout.showInspector") || (isInspectorOpen ? "Hide inspector" : "Show inspector")}
+            data-tooltip-pos="bottom"
+          >
+            {isInspectorOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
+        </>
       )}
 
-      {/* Floating control bar */}
+      {/* Unified floating control bar */}
       {displayImageUrl && (
         <div className="canvas-floating-controls">
           <div className="actions-capsule">
-            <button
-              type="button"
-              className={`canvas-debug-button${showDetectionOverlay ? " active" : ""}`}
-              onClick={() => setShowDetectionOverlay((visible) => !visible)}
-              title={showDetectionOverlay ? (t?.("canvas.hideDetection") || "Hide detection boxes") : (t?.("canvas.showDetection") || "Show detection boxes")}
-              aria-label={showDetectionOverlay ? (t?.("canvas.hideDetection") || "Hide detection boxes") : (t?.("canvas.showDetection") || "Show detection boxes")}
-            >
-              <Bug size={15} />
-            </button>
+            {!isMultiPageSelection && (
+              <>
+                <CanvasZoomControls
+                  scale={scale}
+                  onZoomIn={() => zoomBy(1.25)}
+                  onZoomOut={() => zoomBy(1 / 1.25)}
+                  onZoomReset={() => zoomTo(1)}
+                  onZoomFit={fitToWindow}
+                  t={t}
+                />
+              </>
+            )}
+            {!isMultiPageSelection && <div className="control-divider" aria-hidden="true" />}
             <CanvasTranslateButton
               isProcessing={isProcessing}
               isJobActive={isJobActive}
@@ -233,6 +277,32 @@ export const Canvas: React.FC<CanvasProps> = ({
               onCancel={onCancelJob}
               t={t}
             />
+            {!isMultiPageSelection && (
+              <>
+                <div className="control-divider" aria-hidden="true" />
+                <button
+                  type="button"
+                  className={`canvas-compare-button${showOriginal ? " active" : ""}`}
+                  disabled={!originalImageUrl || !hasProcessedImage}
+                  onPointerDown={() => setShowOriginal(true)}
+                  onPointerUp={() => setShowOriginal(false)}
+                  onPointerLeave={() => setShowOriginal(false)}
+                  onPointerCancel={() => setShowOriginal(false)}
+                  onKeyDown={(event) => {
+                    if (event.key === " " || event.key === "Enter") setShowOriginal(true);
+                  }}
+                  onKeyUp={() => setShowOriginal(false)}
+                  aria-pressed={showOriginal}
+                  data-tooltip={hasProcessedImage
+                    ? (t?.("canvas.holdForOriginal") || "Hold to view original")
+                    : (t?.("canvas.compareUnavailable") || "Available after translation")}
+                  data-tooltip-pos="top"
+                >
+                  <ScanEye size={15} />
+                  <span>{showOriginal ? (t?.("canvas.viewingOriginal") || "Original") : (t?.("canvas.compare") || "Compare")}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -252,6 +322,134 @@ export const Canvas: React.FC<CanvasProps> = ({
           height: max-content;
         }
 
+        .canvas-empty-state {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 18px;
+          padding: 32px;
+          text-align: center;
+          color: var(--text-primary);
+        }
+
+        .canvas-empty-art {
+          position: relative;
+          width: 92px;
+          height: 92px;
+          margin-bottom: 2px;
+        }
+
+        .canvas-empty-page {
+          position: absolute;
+          width: 62px;
+          height: 78px;
+          border: 1px solid var(--separator-strong);
+          border-radius: 12px;
+          background: var(--bg-panel);
+          box-shadow: var(--shadow-md);
+        }
+
+        .canvas-empty-page-back {
+          top: 3px;
+          left: 10px;
+          transform: rotate(-8deg);
+          opacity: 0.58;
+        }
+
+        .canvas-empty-page-front {
+          right: 8px;
+          bottom: 0;
+          display: grid;
+          place-items: center;
+          color: var(--system-blue);
+        }
+
+        .canvas-empty-copy {
+          max-width: 420px;
+        }
+
+        .canvas-empty-eyebrow {
+          margin-bottom: 7px;
+          color: var(--system-blue);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+        }
+
+        .canvas-empty-copy h1 {
+          margin: 0;
+          font-size: 21px;
+          font-weight: 680;
+          letter-spacing: -0.02em;
+        }
+
+        .canvas-empty-copy > p:last-child {
+          margin-top: 8px;
+          color: var(--text-secondary);
+          font-size: 13px;
+          line-height: 1.55;
+        }
+
+        .canvas-empty-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: min(100%, 336px);
+        }
+
+        .canvas-empty-actions button {
+          flex: 1 1 0;
+          min-width: 0;
+          min-height: 38px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          padding: 0 15px;
+          border-radius: var(--radius-md);
+          font: 600 12.5px/1 var(--font-family);
+          cursor: pointer;
+          transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+        }
+
+        .canvas-empty-actions button:active {
+          transform: translateY(1px);
+        }
+
+        .canvas-empty-primary {
+          border: 1px solid var(--system-blue);
+          background: var(--system-blue);
+          color: #fff;
+          box-shadow: 0 6px 18px color-mix(in srgb, var(--system-blue) 24%, transparent);
+        }
+
+        .canvas-empty-primary:hover {
+          background: var(--system-blue-hover);
+          border-color: var(--system-blue-hover);
+        }
+
+        .canvas-empty-secondary {
+          border: 1px solid var(--border-color);
+          background: var(--bg-panel);
+          color: var(--text-primary);
+        }
+
+        .canvas-empty-secondary:hover {
+          background: var(--fill-hover);
+          border-color: var(--separator-strong);
+        }
+
+        .canvas-empty-drop-hint {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          color: var(--text-tertiary);
+          font-size: 11px;
+        }
+
         .canvas-image-wrapper {
           box-shadow: var(--shadow-lg);
           background: var(--page-paper);
@@ -262,24 +460,6 @@ export const Canvas: React.FC<CanvasProps> = ({
           display: block;
           max-width: none;
           max-height: none;
-        }
-
-        .canvas-debug-button {
-          width: 30px;
-          height: 30px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border: 0;
-          border-radius: 9px;
-          color: var(--text-secondary);
-          background: transparent;
-          cursor: pointer;
-        }
-
-        .canvas-debug-button:hover, .canvas-debug-button.active {
-          color: var(--system-blue);
-          background: color-mix(in srgb, var(--system-blue) 14%, transparent);
         }
 
         .canvas-svg-overlay, .canvas-text-overlay {
@@ -293,6 +473,62 @@ export const Canvas: React.FC<CanvasProps> = ({
           pointer-events: none;
         }
 
+        .canvas-edge-toggle {
+          position: absolute;
+          top: 16px;
+          width: 32px;
+          height: 32px;
+          padding: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--overlay-border);
+          border-radius: 10px;
+          background: var(--overlay-bg);
+          color: var(--text-secondary);
+          backdrop-filter: var(--glass-blur);
+          -webkit-backdrop-filter: var(--glass-blur);
+          box-shadow: var(--overlay-shadow);
+          cursor: pointer;
+          z-index: 6;
+          transition: background var(--transition-slow), color var(--transition-slow), transform 0.1s ease;
+        }
+
+        .canvas-edge-toggle-left {
+          left: 16px;
+        }
+
+        .canvas-edge-toggle-right {
+          right: 16px;
+        }
+
+        .canvas-edge-toggle-left::after {
+          left: 0;
+          transform: translateY(-2px);
+        }
+
+        .canvas-edge-toggle-right::after {
+          left: auto;
+          right: 0;
+          transform: translateY(-2px);
+        }
+
+        .canvas-edge-toggle-left:hover::after,
+        .canvas-edge-toggle-left:focus-visible::after,
+        .canvas-edge-toggle-right:hover::after,
+        .canvas-edge-toggle-right:focus-visible::after {
+          transform: translateY(0);
+        }
+
+        .canvas-edge-toggle:hover {
+          background: var(--fill-hover);
+          color: var(--text-primary);
+        }
+
+        .canvas-edge-toggle:active {
+          transform: scale(0.94);
+        }
+
         .canvas-floating-controls {
           position: absolute;
           bottom: 24px;
@@ -302,6 +538,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           align-items: center;
           gap: 12px;
           z-index: 5;
+          max-width: calc(100% - 28px);
         }
 
         /* Press feedback: every toolbar button dips slightly when pressed. */
@@ -312,6 +549,14 @@ export const Canvas: React.FC<CanvasProps> = ({
         .actions-capsule {
           display: flex;
           align-items: center;
+          gap: 2px;
+          padding: 5px;
+          border: 1px solid var(--overlay-border);
+          border-radius: var(--radius-lg);
+          background: var(--overlay-bg);
+          backdrop-filter: var(--glass-blur);
+          -webkit-backdrop-filter: var(--glass-blur);
+          box-shadow: var(--overlay-shadow);
         }
 
         .actions-capsule button {
@@ -339,10 +584,24 @@ export const Canvas: React.FC<CanvasProps> = ({
           flex-shrink: 0;
         }
 
+        .actions-capsule .canvas-zoom-controls button {
+          min-width: 28px;
+          padding: 0 6px;
+        }
+
+        .actions-capsule .canvas-zoom-controls .zoom-readout {
+          min-width: 46px;
+        }
+
+        .actions-capsule button.canvas-compare-button {
+          min-width: 82px;
+          justify-content: center;
+        }
+
         /* Prevent layout jitter when Translate ↔ Cancel morphs. */
         .actions-capsule button.primary,
         .actions-capsule button.cancel {
-          min-width: 90px;
+          min-width: 74px;
           justify-content: center;
         }
 
@@ -352,21 +611,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
 
         .actions-capsule button.primary {
-          background: linear-gradient(
-            90deg,
-            var(--system-blue) 0%,
-            var(--accent-tint) 40%,
-            var(--accent-tint-strong) 50%,
-            var(--accent-tint) 60%,
-            var(--system-blue) 100%
-          );
-          background-size: 200% 100%;
-          background-position: 100% 0;
-          color: white;
-          box-shadow:
-            var(--accent-glow),
-            inset 0 1px 0 rgba(255, 255, 255, 0.15);
-          animation: shimmer-bg 3s ease-in-out infinite;
+          background: transparent;
+          color: var(--system-blue);
+          box-shadow: none;
+          font-weight: 600;
         }
 
         /* Smooth icon/label transition when morphing Translate ↔ Cancel */
@@ -380,65 +628,31 @@ export const Canvas: React.FC<CanvasProps> = ({
           transform: rotate(90deg);
         }
 
-        @keyframes shimmer-bg {
-          0% { background-position: 100% 0; }
-          100% { background-position: -100% 0; }
-        }
-
-        /* Processing state: faded but still shimmering */
+        /* Processing state stays calm while progress is shown in the status bar. */
         .actions-capsule button.primary.processing {
           opacity: 0.5;
           cursor: not-allowed;
         }
 
         .actions-capsule button.primary:hover:not(:disabled) {
-          background: linear-gradient(
-            90deg,
-            var(--system-blue-hover) 0%,
-            var(--accent-tint) 40%,
-            var(--accent-tint-strong) 50%,
-            var(--accent-tint) 60%,
-            var(--system-blue-hover) 100%
-          );
-          background-size: 200% 100%;
-          box-shadow:
-            var(--accent-glow-strong),
-            inset 0 1px 0 rgba(255, 255, 255, 0.2);
+          background: var(--fill-hover);
+          color: var(--system-blue-hover);
+          box-shadow: none;
         }
 
         .actions-capsule button.cancel {
-          background: linear-gradient(
-            90deg,
-            var(--system-red) 0%,
-            var(--danger-tint) 40%,
-            var(--danger-tint-strong) 50%,
-            var(--danger-tint) 60%,
-            var(--system-red) 100%
-          );
-          background-size: 200% 100%;
-          background-position: 100% 0;
-          color: white;
-          box-shadow:
-            var(--danger-glow),
-            inset 0 1px 0 rgba(255, 255, 255, 0.15);
-          animation: shimmer-bg 3s ease-in-out infinite;
+          background: transparent;
+          color: var(--system-red);
+          box-shadow: none;
         }
 
-        /* Keep the resting red even when pointed at (override generic hover). */
         .actions-capsule button.cancel:hover:not(:disabled) {
-          background: linear-gradient(
-            90deg,
-            var(--system-red) 0%,
-            var(--danger-tint) 40%,
-            var(--danger-tint-strong) 50%,
-            var(--danger-tint) 60%,
-            var(--system-red) 100%
-          );
-          background-size: 200% 100%;
-          color: white;
+          background: var(--fill-hover);
+          color: var(--system-red);
+          box-shadow: none;
         }
 
-          .actions-capsule button:disabled {
+        .actions-capsule button:disabled {
           opacity: 0.4;
           cursor: not-allowed;
         }

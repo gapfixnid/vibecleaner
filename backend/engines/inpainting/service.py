@@ -66,6 +66,7 @@ class InpaintingService:
         image: np.ndarray,
         boxes: List[List[float]],
         bubble_boxes: Optional[List[List[float]]] = None,
+        source_polygons: Optional[List[List[List[tuple[int, int]]]]] = None,
         protect_edges: bool = False,
         engine: str | None = None,
         mask_dilation: int | None = None,
@@ -84,8 +85,17 @@ class InpaintingService:
         int_bubble_boxes = None
         if bubble_boxes is not None:
             int_bubble_boxes = [[int(val) for val in box] for box in bubble_boxes]
+        int_source_polygons = None
+        if source_polygons is not None:
+            int_source_polygons = [
+                [
+                    [[int(point[0]), int(point[1])] for point in polygon]
+                    for polygon in polygon_group
+                ]
+                for polygon_group in source_polygons
+            ]
         cache_key = self._cache_key(
-            image, int_boxes, int_bubble_boxes, protect_edges,
+            image, int_boxes, int_bubble_boxes, int_source_polygons, protect_edges,
             resolved_engine, int(resolved_dilation), bool(resolved_clip),
         )
         cached = self._get_cached(cache_key)
@@ -98,6 +108,7 @@ class InpaintingService:
                     image,
                     int_boxes,
                     int_bubble_boxes,
+                    source_polygons=int_source_polygons,
                     protect_edges=protect_edges,
                     engine=resolved_engine,
                     mask_dilation=resolved_dilation,
@@ -111,6 +122,7 @@ class InpaintingService:
             result = self.inpainter.inpaint(
                 image,
                 int_boxes,
+                source_polygons=int_source_polygons,
                 protect_edges=protect_edges,
                 engine=resolved_engine,
                 mask_dilation=resolved_dilation,
@@ -125,6 +137,7 @@ class InpaintingService:
         image: np.ndarray,
         boxes: list[list[int]],
         bubble_boxes: list[list[int]] | None,
+        source_polygons: list[list[list[list[int]]]] | None,
         protect_edges: bool,
         engine: str,
         dilation: int,
@@ -135,7 +148,7 @@ class InpaintingService:
         digest.update(str(image.dtype).encode("ascii"))
         digest.update(image.tobytes())
         digest.update(json.dumps(
-            [boxes, bubble_boxes, protect_edges, engine, dilation, clip_to_bubble],
+            [boxes, bubble_boxes, source_polygons, protect_edges, engine, dilation, clip_to_bubble],
             separators=(",", ":"),
         ).encode("utf-8"))
         return digest.hexdigest()
@@ -168,6 +181,7 @@ class InpaintingService:
         image: np.ndarray,
         boxes: List[List[float]],
         bubble_boxes: Optional[List[List[float]]] = None,
+        source_polygons: Optional[List[List[List[tuple[int, int]]]]] = None,
         protect_edges: bool = False,
         engine: str | None = None,
         mask_dilation: int | None = None,
@@ -177,6 +191,7 @@ class InpaintingService:
             image,
             boxes,
             bubble_boxes=bubble_boxes,
+            source_polygons=source_polygons,
             protect_edges=protect_edges,
             engine=engine,
             mask_dilation=mask_dilation,

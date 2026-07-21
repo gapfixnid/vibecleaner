@@ -24,7 +24,7 @@ export interface JobStatus {
   status: JobState;
   progress?: number;
   message?: string;
-  result?: any;
+  result?: unknown;
   error?: string;
 }
 

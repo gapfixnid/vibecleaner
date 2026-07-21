@@ -11,7 +11,7 @@ class DummySettings:
         import onnxruntime as ort
         try:
             providers = ort.get_available_providers()
-            return "CUDAExecutionProvider" in providers or "ROCMExecutionProvider" in providers
+            return "CUDAExecutionProvider" in providers
         except Exception:
             return False
         
@@ -79,7 +79,8 @@ class LocalOCR:
                 with self._lock:
                     if self.japanese_engine is None:
                         engine = MangaOCRMobileONNXEngine()
-                        engine.initialize()
+                        device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
+                        engine.initialize(device=device)
                         self.japanese_engine = engine
             return self.japanese_engine.process_image(
                 image,
@@ -95,7 +96,8 @@ class LocalOCR:
                 with self._lock:
                     if lang_code not in self.ppocr_engines:
                         engine = PPOCRv5Engine()
-                        engine.initialize(lang=lang_code)
+                        device = "cuda" if self.settings.is_gpu_enabled() else "cpu"
+                        engine.initialize(lang=lang_code, device=device)
                         self.ppocr_engines[lang_code] = engine
                         if lang_code == "ko":
                             self.korean_engine = engine

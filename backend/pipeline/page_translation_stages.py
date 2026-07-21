@@ -11,7 +11,9 @@ from .page_analysis import (
     bubbles_from_analysis,
     merge_overlapping_bubbles,
     bubble_clip_boxes,
+    bubble_source_polygons,
     inpaint_boxes,
+    recover_missing_source_polygons,
 )
 from .context import PipelineContext
 from .registry import StageRegistry
@@ -368,11 +370,17 @@ class PageInpaintingStage:
         if inpainted_image is None:
             if show_progress:
                 job_manager.update(job, progress=60, message=msg_from_context("page_translation.cleaning", context))
+            recover_missing_source_polygons(
+                image,
+                local_bubbles,
+                source_language=str(getattr(config, "source_language", "")),
+            )
             boxes = inpaint_boxes(local_bubbles, use_textbox_only=config.inpaint_use_textbox_only)
             inpainted_image = self.inpainting_service.clean_background(
                 image,
                 boxes,
                 bubble_clip_boxes(local_bubbles),
+                source_polygons=bubble_source_polygons(local_bubbles),
                 protect_edges=True,
             )
             job_manager.ensure_not_cancelled(job)
@@ -383,18 +391,20 @@ class PageInpaintingStage:
                 retry_engine = self.quality_router.select_model(
                     "inpainting", current_engine, quality_score, self.provider_manifest
                 )
-                inpainted_image = self.inpainting_service.clean_background(
-                    image,
-                    boxes,
-                    bubble_clip_boxes(local_bubbles),
-                    protect_edges=True,
-                    engine=retry_engine,
-                    mask_dilation=max(1, int(getattr(config, "inpaint_mask_dilation", 2)) + 2),
-                )
-                quality_score = self.quality_router.evaluate_inpainting(image, inpainted_image, boxes)
-                context.artifacts.setdefault("quality_replans", []).append({
-                    "stage": "inpainting", "engine": retry_engine, "passed": quality_score.passed
-                })
+                if retry_engine != current_engine:
+                    inpainted_image = self.inpainting_service.clean_background(
+                        image,
+                        boxes,
+                        bubble_clip_boxes(local_bubbles),
+                        source_polygons=bubble_source_polygons(local_bubbles),
+                        protect_edges=True,
+                        engine=retry_engine,
+                        mask_dilation=max(1, int(getattr(config, "inpaint_mask_dilation", 2)) + 2),
+                    )
+                    quality_score = self.quality_router.evaluate_inpainting(image, inpainted_image, boxes)
+                    context.artifacts.setdefault("quality_replans", []).append({
+                        "stage": "inpainting", "engine": retry_engine, "passed": quality_score.passed
+                    })
             context.artifacts.setdefault("quality_scores", {})["inpainting"] = quality_score
             if inpainted_image is None or getattr(inpainted_image, "shape", None) != getattr(image, "shape", None):
                 raise RuntimeError("Inpainting did not produce a valid page image")
@@ -432,12 +442,15 @@ class PageRenderingStage:
         state = context.artifacts["state"]
         job = context.artifacts["job"]
         job_manager = context.artifacts["job_manager"]
+        show_progress = context.artifacts["show_progress"]
         page_id = context.page_id
         inpainted_image = context.artifacts["inpainted_image"]
         local_bubbles = context.artifacts["local_bubbles"]
         bubble_counter = context.artifacts["bubble_counter"]
         start_revision = context.artifacts["start_revision"]
 
+        if show_progress:
+            job_manager.update(job, progress=80, message=msg_from_context("page_translation.rendering", context))
         job_manager.ensure_not_cancelled(job)
         inpainted_preview_bytes = self.encode_preview_jpeg_bytes(inpainted_image) if inpainted_image is not None else None
         job_manager.ensure_not_cancelled(job)

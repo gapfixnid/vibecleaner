@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type Dispatch,
   type MutableRefObject,
@@ -11,6 +12,7 @@ import type React from "react";
 
 interface UseCanvasViewportOptions {
   containerRef: RefObject<HTMLDivElement | null>;
+  viewportRef: RefObject<HTMLDivElement | null>;
   imageRef: RefObject<HTMLImageElement | null>;
   imageWidth?: number;
   imageHeight?: number;
@@ -43,6 +45,7 @@ function computeFit(containerW: number, containerH: number, imgW: number, imgH: 
 
 export function useCanvasViewport({
   containerRef,
+  viewportRef,
   imageRef,
   imageWidth,
   imageHeight,
@@ -57,6 +60,12 @@ export function useCanvasViewport({
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
+
+  const currentPanRef = useRef<{ x: number; y: number }>(pan);
+
+  useEffect(() => {
+    currentPanRef.current = pan;
+  }, [pan]);
 
   // Recalculate scale/pan on resize.
   useEffect(() => {
@@ -133,19 +142,28 @@ export function useCanvasViewport({
           const rect = containerRef.current.getBoundingClientRect();
           const mouseX = e.clientX - rect.left;
           const mouseY = e.clientY - rect.top;
+          const activePan = isPanning ? currentPanRef.current : pan;
 
-          const imgX = (mouseX - pan.x) / scale;
-          const imgY = (mouseY - pan.y) / scale;
-
-          setScale(nextScale);
-          setPan({
+          const imgX = (mouseX - activePan.x) / scale;
+          const imgY = (mouseY - activePan.y) / scale;
+          const nextPan = {
             x: mouseX - imgX * nextScale,
             y: mouseY - imgY * nextScale,
-          });
+          };
+
+          currentPanRef.current = nextPan;
+          setScale(nextScale);
+          setPan(nextPan);
+          if (isPanning) {
+            setPanStart({
+              x: e.clientX - nextPan.x,
+              y: e.clientY - nextPan.y,
+            });
+          }
         }
       }
     },
-    [containerRef, hasUserAdjustedRef, isSpacePressed, pan.x, pan.y, scale, setPan, setScale],
+    [containerRef, hasUserAdjustedRef, isPanning, isSpacePressed, pan, scale, setPan, setScale],
   );
 
   const startCanvasPan = useCallback(
@@ -154,6 +172,7 @@ export function useCanvasViewport({
         e.preventDefault();
         hasUserAdjustedRef.current = true;
         setIsPanning(true);
+        currentPanRef.current = { x: pan.x, y: pan.y };
         setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
         return true;
       }
@@ -165,20 +184,23 @@ export function useCanvasViewport({
   const updateCanvasPan = useCallback(
     (e: React.MouseEvent) => {
       if (!isPanning) return false;
-      setPan({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      });
+      const nextX = e.clientX - panStart.x;
+      const nextY = e.clientY - panStart.y;
+      currentPanRef.current = { x: nextX, y: nextY };
+      if (viewportRef.current) {
+        viewportRef.current.style.transform = `translate(${nextX}px, ${nextY}px) scale(${scale})`;
+      }
       return true;
     },
-    [isPanning, panStart.x, panStart.y, setPan],
+    [isPanning, panStart.x, panStart.y, scale, viewportRef],
   );
 
   const finishCanvasPan = useCallback(() => {
     if (!isPanning) return false;
     setIsPanning(false);
+    setPan(currentPanRef.current);
     return true;
-  }, [isPanning]);
+  }, [isPanning, setPan]);
 
   /** Zoom to an absolute scale, anchored at the viewport center. */
   const zoomTo = useCallback(

@@ -40,8 +40,9 @@ export function useCanvasImageLoader({
   onImageLoaded,
 }: UseCanvasImageLoaderOptions) {
   const [isImageLoading, setIsImageLoading] = useState<boolean>(true);
-  const [displayImageUrl, setDisplayImageUrl] = useState<string>(imageUrl);
-  const [isUsingFullRes, setIsUsingFullRes] = useState<boolean>(false);
+  const [loadedFullRes, setLoadedFullRes] = useState<{ source: string; url: string } | null>(null);
+  const displayImageUrl = loadedFullRes?.source === imageUrl ? loadedFullRes.url : imageUrl;
+  const isUsingFullRes = loadedFullRes?.source === imageUrl;
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const fullResRequestRef = useRef<number>(0);
   const fullResPreloadUrlRef = useRef<string>("");
@@ -55,7 +56,6 @@ export function useCanvasImageLoader({
       setIsImageLoading(true);
       setImageDimensions({ w: 0, h: 0 });
       setScale(1);
-      setIsUsingFullRes(false);
       hasUserAdjustedRef.current = false;
       prevPageIndexRef.current = pageIndex;
     }
@@ -64,8 +64,6 @@ export function useCanvasImageLoader({
   useLayoutEffect(() => {
     fullResRequestRef.current += 1;
     fullResPreloadUrlRef.current = "";
-    setDisplayImageUrl(imageUrl);
-    setIsUsingFullRes(false);
   }, [imageUrl]);
 
   const handleImageLoad = useCallback(() => {
@@ -122,8 +120,7 @@ export function useCanvasImageLoader({
     img.decoding = "async";
     img.onload = () => {
       if (requestId !== fullResRequestRef.current) return;
-      setDisplayImageUrl(fullResImageUrl);
-      setIsUsingFullRes(true);
+      setLoadedFullRes({ source: imageUrl, url: fullResImageUrl });
     };
     img.onerror = () => {
       fullResPreloadUrlRef.current = "";

@@ -93,6 +93,7 @@ def test_local_stage_manifests_cover_current_advanced_settings():
     assert {field["key"] for field in detection["config_schema"]} == {
         "detect_model", "confidence_threshold", "tiling_enabled", "bubbles_only",
         "smart_direction", "text_direction_override", "line_merge_sensitivity",
+        "show_detection_overlay",
     }
     assert {field["key"] for field in ocr["config_schema"]} == {
         "ocr_engine", "ocr_padding", "ocr_crop_scale",
@@ -108,5 +109,9 @@ def test_local_stage_manifests_cover_current_advanced_settings():
     assert {model["selection_value"] for model in detection["model_catalog"]} == {
         "High Precision (FP32)", "Small (INT8)"
     }
-    assert {model["selection_value"] for model in ocr["model_catalog"]} == {"balanced", "fast"}
+    assert {model["selection_value"] for model in ocr["model_catalog"]} == {
+        "balanced", "manga_ocr", "ppocr"
+    }
+    ocr_engine = next(field for field in ocr["config_schema"] if field["key"] == "ocr_engine")
+    assert ocr_engine["choices"] == ["balanced", "manga_ocr", "ppocr"]
     assert {model["selection_value"] for model in inpainting["model_catalog"]} == {"lama", "opencv"}

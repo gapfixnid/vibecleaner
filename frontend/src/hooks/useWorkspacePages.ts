@@ -19,6 +19,7 @@ interface UseWorkspacePagesDeps {
     destructive?: boolean
   ) => void;
   markDirty: () => void;
+  markPagesDeleted: (remainingPageCount: number) => void;
   /** Passed through to useBubbles for the delete-undo toast. */
   onBubbleDeleted?: (undo: () => void) => void;
   t?: (key: string) => string;
@@ -30,6 +31,7 @@ export function useWorkspacePages({
   showError,
   showConfirm,
   markDirty,
+  markPagesDeleted,
   onBubbleDeleted,
   t = (key) => key,
 }: UseWorkspacePagesDeps) {
@@ -60,6 +62,7 @@ export function useWorkspacePages({
     onPageActivated: bubblesApi.handlePageActivated,
     onPagesCleared: bubblesApi.clearBubbles,
     markDirty,
+    markPagesDeleted,
     t,
   });
 

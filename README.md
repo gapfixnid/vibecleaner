@@ -1,259 +1,126 @@
 # vibecleaner
 
-vibecleaner is a local desktop application for manga image translation and typesetting. It runs a Tauri desktop shell, a React frontend, and a local Python backend that handles image analysis, OCR, translation, inpainting, rendering, and export.
+**만화 이미지의 대사를 찾아 번역하고, 원문을 지운 자리에 번역문을 다시 배치해 주는 Windows 데스크톱 앱입니다.**
 
-The application is designed for local workflows. Images are loaded from the user's machine, model files are stored under the app data directory, and translation providers are configured by the user.
+[한국어](README.md) · [English](README.en.md)
 
-## Architecture
+> 현재 개발 중인 프로젝트입니다. 중요한 원본 이미지는 별도로 보관하고, 결과를 내보내기 전에 한 번 검수해 주세요.
 
-```mermaid
-flowchart LR
-  UI["React frontend"] --> Tauri["Tauri commands"]
-  Tauri --> API["FastAPI backend on 127.0.0.1"]
-  API --> Pipeline["Pipeline runner and stages"]
-  Pipeline --> Ports["Core ports and models"]
-  Engines["Detection/OCR/translation/inpainting/rendering engines"] --> Ports
-  Infrastructure["Image, fonts, cache, storage, downloads"] --> Ports
-  Container["Composition root"] --> API
-  Container --> Pipeline
-  Container --> Engines
-  Container --> Infrastructure
-```
+## 왜 필요한가요?
 
-- `frontend/`: React UI, state stores, API adapter, canvas/editor views.
-- `desktop/src-tauri/`: Tauri shell, backend process launcher, command forwarding to the local API.
-- `backend/api/`: FastAPI routes, dependency helpers, and use-case helpers (`api/use_cases/`). Routes receive application dependencies from the container instead of importing global services.
-- `backend/core/`: application configuration snapshots, models, ports, state contracts, and the composition root in `backend/core/container.py`.
-- `backend/pipeline/`: page-processing plans, runner, stages, strategies, validation, and provenance capture.
-- `backend/engines/`: concrete detection, OCR, translation, inpainting, and rendering implementations and adapters behind core ports, plus shared engine domain types in `engines/common`.
-- `backend/infrastructure/`: image, font, runtime (device/ONNX), storage, download, and asset helpers.
-- `download_models.py`: downloads the core local model set into the user's app data directory.
-- `scripts/verify-packaging.py`: checks packaging prerequisites without downloading large model assets.
-- `scripts/build-runtime-sidecar.ps1`: builds the packaged backend sidecar from runtime-only dependencies.
+이미지 속 만화를 번역하려면 보통 다음 작업을 하나씩 해야 합니다.
 
-The backend uses a composition-root pattern: `backend/main.py` creates the FastAPI app, calls `build_container()`, stores the container on `app.state`, and routes access it through `api.dependencies.get_container`. Pipeline code depends on core ports and explicit option DTOs rather than importing concrete engines directly. Strategies convert settings into stage options, validation produces structured pipeline issues, and provenance records stage execution metadata.
+1. 말풍선과 대사 위치를 찾습니다.
+2. 이미지 속 글자를 직접 입력하거나 OCR로 읽습니다.
+3. 대사를 번역합니다.
+4. 원문 글자를 자연스럽게 지웁니다.
+5. 번역문을 말풍선 안에 맞춰 다시 배치합니다.
 
-Backend dependency direction is intentionally one-way:
+vibecleaner는 이 과정을 한 화면에서 이어서 처리합니다. 자동 결과가 완벽하지 않은 페이지는 비교 화면과 인스펙터에서 확인하고 직접 다듬을 수 있습니다.
 
-- `backend/api` may depend on `backend/core` and container-owned application services.
-- `backend/pipeline` may depend on `backend/core` contracts, pipeline stages, strategies, validation, and provenance.
-- `backend/engines` and `backend/infrastructure` adapt concrete libraries behind core ports.
-- `backend/core/container.py` is the only place that wires API-facing services, pipeline stages, concrete engines, infrastructure, configuration, and project state together.
+## 어떤 점이 좋은가요?
 
-Routes must not import concrete engines, module-level project state, or module-level config singletons. The legacy `backend/services` package has been fully absorbed into `infrastructure`, `core`, `engines`, `pipeline`, and `api/use_cases`. Runtime state, settings, and the job manager are container-owned instances, so tests can assemble fake ports and run the pipeline without local model files.
+- **한 번에 처리합니다.** 대사 검출, OCR, 번역, 원문 제거, 번역문 배치를 하나의 작업 흐름으로 실행합니다.
+- **만화에 맞춰져 있습니다.** 세로쓰기와 대각선 대사, 여러 말풍선이 있는 페이지를 고려합니다.
+- **원본과 비교할 수 있습니다.** 번역 후 비교 버튼을 눌러 원본을 바로 확인할 수 있습니다.
+- **여러 페이지를 관리합니다.** 한 프로젝트에 이미지를 여러 장 추가하고 선택한 페이지를 함께 번역하거나 내보낼 수 있습니다.
+- **핵심 이미지 처리는 로컬입니다.** 대사 검출, OCR, 인페인팅은 내 컴퓨터에서 실행됩니다.
+- **선택권이 있습니다.** 간편한 온라인 번역부터 Ollama 같은 로컬 번역 환경까지 설정할 수 있습니다.
 
-The cleanup goal is that the application runs through the new architecture
-only. Any remaining legacy state/model wrapper dependency is migration debt,
-not an accepted end state.
+## 처음 사용하는 방법
 
-See `docs/backend-dependency-contract.md` for the full import boundary,
-composition root, dependency-set, and verification contract.
+### 1. 프로그램 준비하기
 
-The v0.2 evolution guardrails are documented in
-`docs/adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md`. Persisted
-project, settings, artifact, checkpoint, and cache compatibility follows
-`docs/schema-versioning-policy.md`.
-Provider manifest, registration, and catalog rules are documented in
-`docs/provider-extension-contract.md`.
+[GitHub Releases](https://github.com/gapfixnid/vibecleaner/releases)에서 Windows용 배포 파일이 제공되는 경우 내려받아 실행하세요.
 
-## Translation Pipeline
+배포 파일 없이 소스 코드로 실행하려는 경우에는 [개발 및 빌드 가이드](docs/development-guide.ko.md)를 따라 주세요. Node.js, Python, Rust 설치가 필요하므로 일반 사용자에게는 배포 버전을 권장합니다.
 
-The current page translation flow is:
+### 2. 처음 설정하기
 
-1. Load image pages into the project.
-2. Detect text and speech-bubble regions.
-3. Run OCR on detected text regions.
-4. Translate OCR text with the configured translation provider.
-5. Build an inpainting mask from detected text areas.
-6. Inpaint the source text.
-7. Plan text layout for each bubble.
-8. Render translated text back into the page.
-9. Export the processed page or project output.
+처음 실행하면 기본 작업 방식을 선택합니다.
 
-The frontend Translate action calls the backend `translate-all` pipeline for the selected page. Batch translation calls the backend batch route. Standalone Bubble Scan and manual region translation flows are not part of the current frontend workflow.
+- **원문 언어**: 이미지에 적힌 언어입니다. 일본 만화라면 `일본어`를 선택합니다.
+- **번역 언어**: 결과로 표시할 언어입니다.
+- **처리 방식**: 잘 모르겠다면 `균형`을 선택합니다.
+- **번역 제공자**: 별도 설정 없이 시작하려면 Google Translate를 사용할 수 있습니다. 완전한 로컬 번역을 원하면 Ollama를 설정하세요.
 
-## Requirements
+필요한 로컬 모델이 없다면 앱이 확인 후 내려받습니다. 첫 실행만 다운로드 때문에 시간이 더 걸릴 수 있습니다.
 
-- Windows 10/11
-- Node.js LTS with `node` and `npm` on `PATH`
-- Rust stable with the MSVC toolchain, installed through `rustup`
-- Python 3.10-3.12 with `python` on `PATH`
-- Microsoft Edge WebView2 Runtime, usually already installed on Windows
-- A repository-root Python virtual environment at `venv/`
+### 3. 이미지 추가하기
 
-Tauri requires `cargo` to be available on the shell `PATH`. If `npm run dev` fails at `cargo metadata`, install Rust from `https://rustup.rs`, restart the terminal, and confirm all required CLIs are visible:
+초기 화면의 **이미지 추가**를 누르고 만화 이미지를 선택합니다.
 
-```powershell
-node --version
-npm --version
-cargo --version
-rustc --version
-python --version
-```
+지원 입력 형식은 PNG, JPG/JPEG, WebP, BMP입니다. 이미지를 여러 장 선택하면 페이지 패널에서 순서대로 관리할 수 있습니다.
 
-## Dependency Sets
+### 4. 번역하기
 
-| Dependency set | Install command | Purpose |
-| --- | --- | --- |
-| Root Node package | `npm install` | Installs the Tauri CLI used by `npm run dev` and `npm run build`. |
-| Frontend package | `npm --prefix frontend install` | Installs React, Vite, TypeScript, and the Tauri frontend API. |
-| Backend runtime | `.\venv\Scripts\python.exe -m pip install -r requirements-runtime.txt` | Default local desktop backend and release sidecar runtime. |
-| Optional Torch runtime | `.\venv\Scripts\python.exe -m pip install -r requirements-torch.txt` | Torch-backed OCR, inpainting, RT-DETR, or font-detection paths. |
-| Sidecar build tools | installed by `npm run build:sidecar:runtime` | PyInstaller build environment for the packaged backend sidecar. |
-| Full Python dev file | `requirements.txt` | Full development environment; avoid it for lean sidecar packaging. |
+이미지가 열리면 캔버스 아래 플로팅 바의 **번역**을 누릅니다. 앱이 다음 작업을 자동으로 진행합니다.
 
-## Quick Start
+`대사 영역 찾기 → 글자 읽기 → 번역 → 원문 지우기 → 번역문 배치`
 
-Run these commands from the repository root.
+처리가 끝나면 다음 기능으로 결과를 확인하세요.
 
-Install the root Tauri CLI dependency and the React frontend dependencies.
-Both are required for the desktop app; installing only `frontend/` is not enough.
+- **비교**: 누르고 있는 동안 원본 이미지를 표시합니다.
+- **페이지 패널**: 여러 페이지를 선택하거나 순서를 확인합니다.
+- **인스펙터**: 선택한 말풍선의 원문, 번역문, 글자 배치를 수정합니다.
+- **캔버스 양쪽 화살표**: 페이지 패널과 인스펙터를 접거나 펼칩니다.
 
-```powershell
-npm install
-npm --prefix frontend install
-```
+### 5. 저장하고 내보내기
 
-Create the Python environment in the repository root. The Tauri dev launcher
-looks for this exact `venv` folder when it starts `backend/main.py`.
+- 왼쪽 위 앱 아이콘을 눌러 **프로젝트 저장**을 선택하면 나중에 작업을 이어갈 수 있습니다.
+- 페이지 패널 위의 저장 아이콘으로 선택한 결과 이미지를 내보낼 수 있습니다.
+- 여러 페이지를 선택한 뒤 번역 또는 내보내기를 한 번에 실행할 수도 있습니다.
 
-```powershell
-python -m venv venv
-.\venv\Scripts\python.exe -m pip install -U pip
-.\venv\Scripts\python.exe -m pip install -r requirements-runtime.txt
-```
+프로젝트 저장은 편집 가능한 작업 상태를 보관하는 기능이고, 이미지 내보내기는 완성된 결과 파일을 만드는 기능입니다.
 
-For the default ONNX-backed local workflow, `requirements-runtime.txt` is enough to start the desktop app. Install Torch only when you need Torch-backed OCR, inpainting, RT-DETR, or font-detection paths:
+## 권장 설정
 
-```powershell
-.\venv\Scripts\python.exe -m pip install -r requirements-torch.txt
-```
+처음에는 기본값을 그대로 사용하는 것이 가장 안전합니다.
 
-### NVIDIA CUDA acceleration
-
-The runtime requirements install the CPU build of ONNX Runtime by default so
-the app works on machines without NVIDIA hardware. To use CUDA for the ONNX
-detection, OCR, and LaMa inpainting paths on Windows, replace that package in
-the same virtual environment with the GPU build:
-
-```powershell
-.\venv\Scripts\python.exe -m pip uninstall -y onnxruntime
-.\venv\Scripts\python.exe -m pip install --upgrade "onnxruntime-gpu[cuda,cudnn]"
-```
-
-Restart the app after installation and verify that CUDA is available:
-
-```powershell
-.\venv\Scripts\python.exe -c "import onnxruntime as ort; print(ort.__version__); print(ort.get_available_providers())"
-```
-
-The output must include `CUDAExecutionProvider`. If it is absent, check that
-the NVIDIA driver is installed with `nvidia-smi`, then reinstall the GPU
-package in the repository `venv`. The application intentionally falls back to
-`CPUExecutionProvider` when CUDA is unavailable.
-
-To verify actual GPU inference with the locally downloaded detection and LaMa
-models, run:
-
-```powershell
-.\venv\Scripts\python.exe scripts\verify_gpu_runtime.py
-```
-
-The command reports each ONNX session's providers and one inference duration;
-both sessions must list `CUDAExecutionProvider`.
-
-The GPU wheel uses CUDA 12.x by default and requires compatible CUDA/cuDNN
-runtime libraries. See the [ONNX Runtime installation guide](https://onnxruntime.ai/docs/install/)
-and [CUDA Execution Provider requirements](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html)
-for compatibility details.
-
-Download local models. The minimal profile is the fastest way to get the app
-running; use the full profile only when you need every local model path.
-
-```powershell
-.\venv\Scripts\python.exe download_models.py --minimal
-```
-
-```powershell
-.\venv\Scripts\python.exe download_models.py
-```
-
-Start the desktop app. This is the normal development command. `npm run dev`
-runs `tauri dev`; Tauri starts the Vite frontend through
-`desktop/src-tauri/tauri.conf.json` and launches the Python backend from
-`.\venv\Scripts\python.exe`.
-
-```powershell
-npm run dev
-```
-
-The frontend API client currently talks through Tauri commands. Running Vite by
-itself opens a browser-only frontend without the backend launcher or Tauri
-command bridge, so it is only useful for static UI work that does not call
-backend or desktop APIs.
-
-```powershell
-npm --prefix frontend run dev
-```
-
-Release sidecar builds use a separate `.venv-runtime` environment created by `scripts/build-runtime-sidecar.ps1`. Do not install sidecar build dependencies into `venv` unless you need them for local packaging experiments.
-
-## Commands
-
-| Command | Description |
+| 원하는 결과 | 권장 선택 |
 | --- | --- |
-| `npm run dev` | Start Tauri development mode. Requires Rust/Cargo and the Python backend environment. |
-| `npm run build` | Build the Tauri desktop app. Requires a packaged backend sidecar. |
-| `npm run build:sidecar:runtime` | Build the Python backend sidecar from `requirements-runtime.txt`. |
-| `npm run sync-version` | Sync the root app version into app metadata files. |
-| `npm run verify:packaging` | Check sidecar, bundled font, and model registry metadata. |
-| `npm run verify:packaging:models` | Also require local model files to exist and pass checksum checks. |
-| `.\venv\Scripts\python.exe download_models.py` | Download the full core model profile. |
-| `.\venv\Scripts\python.exe download_models.py --minimal` | Download the minimal detector/OCR profile. |
-| `npm --prefix frontend run build` | Build the frontend only. |
+| 무엇을 골라야 할지 모름 | 균형 처리 방식 |
+| 일본 만화 OCR 품질 우선 | Manga OCR |
+| 다른 언어 또는 속도 우선 | PP-OCR |
+| 원문 제거 품질 우선 | LaMa 인페인팅 |
+| 빠른 미리보기 | OpenCV 인페인팅 |
 
-## Runtime Notes
+고급 설정의 패딩, 마스크 확장, 신뢰도 값은 특정 페이지에서 문제가 있을 때만 조금씩 조정하세요.
 
-- The backend listens on `127.0.0.1` and is launched by Tauri in desktop mode.
-- Local browser and local process access are not the same security boundary. Treat the local API as a loopback service for the desktop app, not as a network service.
-- Translation provider credentials are configured in app settings. Do not commit local settings or API keys.
-- Model files are downloaded into the user data directory and are not committed to the repository.
-- Runtime sidecar builds use `.venv-runtime/`, `requirements-runtime.txt`, and PyInstaller excludes so optional Torch packages and model weights are not bundled into the installer.
-- Release builds need a backend sidecar at `desktop/src-tauri/binaries/server-x86_64-pc-windows-msvc.exe`.
-- Pretendard is bundled for Korean text rendering under `backend/infrastructure/assets/fonts/`.
+## 자주 묻는 문제
 
-## Release Packaging
+### 첫 번역이 오래 걸려요
 
-Build the backend sidecar from a clean runtime-only environment:
+처음 사용하는 모델을 내려받고 메모리에 올리는 과정이 포함될 수 있습니다. 같은 실행 중 두 번째 작업부터는 일반적으로 더 빨라집니다.
 
-```powershell
-npm run build:sidecar:runtime
-npm run verify:packaging
-npm run build
-```
+### 대각선 또는 세로 대사를 잘못 읽어요
 
-Do not build the sidecar from `venv/` if that environment contains optional packages such as Torch, torchvision, spaCy, or notebook tooling. PyInstaller can detect imports even when they are only used by optional code paths, which inflates the sidecar. The runtime sidecar script creates `.venv-runtime/`, installs `requirements-runtime.txt`, excludes optional Torch modules, and copies the generated server to `desktop/src-tauri/binaries/server-x86_64-pc-windows-msvc.exe`.
+원문 언어를 일본어로 설정하고 Manga OCR 또는 균형 모드를 사용해 보세요. 그래도 틀리면 인스펙터에서 원문을 직접 수정한 뒤 다시 번역할 수 있습니다.
 
-Model files are external runtime assets. They are resolved through `ModelDownloader` and saved under the platform-specific user data directory, for example `%LOCALAPPDATA%\vibecleaner\models` on Windows. Use `download_models.py` only to pre-warm a local machine; do not add downloaded model folders to Tauri resources.
+### 말풍선 밖까지 흐려져요
 
-## License
+설정에서 LaMa 인페인팅을 사용하고, 말풍선 경계 제한 옵션을 켜세요. 검출 영역이 잘못된 경우에는 검출 박스를 표시해 범위를 먼저 확인하는 것이 좋습니다.
 
-This repository is licensed under the Apache License, Version 2.0. See `LICENSE`.
+### 번역문 위치가 어색해요
 
-Third-party source code, model files, fonts, and services keep their own licenses and terms. See `NOTICE` and the upstream projects/model cards before redistributing packaged builds with bundled assets.
+인스펙터에서 정렬, 글자 크기, 줄 간격을 조정하세요. 자동 배치는 말풍선 형태와 번역문 길이에 따라 달라질 수 있습니다.
 
-## Acknowledgements
+### 내 이미지가 외부로 전송되나요?
 
-This project uses or adapts work from the following projects and model sources:
+검출, OCR, 인페인팅은 로컬에서 처리합니다. 다만 Google, DeepL, OpenAI 같은 온라인 번역 제공자를 선택하면 번역에 필요한 텍스트가 해당 서비스로 전송됩니다. 이미지 문맥 기능을 직접 켠 경우에는 이미지도 전송될 수 있습니다. 외부 전송을 원하지 않으면 Ollama와 로컬 모델을 사용하세요.
 
-- `ogkalu2/comic-translate`: upstream application and pipeline reference, Apache-2.0.
-- `kha-white/manga-ocr`: Japanese OCR model/code source used by the Manga OCR path.
-- `PaddlePaddle/PaddleOCR` and RapidOCR model exports: PPOCR detection/recognition models and dictionaries.
-- `kakaobrain/pororo` and related BrainOCR/CRAFT assets: optional Korean OCR path.
-- `Sanster/lama-cleaner` / IOPaint: inpainting helper/schema references.
-- Sanster model releases and `ogkalu` Hugging Face model repositories: inpainting, detection, OCR, and ONNX model artifacts used by the downloader.
-- `gyrojeff/YuzuMarker.FontDetection` and `ogkalu/yuzumarker-font-detection-onnx`: font attribute detection model sources.
-- CPython `textwrap.py`: reference for the local hyphen-aware text wrapping helper.
-- Pretendard: bundled Korean font, SIL Open Font License 1.1.
+## 문서
 
-Translation providers such as Ollama, OpenAI-compatible endpoints, OpenAI, DeepL, Google Translate, Papago, Anthropic, and Baidu are optional runtime integrations. Their APIs and models are governed by the user's configuration and the providers' own terms.
+- [English user guide](README.en.md)
+- [개발 및 빌드 가이드](docs/development-guide.ko.md)
+- [Development and build guide](docs/development-guide.md)
+- [백엔드 의존성 규칙](docs/backend-dependency-contract.md)
+- [파이프라인 확장 설계](docs/adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md)
+- [프로바이더 확장 규칙](docs/provider-extension-contract.md)
+- [스키마 버전 정책](docs/schema-versioning-policy.md)
+
+## 라이선스와 감사의 말
+
+이 저장소는 [Apache License 2.0](LICENSE)으로 배포됩니다. 포함되거나 다운로드되는 모델, 글꼴, 외부 서비스에는 각 제작자의 라이선스와 이용 약관이 적용됩니다. 자세한 출처는 [NOTICE](NOTICE)를 확인하세요.
+
+문제나 개선 의견은 [GitHub Issues](https://github.com/gapfixnid/vibecleaner/issues)에 남겨 주세요.

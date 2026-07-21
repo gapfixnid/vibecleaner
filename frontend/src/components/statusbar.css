@@ -91,6 +91,54 @@
   color: #fff;
 }
 
+.status-bar-stages {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 0 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.status-bar-stages li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-quaternary);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.status-bar-stages li:not(:last-child)::after {
+  content: "";
+  width: 12px;
+  height: 1px;
+  margin: 0 5px;
+  background: var(--separator-strong);
+}
+
+.status-stage-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.status-bar-stages li.complete {
+  color: var(--system-green);
+}
+
+.status-bar-stages li.active {
+  color: var(--system-blue);
+  font-weight: 650;
+}
+
+@media (max-width: 1120px) {
+  .status-bar-stages {
+    display: none;
+  }
+}
+
 .status-bar-unsaved {
   display: flex;
   align-items: center;

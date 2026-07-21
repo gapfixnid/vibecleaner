@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "tauri": "tauri",
-    "dev": "tauri dev",
+    "dev": "tauri dev --config desktop/src-tauri/tauri.dev.conf.json",
     "build": "tauri build",
     "build:sidecar:runtime": "powershell -ExecutionPolicy Bypass -File scripts/build-runtime-sidecar.ps1",
     "verify:packaging": ".\\venv\\Scripts\\python.exe scripts/verify-packaging.py",

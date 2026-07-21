@@ -6,15 +6,16 @@ import numpy as np
 from backend.core.config import AppConfig
 from backend.engines.ocr.ppocr import engine as ppocr_module
 from backend.engines.ocr.ppocr.engine import PPOCRv5Engine
-from backend.engines.ocr.ppocr.preprocessing import apply_adaptive_binarization
+from backend.engines.ocr.ppocr.preprocessing import apply_adaptive_binarization, crop_text_line
+from backend.engines.ocr.manga_ocr.mobile.onnx_engine import MangaOCRMobileONNXEngine
 from backend.engines.ocr.local import LocalOCR
 from backend.engines.common.textblock import TextBlock
 
 class FakeMangaEngine:
     calls = []
 
-    def initialize(self):
-        pass
+    def initialize(self, device="cpu"):
+        self.device = device
 
     def process_image(self, image, blocks, **kwargs):
         self.calls.append(kwargs)
@@ -25,8 +26,9 @@ class FakeMangaEngine:
 class FakePPOCREngine:
     calls = []
 
-    def initialize(self, lang="ch"):
+    def initialize(self, lang="ch", device="cpu"):
         self.lang = lang
+        self.device = device
 
     def process_image(self, image, blocks, **kwargs):
         self.calls.append(kwargs)
@@ -46,6 +48,38 @@ class OcrPipelineOptionsTests(unittest.TestCase):
             LocalOCR(lang="Japanese").recognize_text(image, [block], engine="ppocr")
 
         self.assertEqual(block.text, "ppocr:ch")
+
+    def test_local_ocr_passes_gpu_device_when_cuda_is_available(self):
+        block = TextBlock([1, 1, 10, 10])
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+
+        class GpuSettings:
+            def is_gpu_enabled(self):
+                return True
+
+        with (
+            patch("backend.engines.ocr.local.PPOCRv5Engine", FakePPOCREngine),
+        ):
+            ocr = LocalOCR(lang="English")
+            ocr.settings = GpuSettings()
+            ocr.recognize_text(image, [block], engine="ppocr")
+
+        self.assertEqual(ocr.ppocr_engines["en"].device, "cuda")
+
+    def test_local_ocr_passes_gpu_device_to_manga_engine(self):
+        block = TextBlock([1, 1, 10, 10])
+        image = np.zeros((16, 16, 3), dtype=np.uint8)
+
+        class GpuSettings:
+            def is_gpu_enabled(self):
+                return True
+
+        with patch("backend.engines.ocr.local.MangaOCRMobileONNXEngine", FakeMangaEngine):
+            ocr = LocalOCR(lang="Japanese")
+            ocr.settings = GpuSettings()
+            ocr.recognize_text(image, [block], engine="manga_ocr")
+
+        self.assertEqual(ocr.japanese_engine.device, "cuda")
 
     def test_forced_ppocr_engine_overrides_japanese_auto_engine(self):
         block = TextBlock([1, 1, 10, 10])
@@ -107,6 +141,53 @@ class OcrPipelineOptionsTests(unittest.TestCase):
         )
 
         self.assertEqual(crop.shape[:2], (44, 44))
+
+    def test_diagonal_quad_is_rectified_to_horizontal_crop(self):
+        image = np.full((120, 120, 3), 255, dtype=np.uint8)
+        quad = np.array([[15, 35], [95, 65], [89, 81], [9, 51]], dtype=np.float32)
+
+        crop = crop_text_line(
+            image,
+            quad,
+            padding=0,
+            crop_scale=1.0,
+            adaptive_binarization=False,
+        )
+
+        self.assertIsNotNone(crop)
+        self.assertGreater(crop.shape[1], crop.shape[0] * 3)
+
+    def test_manga_ocr_uses_each_oriented_line_and_joins_japanese_text(self):
+        class FakeModel:
+            def __init__(self):
+                self.crops = []
+
+            def process_batch(self, crops):
+                self.crops = crops
+                return ["斜め", "台詞"]
+
+        block = TextBlock(
+            [5, 5, 110, 110],
+            lines=[
+                np.array([[10, 20], [90, 45], [86, 57], [6, 32]]),
+                np.array([[18, 48], [98, 73], [94, 85], [14, 60]]),
+            ],
+            source_lang="Japanese",
+        )
+        engine = MangaOCRMobileONNXEngine()
+        engine.model = FakeModel()
+
+        engine.process_image(
+            np.full((120, 120, 3), 255, dtype=np.uint8),
+            [block],
+            padding=0,
+            crop_scale=1.0,
+            adaptive_binarization=False,
+        )
+
+        self.assertEqual(block.text, "斜め台詞")
+        self.assertEqual(block.texts, ["斜め", "台詞"])
+        self.assertTrue(all(crop.shape[1] > crop.shape[0] for crop in engine.model.crops))
 
     def test_adaptive_binarization_strength_controls_clahe_clip_limit(self):
         cfg = AppConfig(adaptive_binarization_strength=3.25)

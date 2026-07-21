@@ -36,7 +36,15 @@ def annotate_blocks_with_heuristic_lines(
     height, width = image.shape[:2]
     for block in blocks:
         block_source_language = source_language if source_language is not None else getattr(block, "source_lang", "")
-        crop_box = _clamp_box(_expand_box(_to_box(block.xyxy), 4, 4, width, height), width, height)
+        text_box = _to_box(block.xyxy)
+        bubble_box = getattr(block, "bubble_xyxy", None)
+        context_box = text_box
+        if bubble_box is not None:
+            # A detector's axis-aligned text box is often too tight for slanted
+            # dialogue. Use the containing bubble as line-detection context so
+            # the skew search can see every row and estimate the real angle.
+            context_box = _union_box([text_box, _to_box(bubble_box)]) or text_box
+        crop_box = _clamp_box(_expand_box(context_box, 4, 4, width, height), width, height)
         x1, y1, x2, y2 = crop_box
         if x2 <= x1 or y2 <= y1:
             block.lines = [crop_box]

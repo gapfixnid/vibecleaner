@@ -13,12 +13,13 @@ export function usePageImageRequests({ pages, currentIndex, pageVersions }: UseP
   const backendUrl = api.getBackendUrl();
 
   const buildPageImageUrl = useCallback(
-    (page: PageInfo, preview = true) => {
+    (page: PageInfo, preview = true, imageType: "auto" | "original" | "inpainted" = "auto") => {
       return buildPageImageRequestUrl({
         backendUrl,
         page,
         pageVersion: pageVersions[page.index] || 0,
         preview,
+        imageType,
       });
     },
     [backendUrl, pageVersions]

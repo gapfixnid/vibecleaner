@@ -13,10 +13,14 @@ def session_providers(session: Any) -> list[str] | None:
         return None
 
 
-def model_session_providers(model: Any) -> list[str]:
+def model_session_providers(model: Any, *, _depth: int = 0) -> list[str]:
+    if model is None or _depth > 2:
+        return []
     providers: set[str] = set()
     for value in getattr(model, "__dict__", {}).values():
         names = session_providers(value)
         if names:
             providers.update(names)
+        elif hasattr(value, "__dict__"):
+            providers.update(model_session_providers(value, _depth=_depth + 1))
     return sorted(providers)

@@ -15,8 +15,13 @@ class FakeInpaintingService:
     def __init__(self):
         self.calls = []
 
-    def clean_background(self, image, boxes, bubble_boxes, protect_edges=True):
-        self.calls.append({"boxes": boxes, "bubble_boxes": bubble_boxes, "protect_edges": protect_edges})
+    def clean_background(self, image, boxes, bubble_boxes, source_polygons=None, protect_edges=True, **_kwargs):
+        self.calls.append({
+            "boxes": boxes,
+            "bubble_boxes": bubble_boxes,
+            "source_polygons": source_polygons,
+            "protect_edges": protect_edges,
+        })
         cleaned = image.copy()
         cleaned[:, :] = 255
         return cleaned

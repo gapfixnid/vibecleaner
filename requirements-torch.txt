@@ -1,7 +1,0 @@
-# Optional Torch runtime for development or advanced local model paths.
-# Do not install this into the packaging environment unless you explicitly
-# want Torch-backed features bundled into the sidecar.
-torch>=2.0.0
-torchvision>=0.15.0
-torchmetrics>=0.11.0
-pytorch-lightning>=2.0.0

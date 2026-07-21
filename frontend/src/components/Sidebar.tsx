@@ -66,7 +66,6 @@ const QueuedThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt }) =
   useEffect(() => {
     releasedRef.current = false;
     acquiredRef.current = false;
-    setQueuedSrc(null);
     const cancel = acquireThumbnailSlot(() => {
       acquiredRef.current = true;
       setQueuedSrc(src);
@@ -133,7 +132,6 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   pages,
-  currentIndex: _currentIndex,
   selectedPageIds,
   onSelectPage,
   onPageClick,
@@ -152,7 +150,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   t = (key) => key,
 }) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const pagesListRef = useRef<HTMLDivElement>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [scrollTop, setScrollTop] = useState(0);
@@ -238,7 +235,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     e.dataTransfer.effectAllowed = "move";
   };
 
-  const handleDragOver = (e: React.DragEvent, _index: number) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
 
@@ -268,8 +265,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => window.removeEventListener("resize", updateScrollMetrics);
   }, [updateScrollMetrics, pages.length, searchQuery]);
 
-  const pagesListTop = pagesListRef.current?.offsetTop ?? 0;
-  const visibleTop = Math.max(0, scrollTop - pagesListTop);
+  const visibleTop = Math.max(0, scrollTop);
   const visibleBottom = visibleTop + scrollHeight;
   const startIndex = Math.max(0, Math.floor(visibleTop / PAGE_ROW_HEIGHT) - PAGE_OVERSCAN);
   const endIndex = Math.min(
@@ -330,8 +326,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
+          {selectedPageIds.length > 1 && (
+            <div className="multi-select-actions" role="toolbar" aria-label={t("sidebar.selectedPages")}>
+              <span>{t("sidebar.selectedCount").replace("{count}", String(selectedPageIds.length))}</span>
+              <div>
+                <button type="button" onClick={() => onTranslatePages(selectedPageIds[0])}>
+                  <Languages size={12} />
+                  {t("toolbar.translate")}
+                </button>
+                <button type="button" onClick={onExportSelectedImages}>
+                  <Download size={12} />
+                  {t("toolbar.export")}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="sidebar-scroll-area" ref={scrollAreaRef} onScroll={updateScrollMetrics}>
-            <div className="pages-list" ref={pagesListRef}>
+            <div className="pages-list">
               {filteredPages.length === 0 ? (
                 <div className="empty-pages" role="status">
                   <div className="empty-pages-icon" aria-hidden="true">
@@ -346,6 +358,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       const itemIndex = startIndex + visibleIdx;
                       const pageIdx = page.index;
                       const isSelected = selectedPageIds.includes(pageIdx);
+                      const pageState = page.problems.length > 0
+                        ? "needs-review"
+                        : page.bubble_count > 0 && page.translated_count >= page.bubble_count
+                          ? "complete"
+                          : page.translated_count > 0
+                            ? "in-progress"
+                            : "not-started";
+                      const pageStateLabel = t(`sidebar.status.${pageState}`);
                       const thumbUrl = buildPageImageUrl({
                         backendUrl,
                         page,
@@ -364,7 +384,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           aria-current={isSelected}
                           draggable={renamingIndex !== pageIdx}
                           onDragStart={(e) => handleDragStart(e, pageIdx)}
-                          onDragOver={(e) => handleDragOver(e, pageIdx)}
+                          onDragOver={handleDragOver}
                           onDrop={(e) => handleDrop(e, pageIdx)}
                           onClick={(e) => onPageClick(e, pageIdx)}
                           onKeyDown={(e) => {
@@ -377,6 +397,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         >
                           <div className="page-thumbnail-wrapper">
                             <QueuedThumbnail
+                              key={thumbUrl}
                               src={thumbUrl}
                               alt={`Page ${pageIdx + 1}`}
                             />
@@ -408,8 +429,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             ) : (
                               <div className="page-filename">{page.filename}</div>
                             )}
-                            <div className="page-stats">
-                              {page.width}x{page.height}
+                            <div className="page-stats-row">
+                              <div className="page-stats">
+                                {page.width}x{page.height}
+                              </div>
+                              <span className={`page-status ${pageState}`} title={pageStateLabel} aria-label={pageStateLabel}>
+                                <span className="page-status-dot" aria-hidden="true" />
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -566,6 +592,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
         .sidebar-search-container {
           padding: 0 12px 11px;
           border-bottom: 1px solid var(--border-color);
+        }
+
+        .multi-select-actions {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin: 0 10px 8px;
+          padding: 7px 8px 7px 10px;
+          border: 1px solid var(--accent-border-subtle);
+          border-radius: var(--radius-md);
+          background: var(--accent-bg-subtle);
+          color: var(--text-secondary);
+          font-size: 10.5px;
+          font-weight: 650;
+        }
+
+        .multi-select-actions > div {
+          display: flex;
+          gap: 3px;
+        }
+
+        .multi-select-actions button {
+          min-height: 25px;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 0 7px;
+          border: 0;
+          border-radius: 6px;
+          background: transparent;
+          color: var(--system-blue);
+          font: 650 10.5px/1 var(--font-family);
+          cursor: pointer;
+        }
+
+        .multi-select-actions button:hover {
+          background: var(--fill-hover);
         }
 
         .search-input-wrapper {
@@ -971,6 +1035,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
           font-size: 10px;
           color: var(--text-secondary);
           margin-top: 1px;
+        }
+
+        .page-stats-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+
+        .page-status {
+          display: inline-flex;
+          align-items: center;
+          margin-top: 2px;
+        }
+
+        .page-status-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: var(--radius-full);
+          background: var(--text-quaternary);
+        }
+
+        .page-status.in-progress .page-status-dot {
+          background: var(--system-blue);
+        }
+
+        .page-status.needs-review .page-status-dot {
+          background: var(--system-orange);
+        }
+
+        .page-status.complete .page-status-dot {
+          background: var(--system-green);
         }
 
         .page-item.selected .page-stats {

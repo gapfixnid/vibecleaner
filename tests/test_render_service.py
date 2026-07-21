@@ -18,6 +18,8 @@ class FakeRenderer:
         self.font_family = "not-called"
         self.mask_rect = None
         self.mask_shape = None
+        self.vertical_center_y = None
+        self.vertical_bounds = None
         self.min_size = None
         self.max_size = None
 
@@ -49,6 +51,11 @@ class FakeRenderer:
     def make_ellipse_mask(self, width, height, inset=0):
         return np.ones((height, width), dtype=np.uint8)
 
+    def center_layout_vertically(self, layout, target_center_y, bounds):
+        self.vertical_center_y = target_center_y
+        self.vertical_bounds = _rect_from_qrectf(bounds)
+        return layout
+
 class RenderServiceTests(unittest.TestCase):
     def test_render_service_passes_explicit_font_size_options_to_renderer(self):
         renderer = FakeRenderer()
@@ -56,6 +63,7 @@ class RenderServiceTests(unittest.TestCase):
         bubble = TextBubble(
             id=1,
             box=Rect(0, 0, 100, 80),
+            text_box=Rect(24, 18, 52, 36),
             layout_box=Rect(20, 12, 40, 24),
             text="hello",
         )
@@ -71,6 +79,7 @@ class RenderServiceTests(unittest.TestCase):
         bubble = TextBubble(
             id=1,
             box=Rect(0, 0, 100, 80),
+            text_box=Rect(24, 18, 52, 36),
             layout_box=Rect(20, 12, 40, 24),
             text="hello",
             text_class="text_bubble",
@@ -80,6 +89,8 @@ class RenderServiceTests(unittest.TestCase):
 
         self.assertEqual(renderer.mask_rect, Rect(0, 0, 100, 80))
         self.assertEqual(renderer.mask_shape, (80, 100))
+        self.assertEqual(renderer.vertical_center_y, 36.0)
+        self.assertEqual(renderer.vertical_bounds, Rect(0, 0, 100, 80))
 
     def test_auto_font_selection_reaches_renderer_when_no_font_family_is_requested(self):
         renderer = FakeRenderer()

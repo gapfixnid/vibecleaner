@@ -3,9 +3,16 @@ import { Baseline, Layers } from "lucide-react";
 interface InspectorEmptyStateProps {
   variant: "no-selection" | "multi-select";
   t?: (key: string) => string;
+  reviewProblemCount?: number;
+  onNextProblem?: () => void;
 }
 
-export function InspectorEmptyState({ variant, t = (key) => key }: InspectorEmptyStateProps) {
+export function InspectorEmptyState({
+  variant,
+  reviewProblemCount = 0,
+  onNextProblem,
+  t = (key) => key,
+}: InspectorEmptyStateProps) {
   const isMultiSelect = variant === "multi-select";
   const Icon = isMultiSelect ? Layers : Baseline;
 
@@ -21,6 +28,11 @@ export function InspectorEmptyState({ variant, t = (key) => key }: InspectorEmpt
           ? t("inspector.multiSelectDesc")
           : t("inspector.noSelectionDesc")}
       </p>
+      {!isMultiSelect && reviewProblemCount > 0 && onNextProblem && (
+        <button type="button" className="empty-review-button" onClick={onNextProblem}>
+          <span>{t("inspector.reviewProblems").replace("{count}", String(reviewProblemCount))}</span>
+        </button>
+      )}
       <style>{`
         .inspector-container.empty {
           display: flex;
@@ -72,6 +84,20 @@ export function InspectorEmptyState({ variant, t = (key) => key }: InspectorEmpt
         }
         .inspector-container.empty.multi-select .empty-desc {
           margin-bottom: 24px;
+        }
+        .empty-review-button {
+          min-height: 34px;
+          margin-top: 16px;
+          padding: 0 12px;
+          border: 1px solid var(--accent-border-subtle);
+          border-radius: var(--radius-md);
+          background: var(--accent-bg-subtle);
+          color: var(--system-blue);
+          font: 650 11.5px/1 var(--font-family);
+          cursor: pointer;
+        }
+        .empty-review-button:hover {
+          background: color-mix(in srgb, var(--system-blue) 13%, transparent);
         }
         .empty-help-list {
           display: flex;

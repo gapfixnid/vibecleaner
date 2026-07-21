@@ -82,6 +82,9 @@ class ModelID(Enum):
     PPOCR_V5_REC_LATIN_MOBILE = "ppocr-v5-rec-latin-mobile"
     PPOCR_V5_REC_ESLAV_MOBILE = "ppocr-v5-rec-eslav-mobile"
 
+    # PP-OCRv6 multilingual ONNX recognition model
+    PPOCR_V6_REC_MEDIUM = "ppocr-v6-rec-medium"
+
     # PPOCRv5 Recognition Models - Torch versions (if needed)
     PPOCR_V5_REC_EN_MOBILE_TORCH = "ppocr-v5-rec-en-mobile-torch"
     PPOCR_V5_REC_KOREAN_MOBILE_TORCH = "ppocr-v5-rec-korean-mobile-torch"
@@ -482,6 +485,14 @@ def _register_defaults():
         files=['ch_PP-OCRv5_mobile_det.onnx'],
         sha256=['4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae'],
         save_dir=os.path.join(models_base_dir, 'ocr', 'ppocr-v5-onnx')
+    ))
+
+    ModelDownloader.register(ModelSpec(
+        id=ModelID.PPOCR_V6_REC_MEDIUM,
+        url='https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/main/',
+        files=['inference.onnx', 'inference.yml'],
+        sha256=[None, None],
+        save_dir=os.path.join(models_base_dir, 'ocr', 'ppocr-v6-onnx')
     ))
 
     # PPOCRv5 Detection/Recognition Models - Torch

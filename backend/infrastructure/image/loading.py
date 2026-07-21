@@ -1,4 +1,5 @@
 import logging
+import threading
 
 import cv2
 import numpy as np
@@ -10,6 +11,19 @@ from .encoding import encode_thumbnail_bytes
 
 
 logger = logging.getLogger(APP_NAME)
+_thumbnail_lock_creation = threading.Lock()
+
+
+def _thumbnail_lock(page: MangaPage) -> threading.Lock:
+    lock = getattr(page, "_thumbnail_original_lock", None)
+    if lock is not None:
+        return lock
+    with _thumbnail_lock_creation:
+        lock = getattr(page, "_thumbnail_original_lock", None)
+        if lock is None:
+            lock = threading.Lock()
+            page._thumbnail_original_lock = lock
+        return lock
 
 
 def load_cv_image(file_path: str) -> np.ndarray | None:
@@ -28,18 +42,25 @@ def ensure_original_thumbnail(page: MangaPage) -> bytes:
     if cached is not None:
         return cached
 
-    if getattr(page, "_loaded", True) is False and page.file_path:
-        img = load_cv_image(page.file_path)
-        if img is None:
-            logger.error("Failed to load image for thumbnail: %s", page.file_path)
-            raise PageImageLoadError(page.file_path)
-    else:
-        ensure_page_image(page)
-        img = page.cv_image
+    # Sidebar requests and background cache tasks can reach the same page at
+    # once. Generate a missing thumbnail only once per page.
+    with _thumbnail_lock(page):
+        cached = getattr(page, "_thumbnail_original_bytes", None)
+        if cached is not None:
+            return cached
 
-    thumb_bytes = encode_thumbnail_bytes(img)
-    page._thumbnail_original_bytes = thumb_bytes
-    return thumb_bytes
+        if getattr(page, "_loaded", True) is False and page.file_path:
+            img = load_cv_image(page.file_path)
+            if img is None:
+                logger.error("Failed to load image for thumbnail: %s", page.file_path)
+                raise PageImageLoadError(page.file_path)
+        else:
+            ensure_page_image(page)
+            img = page.cv_image
+
+        thumb_bytes = encode_thumbnail_bytes(img)
+        page._thumbnail_original_bytes = thumb_bytes
+        return thumb_bytes
 
 
 def warm_original_thumbnail(page: MangaPage) -> None:

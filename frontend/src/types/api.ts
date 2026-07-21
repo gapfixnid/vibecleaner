@@ -1,4 +1,4 @@
-import type { ProjectDto, PageDto, SettingsDto } from "./project";
+import type { ProjectDto, PageDto, PagesDto, SettingsDto } from "./project";
 import type { BubbleDto, BubblePatchDto } from "./bubble";
 import type { ProviderCatalogDto } from "./provider";
 
@@ -10,6 +10,11 @@ export interface ActionResultDto {
 export interface CurrentIndexResultDto {
   current_index: number;
   [key: string]: unknown;
+}
+
+export interface ImportResultDto extends CurrentIndexResultDto {
+  page_count: number;
+  added: number;
 }
 
 export interface LoadProjectResultDto {
@@ -96,9 +101,10 @@ export interface ModelStatusDto {
 }
 
 export interface vibeCleanerApi {
-  importImages(paths?: string[]): Promise<ProjectDto>;
-  importDirectory(directory: string): Promise<ProjectDto>;
+  importImages(paths?: string[]): Promise<ImportResultDto>;
+  importDirectory(directory: string): Promise<ImportResultDto>;
   getProject(): Promise<ProjectDto>;
+  getPages(): Promise<PagesDto>;
   getPage(pageId: string): Promise<PageDto>;
   newProject(): Promise<ActionResultDto>;
   loadProject(filePath: string): Promise<LoadProjectResultDto>;

@@ -3,6 +3,35 @@ import numpy as np
 import cv2
 from threading import RLock
 
+
+def build_oriented_target_mask(
+    polygons: list[list[list[int]]] | None,
+    *,
+    origin_x: int,
+    origin_y: int,
+    width: int,
+    height: int,
+    margin: int,
+) -> np.ndarray | None:
+    """Build a locally expanded mask that follows rotated text-line geometry."""
+    if not polygons:
+        return None
+    target = np.zeros((height, width), dtype=np.uint8)
+    for polygon in polygons:
+        points = np.asarray(polygon, dtype=np.float32)
+        if points.ndim != 2 or points.shape[0] < 4 or points.shape[1] != 2:
+            continue
+        points[:, 0] -= origin_x
+        points[:, 1] -= origin_y
+        center, size, angle = cv2.minAreaRect(points)
+        expanded_size = (
+            max(1.0, float(size[0]) + margin * 2),
+            max(1.0, float(size[1]) + margin * 2),
+        )
+        expanded = cv2.boxPoints((center, expanded_size, angle))
+        cv2.fillConvexPoly(target, np.rint(expanded).astype(np.int32), 255)
+    return target if np.any(target) else None
+
 class HybridInpainter:
     def __init__(self):
         class DummySettings:
@@ -10,7 +39,7 @@ class HybridInpainter:
                 import onnxruntime as ort
                 try:
                     providers = ort.get_available_providers()
-                    return "CUDAExecutionProvider" in providers or "ROCMExecutionProvider" in providers
+                    return "CUDAExecutionProvider" in providers
                 except Exception:
                     return False
         self.settings = DummySettings()
@@ -43,6 +72,7 @@ class HybridInpainter:
         image: np.ndarray,
         boxes: list[list[int]],
         bubble_boxes: list[list[int]] | None = None,
+        source_polygons: list[list[list[list[int]]]] | None = None,
         protect_edges: bool = False,
         engine: str = "lama",
         mask_dilation: int = 2,
@@ -64,15 +94,32 @@ class HybridInpainter:
             if x2 <= x1 or y2 <= y1:
                 continue
                 
-            crop = image[y1:y2, x1:x2]
+            crop = inpainted[y1:y2, x1:x2].copy()
             if crop.size == 0:
                 continue
                 
             # Convert crop to grayscale to isolate text strokes
             gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+
+            polygon_group = (
+                source_polygons[index]
+                if source_polygons is not None and index < len(source_polygons)
+                else None
+            )
+            target_mask = build_oriented_target_mask(
+                polygon_group,
+                origin_x=x1,
+                origin_y=y1,
+                width=crop.shape[1],
+                height=crop.shape[0],
+                margin=max(4, int(mask_dilation) * 2),
+            )
             
-            # Find the dominant background color of the crop using the median of all pixels.
-            crop_median_color = np.median(crop, axis=(0, 1))
+            # Estimate the background from the oriented text regions. A whole
+            # speech-bubble crop may contain panel art or a dark outline whose
+            # median is unrelated to the paper behind diagonal lettering.
+            target_pixels = crop[target_mask > 0] if target_mask is not None else crop.reshape(-1, 3)
+            crop_median_color = np.median(target_pixels, axis=0)
             bg_gray = int(0.299 * crop_median_color[2] + 0.587 * crop_median_color[1] + 0.114 * crop_median_color[0])
             
             # 1. Adaptive Thresholding for local lighting variation
@@ -98,6 +145,8 @@ class HybridInpainter:
                 contrast_mask[gray > min(225, bg_gray + 12)] = 255
             
             refined_mask = cv2.bitwise_and(binary, contrast_mask)
+            if target_mask is not None:
+                refined_mask = cv2.bitwise_and(refined_mask, target_mask)
             
             # 3. Connected Components filtering to prune dusts and screen-tones
             num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(refined_mask)
@@ -109,7 +158,7 @@ class HybridInpainter:
             
             if np.any(final_mask):
                 # 3b. Edge protection (for single-bubble inpaint to preserve bubble borders)
-                if protect_edges:
+                if protect_edges and target_mask is None:
                     edge_margin = max(5, min(crop.shape[:2]) // 15)
                     edge_filter = np.zeros_like(final_mask)
                     edge_filter[edge_margin:-edge_margin, edge_margin:-edge_margin] = 255
@@ -125,6 +174,8 @@ class HybridInpainter:
                 kernel_size = 2 * radius + 1
                 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
                 mask = cv2.dilate(final_mask, kernel, iterations=1)
+                if target_mask is not None:
+                    mask = cv2.bitwise_and(mask, target_mask)
                 if clip_to_bubble and bubble_boxes and index < len(bubble_boxes):
                     bx1, by1, bx2, by2 = [int(v) for v in bubble_boxes[index]]
                     bx1, by1 = max(0, bx1), max(0, by1)
@@ -156,7 +207,11 @@ class HybridInpainter:
                         logging.exception("%s inpainting failed; falling back to Telea CV2 inpainting", engine_name)
                         inpainted_crop = cv2.inpaint(crop, mask, 3, cv2.INPAINT_TELEA)
 
-                inpainted[y1:y2, x1:x2] = inpainted_crop
+                # Some model backends can slightly alter known pixels. Always
+                # composite explicitly so speech-bubble borders and artwork
+                # outside the final mask remain byte-for-byte unchanged.
+                composited_crop = np.where(mask[:, :, None] > 0, inpainted_crop, crop)
+                inpainted[y1:y2, x1:x2] = composited_crop
             else:
                 pass
                 

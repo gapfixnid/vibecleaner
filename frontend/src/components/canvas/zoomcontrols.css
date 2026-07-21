@@ -1,20 +1,9 @@
-/* Floating zoom cluster (bottom-right of the canvas). */
+/* Zoom cluster embedded in the unified canvas floating bar. */
 
 .canvas-zoom-controls {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  z-index: 5;
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 3px;
-  background: var(--overlay-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--overlay-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--overlay-shadow);
 }
 
 .canvas-zoom-controls button {

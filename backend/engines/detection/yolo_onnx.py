@@ -62,7 +62,14 @@ class YoloONNXDetection(DetectionEngine):
             file_path = ModelDownloader.get_file_path(model_id, 'detector.onnx')
             
         providers = get_providers(self.device)
-        self.session = make_session(file_path, sess_options=None, providers=providers)
+        from ...infrastructure.runtime.onnx import get_optimal_cpu_threads, make_session_options
+        so = make_session_options(
+            intra_op_num_threads=get_optimal_cpu_threads(),
+            inter_op_num_threads=1
+        )
+        so.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        self.session = make_session(file_path, sess_options=so, providers=providers)
 
     def detect(
         self,

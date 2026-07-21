@@ -35,6 +35,27 @@ def test_quality_router_selects_highest_quality_compatible_catalog_profile():
     assert AdaptiveQualityRouter().select_model("ocr", "fast", score, manifest) == "balanced"
 
 
+def test_quality_router_does_not_downgrade_highest_quality_profile():
+    from backend.core.providers import ProviderCapabilities, ProviderManifest, ProviderModelProfile
+
+    manifest = ProviderManifest(
+        provider_id="test.detection",
+        display_name="Test Detection",
+        stage="detection",
+        api_version="1",
+        implementation_version="test",
+        capabilities=ProviderCapabilities(),
+        resource_classes={"cpu"},
+        model_catalog=(
+            ProviderModelProfile("quality", "Quality", 0.95, 0.45, frozenset({"cpu"})),
+            ProviderModelProfile("fast", "Fast", 0.75, 0.90, frozenset({"cpu"})),
+        ),
+    )
+    score = AdaptiveQualityRouter().evaluate_detection([SimpleNamespace(confidence=0.1)])
+
+    assert AdaptiveQualityRouter().select_model("detection", "quality", score, manifest) == "quality"
+
+
 def test_ocr_quality_accepts_non_empty_blocks():
     router = AdaptiveQualityRouter()
     score = router.evaluate_ocr([SimpleNamespace(text="hello"), SimpleNamespace(text="world")])
@@ -87,3 +108,15 @@ def test_inpainting_quality_accepts_target_change_on_uniform_source():
     score = AdaptiveQualityRouter().evaluate_inpainting(image, result, [[2, 2, 8, 8]])
     assert score.passed is True
     assert score.signals["target_change_ratio"] == 1.0
+
+
+def test_inpainting_quality_accepts_sparse_stroke_removal():
+    image = np.full((40, 40, 3), 255, dtype=np.uint8)
+    result = image.copy()
+    image[10:30:4, 10:30] = 0
+    result[10:30:4, 10:30] = 255
+
+    score = AdaptiveQualityRouter().evaluate_inpainting(image, result, [[8, 8, 32, 32]])
+
+    assert score.passed is True
+    assert score.signals["outside_preserved_ratio"] == 1.0

@@ -1,5 +1,5 @@
 // frontend/src/components/NumberStepper.tsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 
 interface NumberStepperProps {
@@ -31,11 +31,10 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({
   label,
   onChange,
 }) => {
-  const [draft, setDraft] = useState<string>(String(value));
-
-  // Keep the visible draft in sync when the external value changes.
-  useEffect(() => {
-    setDraft(String(value));
+  const [draftState, setDraftState] = useState({ sourceValue: value, text: String(value) });
+  const draft = draftState.sourceValue === value ? draftState.text : String(value);
+  const setDraft = useCallback((text: string) => {
+    setDraftState({ sourceValue: value, text });
   }, [value]);
 
   const commit = useCallback(() => {
@@ -43,7 +42,7 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({
     const next = clamp(Number.isNaN(parsed) ? value : parsed, min, max);
     setDraft(String(next));
     if (next !== value) onChange(next);
-  }, [draft, value, min, max, onChange]);
+  }, [draft, value, min, max, onChange, setDraft]);
 
   const stepBy = useCallback(
     (dir: 1 | -1) => {

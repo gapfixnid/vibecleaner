@@ -38,7 +38,7 @@ class ModelRequirementsTests(unittest.TestCase):
             [
                 ModelID.RTDETR_INT8_ONNX,
                 ModelID.PPOCR_V5_DET_MOBILE,
-                ModelID.PPOCR_V5_REC_MOBILE,
+                ModelID.PPOCR_V6_REC_MEDIUM,
             ],
         )
 
@@ -55,9 +55,22 @@ class ModelRequirementsTests(unittest.TestCase):
             [
                 ModelID.RTDETR_V2_ONNX,
                 ModelID.PPOCR_V5_DET_MOBILE,
-                ModelID.PPOCR_V5_REC_KOREAN_MOBILE,
+                ModelID.PPOCR_V6_REC_MEDIUM,
                 ModelID.LAMA_ONNX,
             ],
+        )
+
+    def test_explicit_manga_ocr_uses_manga_model_regardless_of_language(self):
+        cfg = AppConfig(
+            detect_model="High Precision (FP32)",
+            source_language="Korean",
+            ocr_engine="manga_ocr",
+            inpaint_engine="opencv",
+        )
+
+        self.assertEqual(
+            get_required_model_ids(cfg),
+            [ModelID.RTDETR_V2_ONNX, ModelID.MANGA_OCR_MOBILE_ONNX],
         )
 
     def test_status_marks_missing_models_without_downloading(self):
@@ -78,7 +91,7 @@ class ModelRequirementsTests(unittest.TestCase):
         self.assertEqual(status["missing_count"], 2)
         self.assertEqual(
             [item["id"] for item in status["missing"]],
-            [ModelID.PPOCR_V5_DET_MOBILE.value, ModelID.PPOCR_V5_REC_EN_MOBILE.value],
+            [ModelID.PPOCR_V5_DET_MOBILE.value, ModelID.PPOCR_V6_REC_MEDIUM.value],
         )
         self.assertEqual(is_downloaded.call_count, 3)
 
@@ -95,7 +108,7 @@ class ModelRequirementsTests(unittest.TestCase):
             [
                 ModelID.RTDETR_INT8_ONNX,
                 ModelID.PPOCR_V5_DET_MOBILE,
-                ModelID.PPOCR_V5_REC_KOREAN_MOBILE,
+                ModelID.PPOCR_V6_REC_MEDIUM,
             ],
         )
 
