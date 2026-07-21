@@ -27,12 +27,14 @@ export function useWindowCloseGuard(isDirty: boolean, guardUnsaved: (proceed: ()
         try {
           guardUnsavedRef.current(() => {
             closingRef.current = true;
-            desktop.destroyWindow();
+            // Re-enter the normal close lifecycle. `closingRef` lets the
+            // second close-request pass without showing the prompt again.
+            desktop.closeWindow();
           });
         } catch (e) {
           console.error("[close-guard] prompt failed; forcing close", e);
           closingRef.current = true;
-          desktop.destroyWindow();
+          desktop.closeWindow();
         }
       })
       .then((fn) => {

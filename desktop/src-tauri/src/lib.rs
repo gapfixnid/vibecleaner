@@ -22,6 +22,25 @@ struct BackendState {
     status: Mutex<BackendStatus>,
 }
 
+impl Drop for BackendState {
+    fn drop(&mut self) {
+        // RunEvent::Exit normally clears this slot. This fallback also covers
+        // application-build failures and unwind paths after the backend has
+        // already been spawned.
+        let child_slot = match self.child.get_mut() {
+            Ok(slot) => slot,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(mut child) = child_slot.take() {
+            eprintln!(
+                "Backend state dropped while process {} was still running; terminating it.",
+                child.id()
+            );
+            terminate_child(&mut child);
+        }
+    }
+}
+
 fn get_free_port() -> Option<u16> {
     TcpListener::bind("127.0.0.1:0")
         .and_then(|listener| listener.local_addr())
@@ -102,17 +121,59 @@ fn spawn_backend(port: u16) -> Result<Child, String> {
         .map_err(|e| format!("백엔드 서버 프로세스를 시작하지 못했습니다: {e}"))
 }
 
+fn windows_taskkill_args(pid: u32) -> Vec<String> {
+    vec![
+        "/PID".to_string(),
+        pid.to_string(),
+        "/T".to_string(),
+        "/F".to_string(),
+    ]
+}
+
 fn terminate_child(child: &mut Child) {
     let pid = child.id();
     #[cfg(target_os = "windows")]
     {
-        let _ = Command::new("taskkill")
-            .args(["/F", "/PID", &pid.to_string()])
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+        // `/T` is required for Python launchers and PyInstaller one-file
+        // sidecars, both of which may create the actual server as a child.
+        let status = Command::new("taskkill")
+            .args(windows_taskkill_args(pid))
+            .creation_flags(CREATE_NO_WINDOW)
             .status();
+        let terminated = status
+            .as_ref()
+            .map(|exit_status| exit_status.success())
+            .unwrap_or(false);
+        if !terminated {
+            eprintln!(
+                "Could not terminate backend process tree {pid} with taskkill: {status:?}. Falling back to Child::kill()."
+            );
+            let _ = child.kill();
+        }
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = Command::new("kill").arg("-9").arg(pid.to_string()).status();
+        let _ = child.kill();
+    }
+
+    // Reap the direct child so the process handle is not left behind while
+    // the desktop application is shutting down or restarting the backend.
+    let _ = child.wait();
+}
+
+#[cfg(test)]
+mod process_lifecycle_tests {
+    use super::windows_taskkill_args;
+
+    #[test]
+    fn taskkill_terminates_the_entire_backend_process_tree() {
+        assert_eq!(
+            windows_taskkill_args(4242),
+            ["/PID", "4242", "/T", "/F"]
+        );
     }
 }
 

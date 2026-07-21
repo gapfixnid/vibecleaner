@@ -53,19 +53,6 @@ export const closeWindow = async (): Promise<void> => {
   }
 };
 
-/** Force-destroy the window without re-emitting close-requested. Used to close
- *  after the unsaved-changes prompt is resolved (avoids the close() re-entry
- *  loop). Requires the `core:window:allow-destroy` capability. */
-export const destroyWindow = async (): Promise<void> => {
-  try {
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    console.log("[close-guard] destroying window");
-    await getCurrentWindow().destroy();
-  } catch (e) {
-    console.error("Tauri destroyWindow failed:", e);
-  }
-};
-
 /** Subscribe to the window close-requested event (titlebar/traffic-light close
  *  via close(), Alt+F4, taskbar close). The handler receives the event and may
  *  call `event.preventDefault()` to block the close. Returns an unlisten fn.
