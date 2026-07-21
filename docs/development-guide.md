@@ -51,13 +51,13 @@ python -m venv venv
 .\venv\Scripts\python.exe -m pip install -r requirements-runtime.txt
 ```
 
-Pre-download the minimal model set if desired:
+Pre-download the models required by the currently saved settings if desired:
 
 ```powershell
-.\venv\Scripts\python.exe download_models.py --minimal
+.\venv\Scripts\python.exe download_models.py
 ```
 
-Remove `--minimal` to prepare every registered model. Models are stored outside the repository under `%LOCALAPPDATA%\vibecleaner\models`.
+Use `--minimal` for the lightweight compatibility set or `--all` for every built-in registered model. Models are stored outside the repository under `%LOCALAPPDATA%\vibecleaner\models`. See the [model guide](model-guide.md) for supported layouts and custom ONNX discovery rules.
 
 ## Run in development mode
 
@@ -150,6 +150,7 @@ See these documents for the full contracts:
 - [Schema versioning policy](schema-versioning-policy.md)
 - [Pipeline architecture decision](adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md)
 - [Shadow benchmark](shadow-benchmark.md)
+- [Model selection and custom ONNX guide](model-guide.md)
 
 ## License
 

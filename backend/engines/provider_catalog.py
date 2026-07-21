@@ -392,7 +392,7 @@ def register_builtin_providers(
                 ConfigFieldSpec(
                     key="inpaint_engine",
                     value_type="enum",
-                    label="settings.inpaintEngine",
+                    label="settings.inpaintingEngine",
                     default="aot",
                     choices=("aot", "lama"),
                     choice_labels=("settings.inpaintingEngineAot", "settings.inpaintingEngineBalanced"),

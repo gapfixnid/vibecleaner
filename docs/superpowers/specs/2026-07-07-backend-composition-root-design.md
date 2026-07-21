@@ -1,5 +1,7 @@
 # Backend Composition Root Refactor Design
 
+> Historical design record. Paths and engine examples below capture the planned migration state and must not be read as the current supported-model list. See [the current model guide](../../model-guide.md) for runtime choices.
+
 ## Goal
 
 Refactor the backend as a Big Bang structural change, not a folder-only rename.

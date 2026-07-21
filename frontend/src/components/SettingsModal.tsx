@@ -52,7 +52,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [providerCatalog, setProviderCatalog] = useState<ProviderCatalogDto | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("general");
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const LLM_PROVIDERS: string[] = [...LLM_TRANSLATION_PROVIDERS];
   const translationProviderManifests = (providerCatalog?.providers || [])
@@ -407,16 +406,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const toggleAdvanced = () => {
-    setShowAdvanced((current) => {
-      const next = !current;
-      if (!next && (activeTab === "detection" || activeTab === "inpainting")) {
-        setActiveTab("general");
-      }
-      return next;
-    });
-  };
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
@@ -455,7 +444,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
               <span>{t("settings.translation")}</span>
             </button>
-            {showAdvanced && <button
+            <button
               type="button" 
               className={`menu-btn-pref ${activeTab === "detection" ? "active" : ""}`}
               onClick={() => setActiveTab("detection")}
@@ -464,8 +453,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Scan size={14} />
               </div>
               <span>{t("settings.detection")}</span>
-            </button>}
-            {showAdvanced && <button
+            </button>
+            <button
               type="button" 
               className={`menu-btn-pref ${activeTab === "inpainting" ? "active" : ""}`}
               onClick={() => setActiveTab("inpainting")}
@@ -474,17 +463,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Eraser size={14} />
               </div>
               <span>{t("settings.inpainting")}</span>
-            </button>}
+            </button>
           </div>
-          <button
-            type="button"
-            className={`advanced-mode-toggle ${showAdvanced ? "active" : ""}`}
-            onClick={toggleAdvanced}
-            aria-pressed={showAdvanced}
-          >
-            <Sliders size={14} />
-            <span>{showAdvanced ? t("settings.basicMode") : t("settings.advancedMode")}</span>
-          </button>
         </div>
 
         {/* Right Settings Form Area */}
@@ -546,8 +526,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               aria-label={item.label}
                               className={`theme-segment ${theme === item.id ? "selected" : ""}`}
                               onClick={() => setTheme(item.id)}
+                              style={{
+                                backgroundColor: item.scheme === "dark" ? "#48484a" : item.preview.panel,
+                                color: item.scheme === "dark" ? "#f5f5f7" : "#1d1d1f",
+                              }}
                             >
-                              <span className="theme-dot" style={{ background: item.preview.accent }} />
                               <span>{item.label}</span>
                             </button>
                           ))}
@@ -557,10 +540,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
 
-                  {showAdvanced && <>
-                    <div className="advanced-settings-note">{t("settings.advancedHint")}</div>
-                    <div className="section-title-label">{t("settings.connectionDefaults")}</div>
-                    <div className="settings-card">
+                  <div className="section-title-label">{t("settings.connectionDefaults")}</div>
+                  <div className="settings-card">
                     <div className="form-row-group">
                       <label className="pref-label">{t("settings.requestTimeout")}</label>
                       <div className="pref-control-right">
@@ -625,8 +606,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
                       </div>
                     )}
-                    </div>
-                  </>}
+                  </div>
                 </div>
               )}
 
@@ -883,7 +863,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
                   </div>
 
-                  {showAdvanced && providerCapabilities.llmOptions && (
+                  {providerCapabilities.llmOptions && (
                     <>
                       <div className="section-title-label">{t("settings.llmOptions")}</div>
                       <div className="settings-card">
@@ -1254,28 +1234,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           gap: 3px;
         }
 
-        .advanced-mode-toggle {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          width: calc(100% - 16px);
-          min-height: 34px;
-          margin: auto 8px 0;
-          padding: 0 10px;
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-md);
-          background: var(--fill-3);
-          color: var(--text-secondary);
-          font: 600 11.5px/1 var(--font-family);
-          cursor: pointer;
-        }
-
-        .advanced-mode-toggle:hover,
-        .advanced-mode-toggle.active {
-          background: var(--fill-hover);
-          color: var(--text-primary);
-        }
-
         .menu-btn-pref {
           background: transparent;
           border: none;
@@ -1599,7 +1557,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           gap: 6px;
           height: 26px;
           padding: 0 8px;
-          border: none;
+          border: 1px solid transparent;
           border-radius: calc(var(--radius-md) - 2px);
           background: transparent;
           color: var(--text-secondary);
@@ -1610,21 +1568,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }
 
         .theme-segment:hover {
-          color: var(--text-primary);
-          background: var(--fill-3);
+          filter: brightness(1.06);
         }
 
         .theme-segment.selected {
-          color: var(--text-primary);
-          background: var(--bg-panel);
+          border-color: var(--system-blue);
           box-shadow: var(--shadow-sm);
-        }
-
-        .theme-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          flex: 0 0 auto;
         }
 
         .model-hint {

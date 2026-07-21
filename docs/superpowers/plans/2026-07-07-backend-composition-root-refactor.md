@@ -1,5 +1,7 @@
 # Backend Composition Root Refactor Implementation Plan
 
+> Historical implementation plan. Engine names and migration notes below describe the repository at the time of the refactor and are not the current supported-model list. See [the current model guide](../../model-guide.md) for runtime choices.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Refactor the backend into an explicit `api/core/pipeline/engines/infrastructure` architecture with a single composition root and no route-to-engine or pipeline-to-concrete-engine coupling.

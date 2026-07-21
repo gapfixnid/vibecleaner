@@ -51,13 +51,13 @@ python -m venv venv
 .\venv\Scripts\python.exe -m pip install -r requirements-runtime.txt
 ```
 
-기본 모델을 미리 내려받으려면 다음 명령을 실행합니다.
+현재 저장된 설정에 필요한 모델을 미리 내려받으려면 다음 명령을 실행합니다.
 
 ```powershell
-.\venv\Scripts\python.exe download_models.py --minimal
+.\venv\Scripts\python.exe download_models.py
 ```
 
-모든 등록 모델을 준비하려면 `--minimal`을 빼세요. 모델은 저장소가 아니라 Windows 사용자 데이터 디렉터리의 `%LOCALAPPDATA%\vibecleaner\models`에 저장됩니다.
+경량 호환 세트는 `--minimal`, 모든 기본 등록 모델은 `--all`을 사용합니다. 모델은 저장소가 아니라 Windows 사용자 데이터 디렉터리의 `%LOCALAPPDATA%\vibecleaner\models`에 저장됩니다. 지원 모델 구조와 사용자 ONNX 검색 규칙은 [모델 가이드](model-guide.ko.md)를 참고하세요.
 
 ## 개발 모드 실행
 
@@ -150,6 +150,7 @@ sidecar 빌드 스크립트는 별도 `.venv-runtime`을 만들고 `requirements
 - [스키마 버전 정책](schema-versioning-policy.md)
 - [파이프라인 ADR](adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md)
 - [Shadow benchmark](shadow-benchmark.md)
+- [모델 선택 및 ONNX 추가 가이드](model-guide.ko.md)
 
 ## 라이선스
 

@@ -143,6 +143,8 @@ export type TranslationKey =
   | "statusbar.unsaved"
   | "setup.downloadingModels"
   | "setup.languageHelp"
+  | "setup.googleProviderHelp"
+  | "setup.ollamaProviderHelp"
   | "setup.profileHelp"
   | "setup.reviewHelp"
   | "setup.back"
@@ -197,9 +199,6 @@ export type TranslationKey =
   | "export.successMultiMessage"
   | "export.failedTitle"
   | "settings.preferences"
-  | "settings.basicMode"
-  | "settings.advancedMode"
-  | "settings.advancedHint"
   | "settings.general"
   | "settings.translation"
   | "settings.detection"
@@ -457,7 +456,9 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "statusbar.selectedPageIndicator": "{count} of {total} pages selected",
     "statusbar.unsaved": "Unsaved changes",
     "setup.downloadingModels": "Downloading models...",
-    "setup.languageHelp": "Choose the language used in the source pages and the language you want to produce.",
+    "setup.languageHelp": "Choose the source and target languages, then select the translation provider you want to use.",
+    "setup.googleProviderHelp": "Ready to use without an API key.",
+    "setup.ollamaProviderHelp": "Run Ollama locally, then select a model.",
     "setup.profileHelp": "Balanced is recommended for most projects. Choose Fast when turnaround matters more than maximum quality.",
     "setup.reviewHelp": "Review the models required by your choices. Installed models will not be downloaded again.",
     "setup.back": "Back",
@@ -512,9 +513,6 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "export.successMultiMessage": "Saved {count} images to:\n{path}",
     "export.failedTitle": "Export Failed",
     "settings.preferences": "Preferences",
-    "settings.basicMode": "Basic settings",
-    "settings.advancedMode": "Advanced settings",
-    "settings.advancedHint": "These options tune connection reliability and processing behavior. The defaults are recommended for most projects.",
     "settings.general": "General",
     "settings.translation": "Translation",
     "settings.detection": "Detection",
@@ -616,7 +614,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.maskDilation": "Mask Dilation (Expansion)",
     "setup.title": "Initial Setup",
     "setup.subtitle": "Choose the balanced or fast pipeline profiles and prepare only the models this setup needs.",
-    "setup.languages": "Languages",
+    "setup.languages": "Languages & translation",
     "setup.models": "Model Profiles",
     "setup.requiredModels": "Required Models",
     "setup.installed": "Installed",
@@ -771,7 +769,9 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "statusbar.selectedPageIndicator": "{total}페이지 중 {count}페이지 선택",
     "statusbar.unsaved": "저장되지 않은 변경 사항",
     "setup.downloadingModels": "모델 다운로드 중...",
-    "setup.languageHelp": "원본 페이지의 언어와 번역 결과로 사용할 언어를 선택하세요.",
+    "setup.languageHelp": "원문과 번역 언어를 정한 뒤 사용할 번역 제공자를 선택하세요.",
+    "setup.googleProviderHelp": "API 키 없이 바로 사용할 수 있습니다.",
+    "setup.ollamaProviderHelp": "로컬 Ollama 실행 후 모델을 선택하세요.",
     "setup.profileHelp": "대부분의 프로젝트에는 균형 모드를 권장합니다. 최고 품질보다 처리 속도가 중요할 때 고속을 선택하세요.",
     "setup.reviewHelp": "선택한 설정에 필요한 모델을 확인하세요. 이미 설치된 모델은 다시 다운로드하지 않습니다.",
     "setup.back": "이전",
@@ -826,9 +826,6 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "export.successMultiMessage": "{count}개 이미지를 저장했습니다:\n{path}",
     "export.failedTitle": "내보내기 실패",
     "settings.preferences": "환경설정",
-    "settings.basicMode": "기본 설정",
-    "settings.advancedMode": "고급 설정",
-    "settings.advancedHint": "연결 안정성과 처리 방식을 세밀하게 조정하는 옵션입니다. 대부분의 프로젝트에는 기본값을 권장합니다.",
     "settings.general": "일반",
     "settings.translation": "번역",
     "settings.detection": "감지",
@@ -930,7 +927,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.maskDilation": "마스크 확장",
     "setup.title": "초기 설정",
     "setup.subtitle": "균형 또는 고속 파이프라인을 선택하고 이 설정에 필요한 모델만 준비합니다.",
-    "setup.languages": "언어",
+    "setup.languages": "언어 및 번역",
     "setup.models": "모델 프로필",
     "setup.requiredModels": "필요한 모델",
     "setup.installed": "설치됨",

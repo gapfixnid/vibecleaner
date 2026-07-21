@@ -21,6 +21,14 @@ You can let the app create a first pass, compare it with the original, and corre
 - **Local image processing:** detection, OCR, and inpainting run on your computer.
 - **Flexible translation:** use a convenient online provider or a local environment such as Ollama.
 
+## What changed in 0.2
+
+- Initial setup now covers languages, the translation provider, and detection, OCR, and inpainting models.
+- OCR uses a simpler local PP-OCR path, with AOT inpainting as the recommended default.
+- Multi-page selection shows its page count and batch translation action in the canvas floating bar.
+- Compare appears only for a translated single page, with smooth floating-bar transitions.
+- The slimmer title bar keeps only the app name and a menu beside the window controls.
+
 ## Getting started
 
 ### 1. Install the app
@@ -31,12 +39,13 @@ To run the source code instead, follow the [development and build guide](docs/de
 
 ### 2. Complete initial setup
 
+- **Interface language:** the language used by menus and help text.
 - **Source language:** the language written in the image.
 - **Target language:** the language you want to produce.
-- **Processing profile:** choose `Balanced` if you are unsure.
-- **Translation provider:** Google Translate is a simple online starting point. Choose Ollama for a fully local translation setup.
+- **Translation provider:** choose Google Translate to start without credentials. For fully local translation, choose Ollama and select a running local model.
+- **Detection, OCR, and inpainting models:** keep the options marked `Recommended` if you are unsure.
 
-The app checks for the local models required by your choices. The first run may take longer while those files download.
+Providers that require configuration reveal their key, address, and model fields automatically. The final step checks the local image models required by your choices. The first run may take longer while those files download.
 
 ### 3. Add images
 
@@ -59,7 +68,7 @@ After processing:
 
 ### 5. Save or export
 
-- Select the app icon at the upper left and choose **Save Project** to continue editing later.
+- Open the hamburger menu beside the Minimize button at the upper right and choose **Save Project** to continue editing later.
 - Use the save button in the page panel to export selected result images.
 - Select several pages to translate or export them together.
 
@@ -72,22 +81,14 @@ The defaults are the safest place to start.
 | Goal | Recommended option |
 | --- | --- |
 | Not sure what to choose | Default settings |
-| Diagonal, vertical, or curved text detection | PP-OCRv6 Medium |
-| Multilingual text recognition | PP-OCRv6 Medium |
+| Speech-bubble and dialogue-region detection | RT-DETR-v2 FP32 |
+| Diagonal and vertical text recognition | PP-OCRv6 Medium ONNX |
 | Typical dialogue removal | AOT inpainting (recommended) |
 | Very large regions or repeating patterns | LaMa inpainting |
 
 Only adjust advanced padding, mask dilation, and confidence settings when a particular page needs correction.
 
-## Add your own ONNX models
-
-Place compatible ONNX files in the app data `models` directory. They will appear in both initial setup and the regular settings screen. No separate manifest is used; only these names and layouts are recognized:
-
-- `detection`: an RT-DETR-v2 or YOLOv8/11 ONNX file whose name contains `rtdetr` or `yolo`
-- `ocr/<model name>`: PP-OCR DB + CTC files named `*det*.onnx`, `*rec*.onnx`, and `inference.yml` in one directory
-- `inpainting`: a compatible ONNX file whose name contains `lama` or `aot`
-
-The default Windows location is `%LOCALAPPDATA%\vibecleaner\models`. Reopen Settings after adding a model to rescan the directory. Detection classes must use `0=speech bubble` and `1+=text`.
+To use ONNX files you prepared yourself, see the [model selection and custom ONNX guide](docs/model-guide.md).
 
 ## Common questions
 
@@ -97,7 +98,7 @@ The app may need to download and load a local model. Later operations in the sam
 
 ### Vertical or diagonal text is read incorrectly
 
-Set the source language to Japanese. PP-OCRv6 Medium preserves rotated text regions for recognition. You can also correct the recognized source text in the inspector before translating again.
+Set the source language to Japanese. PP-OCRv6 Medium OCR recognizes rotated dialogue regions with direction-aware processing. You can also correct the recognized source text in the inspector before translating again.
 
 ### Inpainting blurs outside a speech bubble
 
@@ -116,6 +117,8 @@ Detection, OCR, and inpainting run locally. Online translation providers receive
 - [한국어 사용자 안내](README.md)
 - [Development and build guide](docs/development-guide.md)
 - [개발 및 빌드 가이드](docs/development-guide.ko.md)
+- [Model selection and custom ONNX guide](docs/model-guide.md)
+- [모델 선택 및 ONNX 추가 가이드](docs/model-guide.ko.md)
 - [Backend dependency contract](docs/backend-dependency-contract.md)
 - [Pipeline architecture decision](docs/adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md)
 - [Provider extension contract](docs/provider-extension-contract.md)
