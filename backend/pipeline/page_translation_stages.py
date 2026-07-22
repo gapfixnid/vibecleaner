@@ -7,6 +7,7 @@ from typing import Any
 from ..core.errors import PageNotFoundError
 from ..core.models.image import ImageData
 from ..infrastructure.job_messages import msg_from_context
+from ..engines.rendering.bubble_layout import bubble_layout_cache_key, compute_bubble_layout
 from .page_analysis import (
     bubbles_from_analysis,
     merge_overlapping_bubbles,
@@ -417,8 +418,24 @@ class PageInpaintingStage:
 class PageLayoutStage:
     name = "layout"
 
+    def __init__(self, render_service: Any) -> None:
+        self.render_service = render_service
+
     def run(self, context: PipelineContext) -> PipelineContext:
-        context.artifacts["layout_result"] = context.artifacts["local_bubbles"]
+        job = context.artifacts["job"]
+        job_manager = context.artifacts["job_manager"]
+        image = context.artifacts["image"]
+        local_bubbles = context.artifacts["local_bubbles"]
+        layout_cache = {}
+        for bubble in local_bubbles:
+            job_manager.ensure_not_cancelled(job)
+            layout_cache[bubble_layout_cache_key(bubble)] = compute_bubble_layout(
+                bubble,
+                image,
+                self.render_service,
+            )
+        context.artifacts["bubble_layout_cache"] = layout_cache
+        context.artifacts["layout_result"] = local_bubbles
         return context
 
 
@@ -447,6 +464,7 @@ class PageRenderingStage:
         inpainted_image = context.artifacts["inpainted_image"]
         local_bubbles = context.artifacts["local_bubbles"]
         bubble_counter = context.artifacts["bubble_counter"]
+        bubble_layout_cache = context.artifacts.get("bubble_layout_cache", {})
         start_revision = context.artifacts["start_revision"]
 
         if show_progress:
@@ -464,6 +482,7 @@ class PageRenderingStage:
             page.inpainted_image = inpainted_image
             self.refresh_page_status(page)
             self.invalidate_page_caches(page, thumbnails=True, responses=True)
+            page._bubble_layout_cache = dict(bubble_layout_cache)
             page._thumbnail_original_bytes = self.encode_thumbnail_bytes(page.cv_image)
             if inpainted_preview_bytes is not None:
                 page._preview_inpainted_bytes = inpainted_preview_bytes
@@ -482,6 +501,7 @@ def build_page_translation_runner(
     page_analysis_service: Any,
     bubble_analysis_service: Any,
     layout_planner_service: Any,
+    render_service: Any,
     ensure_page_image: Any,
     invalidate_page_caches: Any,
     encode_preview_jpeg_bytes: Any,
@@ -515,7 +535,7 @@ def build_page_translation_runner(
         quality_router=quality_router,
         provider_manifest=(provider_manifests or {}).get("inpainting"),
     ))
-    registry.register(PageLayoutStage())
+    registry.register(PageLayoutStage(render_service))
     registry.register(
         PageRenderingStage(
             encode_preview_jpeg_bytes=encode_preview_jpeg_bytes,

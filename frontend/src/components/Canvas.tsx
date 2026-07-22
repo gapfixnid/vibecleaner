@@ -217,7 +217,9 @@ export const Canvas: React.FC<CanvasProps> = ({
       ) : (
         <CanvasImageStage
           ref={viewportRef}
-          displayImageUrl={showOriginal && originalImageUrl ? originalImageUrl : displayImageUrl}
+          displayImageUrl={displayImageUrl}
+          originalImageUrl={originalImageUrl}
+          showOriginal={showOriginal}
           imageRef={imageRef}
           imageDimensions={imageDimensions}
           pan={pan}
@@ -230,7 +232,6 @@ export const Canvas: React.FC<CanvasProps> = ({
           onImageError={handleImageError}
           onStartBubbleDrag={startBubbleDrag}
           showDetectionOverlay={showDetectionOverlay}
-          hideOverlays={showOriginal}
         />
       )}
 
@@ -496,6 +497,19 @@ export const Canvas: React.FC<CanvasProps> = ({
           display: block;
           max-width: none;
           max-height: none;
+        }
+
+        .canvas-original-image {
+          position: absolute;
+          inset: 0;
+          z-index: 4;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.06s linear;
+        }
+
+        .canvas-original-image.visible {
+          opacity: 1;
         }
 
         .canvas-svg-overlay, .canvas-text-overlay {

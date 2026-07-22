@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import type { RefObject } from "react";
 import type { BubbleInfo } from "../../types";
 import { CanvasBubbleBoxOverlay } from "./CanvasBubbleBoxOverlay";
@@ -7,6 +7,8 @@ import { CanvasDetectionOverlay } from "./CanvasDetectionOverlay";
 
 interface CanvasImageStageProps {
   displayImageUrl: string;
+  originalImageUrl?: string;
+  showOriginal?: boolean;
   imageRef: RefObject<HTMLImageElement | null>;
   imageDimensions: { w: number; h: number };
   pan: { x: number; y: number };
@@ -19,13 +21,14 @@ interface CanvasImageStageProps {
   onImageError: () => void;
   onStartBubbleDrag: (event: React.MouseEvent, bubble: BubbleInfo, type: "move" | "resize") => void;
   showDetectionOverlay?: boolean;
-  hideOverlays?: boolean;
 }
 
 export const CanvasImageStage = React.forwardRef<HTMLDivElement, CanvasImageStageProps>(
   (
     {
       displayImageUrl,
+      originalImageUrl,
+      showOriginal = false,
       imageRef,
       imageDimensions,
       pan,
@@ -38,10 +41,14 @@ export const CanvasImageStage = React.forwardRef<HTMLDivElement, CanvasImageStag
       onImageError,
       onStartBubbleDrag,
       showDetectionOverlay = false,
-      hideOverlays = false,
     },
     ref
   ) => {
+    const [loadedOriginalUrl, setLoadedOriginalUrl] = useState("");
+    const isOriginalVisible = Boolean(
+      showOriginal && originalImageUrl && loadedOriginalUrl === originalImageUrl,
+    );
+
     return (
       <div
         className="canvas-viewport"
@@ -70,7 +77,23 @@ export const CanvasImageStage = React.forwardRef<HTMLDivElement, CanvasImageStag
               }}
             />
 
-            {!hideOverlays && !isWaitingForImageReload && !showDetectionOverlay && (
+            {originalImageUrl && (
+              <img
+                src={originalImageUrl}
+                alt=""
+                aria-hidden="true"
+                className={`canvas-image canvas-original-image${isOriginalVisible ? " visible" : ""}`}
+                decoding="async"
+                onLoad={() => setLoadedOriginalUrl(originalImageUrl)}
+                draggable={false}
+                style={{
+                  width: imageDimensions.w ? `${imageDimensions.w}px` : undefined,
+                  height: imageDimensions.h ? `${imageDimensions.h}px` : undefined,
+                }}
+              />
+            )}
+
+            {!isOriginalVisible && !isWaitingForImageReload && !showDetectionOverlay && (
               <CanvasBubbleBoxOverlay
                 bubbles={bubbles}
                 selectedBubbleId={selectedBubbleId}
@@ -81,11 +104,11 @@ export const CanvasImageStage = React.forwardRef<HTMLDivElement, CanvasImageStag
               />
             )}
 
-            {!hideOverlays && !isWaitingForImageReload && (
+            {!isOriginalVisible && !isWaitingForImageReload && (
               <CanvasBubbleTextOverlay bubbles={bubbles} selectedBubbleId={selectedBubbleId} />
             )}
 
-            {!hideOverlays && !isWaitingForImageReload && showDetectionOverlay && (
+            {!isOriginalVisible && !isWaitingForImageReload && showDetectionOverlay && (
               <CanvasDetectionOverlay bubbles={bubbles} scale={scale} />
             )}
           </div>

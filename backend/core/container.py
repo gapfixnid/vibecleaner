@@ -106,6 +106,7 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
         page_analysis_service=PageAnalysisService(),
         bubble_analysis_service=BubbleAnalysisService(),
         layout_planner_service=LayoutPlannerService(),
+        render_service=render_service,
         ensure_page_image=ensure_page_image,
         invalidate_page_caches=invalidate_page_caches,
         encode_preview_jpeg_bytes=encode_preview_jpeg_bytes,
