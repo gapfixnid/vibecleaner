@@ -15,6 +15,7 @@ export interface CurrentIndexResultDto {
 export interface ImportResultDto extends CurrentIndexResultDto {
   page_count: number;
   added: number;
+  pages: PagesDto["pages"];
 }
 
 export interface LoadProjectResultDto {

@@ -110,6 +110,8 @@ def _compute_bubble_layout(bubble: TextBubble, image, render_service) -> dict:
         "font_family": computed_font_family,
         "overflow": bool(getattr(layout, "is_overflow", False)),
         "reached_min_font": bool(getattr(layout, "reached_min_font", False)),
+        "line_height_ratio": float(getattr(layout, "line_height_ratio", 1.0)),
+        "area_usage": float(getattr(layout, "area_usage", 0.0)),
         "lines": [
             {
                 "text": line.text,
@@ -199,6 +201,8 @@ def get_bubbles_response(state, page_id: str, render_service):
             "detection_confidence": bubble.detection_confidence,
             "layout_reasoning": bubble.layout_reasoning,
             "layout_overflow": bool(cached_layout.get("overflow") or cached_layout.get("reached_min_font")),
+            "line_height_ratio": float(cached_layout.get("line_height_ratio", 1.0)),
+            "layout_area_usage": float(cached_layout.get("area_usage", 0.0)),
             "bold": bubble.bold,
             "italic": bubble.italic,
             "color": bubble.color,

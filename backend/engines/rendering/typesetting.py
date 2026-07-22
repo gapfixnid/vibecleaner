@@ -13,8 +13,11 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
+
+from PySide6.QtCore import QTextBoundaryFinder
 
 
 # ---------------------------------------------------------------------------
@@ -65,34 +68,84 @@ WIDOW_ORPHAN_THRESHOLD = 0.3
 _LINE_START_PUNCTUATION = set(",.!?;:)]}〉》」』】〕〉！？。，、：；》」』】")
 _LINE_END_PUNCTUATION = set("([{〈《「『【〔")
 
+_PROTECTED_TOKEN_PATTERN = re.compile(
+    r"https?://[^\s]+"
+    r"|\([^()\n]+\)|\[[^\[\]\n]+\]|\{[^{}\n]+\}"
+    r"|\d+(?:[.,]\d+)?\s?(?:[%°℃℉]|[A-Za-z]{1,6})"
+    r"|[가-힣]+"
+)
+
 
 # ---------------------------------------------------------------------------
 # Text segmentation helpers
 # ---------------------------------------------------------------------------
 
-def _split_into_chunks(text: str, no_space: bool) -> List[str]:
-    """Split text into indivisible chunks for line breaking.
+def _utf16_position_map(text: str) -> dict[int, int]:
+    """Map Qt's UTF-16 boundary offsets to Python string indices."""
+    positions = {0: 0}
+    utf16_offset = 0
+    for index, char in enumerate(text, start=1):
+        utf16_offset += 2 if ord(char) > 0xFFFF else 1
+        positions[utf16_offset] = index
+    return positions
 
-    For space-separated languages: split on whitespace, keeping chunks
-    as words (spaces are added between words on the same line).
 
-    For no-space languages (CJK, etc.): each character is a chunk,
-    but spaces are preserved as characters (not stripped).
+def unicode_break_tokens(text: str, allow_grapheme_breaks: bool = False) -> List[str]:
+    """Tokenize at Unicode line boundaries, with grapheme fallback.
+
+    The primary pass preserves Korean eojeol, URLs, number/unit pairs, and
+    bracket groups. The fallback pass exposes grapheme boundaries so an
+    otherwise impossible layout can still be marked or rendered deterministically.
     """
-    if no_space:
-        # Each character is a chunk; spaces are kept as regular chars
-        paragraphs = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
-        chunks: List[str] = []
-        for i, para in enumerate(paragraphs):
-            chars = list(para)  # keep all characters including spaces
-            chunks.extend(chars)
-            if i < len(paragraphs) - 1:
-                chunks.append('\n')  # mandatory break
-        return chunks if chunks else ['']
-    else:
-        # Standard word splitting — spaces handled in line assembly
-        words = text.split()
-        return words if words else ['']
+    if not text:
+        return [""]
+
+    boundary_type = (
+        QTextBoundaryFinder.BoundaryType.Grapheme
+        if allow_grapheme_breaks
+        else QTextBoundaryFinder.BoundaryType.Line
+    )
+    finder = QTextBoundaryFinder(boundary_type, text)
+    offset_map = _utf16_position_map(text)
+    boundaries = [0]
+    finder.toStart()
+    while True:
+        utf16_position = finder.toNextBoundary()
+        if utf16_position < 0:
+            break
+        python_position = offset_map.get(utf16_position)
+        if python_position is not None and python_position > boundaries[-1]:
+            boundaries.append(python_position)
+    if boundaries[-1] != len(text):
+        boundaries.append(len(text))
+
+    if not allow_grapheme_breaks:
+        protected_ranges = [match.span() for match in _PROTECTED_TOKEN_PATTERN.finditer(text)]
+        boundaries = [
+            position
+            for position in boundaries
+            if position in {0, len(text)}
+            or not any(start < position < end for start, end in protected_ranges)
+        ]
+
+    tokens = [
+        text[start:end]
+        for start, end in zip(boundaries, boundaries[1:])
+        if end > start
+    ]
+    return tokens or [text]
+
+
+def _split_into_chunks(text: str, no_space: bool) -> List[str]:
+    """Split text through the shared Unicode line-break tokenizer."""
+    del no_space  # Kept in the public DP signature for compatibility.
+    paragraphs = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+    chunks: List[str] = []
+    for index, paragraph in enumerate(paragraphs):
+        chunks.extend(unicode_break_tokens(paragraph))
+        if index < len(paragraphs) - 1:
+            chunks.append('\n')
+    return chunks if chunks else ['']
 
 
 def _is_mandatory_break(chunk: str) -> bool:
@@ -110,10 +163,8 @@ def _assemble_line(chunks: List[str], no_space: bool) -> str:
     For no_space mode: concatenate directly (spaces are already in chunks).
     For space mode: join words with spaces.
     """
-    if no_space:
-        return ''.join(chunks)
-    else:
-        return ' '.join(chunks)
+    del no_space
+    return ''.join(chunks).strip()
 
 
 def _line_cost(
@@ -305,7 +356,7 @@ def dp_wrap_text(
     while all_lines and all_lines[0] == '':
         all_lines.pop(0)
     while all_lines and all_lines[-1] == '':
-        all_lines.pop(0)
+        all_lines.pop()
 
     # ---- Post-processing penalties ----
     num_lines = len(all_lines)

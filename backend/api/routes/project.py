@@ -19,6 +19,7 @@ from ...infrastructure.storage.project_schema import (
     create_project_metadata,
     normalize_project_metadata,
 )
+from ..use_cases.page_crud import get_pages_response
 
 router = APIRouter()
 logger = logging.getLogger(APP_NAME)
@@ -78,6 +79,43 @@ def new_project(container: AppContainer = Depends(get_container)):
         state.touch()
     return {"page_count": 0, "current_index": -1}
 
+
+def _append_imported_pages(state, loaded_pages: list[MangaPage]) -> dict:
+    """Append unique pages and select a single new import atomically."""
+    with state.lock:
+        before_count = len(state.pages)
+        existing_paths = {page.file_path for page in state.pages}
+        added = [page for page in loaded_pages if page.file_path not in existing_paths]
+        state.pages.extend(added)
+
+        if before_count == 0 and added:
+            state.current_page_idx = 0
+        elif len(added) == 1:
+            state.current_page_idx = before_count
+        elif state.current_page_idx < 0 and state.pages:
+            state.current_page_idx = 0
+
+        if added:
+            state.touch()
+        return {
+            "page_count": len(state.pages),
+            "current_index": state.current_page_idx,
+            "added": len(added),
+        }
+
+
+def _import_result(state, loaded_pages: list[MangaPage]) -> dict:
+    """Return the committed page snapshot with the import mutation.
+
+    Keeping the mutation and its UI snapshot in one HTTP response avoids a
+    startup/restart race where the import succeeds but a follow-up /api/pages
+    request is rejected by the desktop backend manager.
+    """
+    with state.lock:
+        result = _append_imported_pages(state, loaded_pages)
+        result.update(get_pages_response(state))
+        return result
+
 @router.post("/api/project/open-directory")
 def open_directory(directory: str = Form(...), container: AppContainer = Depends(get_container)):
     if not os.path.isdir(directory):
@@ -108,21 +146,7 @@ def open_directory(directory: str = Form(...), container: AppContainer = Depends
         except Exception:
             continue
 
-    state = container.project_state
-    with state.lock:
-        # Append to existing pages (dedup by file path); keep the current page.
-        existing_paths = {p.file_path for p in state.pages}
-        added = [pg for pg in loaded_pages if pg.file_path not in existing_paths]
-        state.pages.extend(added)
-        if state.current_page_idx < 0 and state.pages:
-            state.current_page_idx = 0
-        state.touch()
-        result = {
-            "page_count": len(state.pages),
-            "current_index": state.current_page_idx,
-            "added": len(added),
-        }
-    return result
+    return _import_result(container.project_state, loaded_pages)
 
 @router.post("/api/project/open-files")
 def open_files(files_json: str = Form(...), container: AppContainer = Depends(get_container)):
@@ -157,21 +181,7 @@ def open_files(files_json: str = Form(...), container: AppContainer = Depends(ge
         except Exception:
             continue
 
-    state = container.project_state
-    with state.lock:
-        # Append to existing pages (dedup by file path); keep the current page.
-        existing_paths = {p.file_path for p in state.pages}
-        added = [pg for pg in loaded_pages if pg.file_path not in existing_paths]
-        state.pages.extend(added)
-        if state.current_page_idx < 0 and state.pages:
-            state.current_page_idx = 0
-        state.touch()
-        result = {
-            "page_count": len(state.pages),
-            "current_index": state.current_page_idx,
-            "added": len(added),
-        }
-    return result
+    return _import_result(container.project_state, loaded_pages)
 
 @router.post("/api/project/save")
 def save_project(

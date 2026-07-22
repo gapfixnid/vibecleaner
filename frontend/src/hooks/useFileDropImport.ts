@@ -1,12 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "bmp"]);
+const IMAGE_PATH_COLLATOR = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: "base",
+});
 
-function splitImagePaths(paths: string[]): { images: string[]; skipped: number } {
+function fileNameFromPath(path: string): string {
+  return path.replaceAll("\\", "/").split("/").pop() ?? path;
+}
+
+export function splitImagePaths(paths: string[]): { images: string[]; skipped: number } {
   const images = paths.filter((path) => {
     const dot = path.lastIndexOf(".");
     if (dot < 0) return false;
     return IMAGE_EXTENSIONS.has(path.slice(dot + 1).toLowerCase());
+  });
+  images.sort((left, right) => {
+    const byFileName = IMAGE_PATH_COLLATOR.compare(fileNameFromPath(left), fileNameFromPath(right));
+    return byFileName || IMAGE_PATH_COLLATOR.compare(left, right);
   });
   return { images, skipped: paths.length - images.length };
 }

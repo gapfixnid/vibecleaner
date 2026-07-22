@@ -30,6 +30,8 @@ test("canvas renders glyphs with the layout-computed font size", () => {
     problems: [],
     edited: false,
     layout_overflow: false,
+    line_height_ratio: 1.12,
+    layout_area_usage: 0.67,
     writing_mode: "horizontal",
     text_direction: "ltr",
     justification: "none",

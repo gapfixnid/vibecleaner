@@ -92,6 +92,23 @@ must not silently shrink. Canvas preview and export both use
 `computed_font_size` from the layout, so glyph size and line geometry always
 come from the same calculation.
 
+Adaptive Typesetting v2 converts bubble masks to safe text regions with a
+distance transform. Planned padding and margin plus the expected text stroke
+define the boundary clearance; line slots are intersections of one contiguous
+horizontal segment across every glyph row, so a line cannot bridge a concave
+or disconnected gap. If the planned padding is too restrictive, the engine
+may retry a documented reduced-padding candidate, but it never bypasses the
+stroke-safe boundary.
+
+Rectangle and mask layouts share the Unicode boundary tokenizer. Explicit
+newlines are mandatory, while Korean eojeol, URLs, number/unit pairs, and
+bracket groups remain intact until the grapheme fallback is required. Feasible
+candidates are compared lexicographically by invalid breaks, preferred line
+count, font size, balance, area use, and vertical placement. Automatic layouts
+also test line-height ratios `1.12`, `1.06`, `1.00`, and `1.18`, and use a
+page-resolution readability floor clamped to 11–24 px. Identical inputs must
+produce identical layout output.
+
 When a newer generation reaches `running`, React atomically stops job polling,
 clears pages, bubbles, selections, image versions, dirty state, loading state,
 and the active project path before reloading settings and pages. If the prior

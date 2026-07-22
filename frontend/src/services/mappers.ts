@@ -61,6 +61,8 @@ export function toBubbleInfo(bubble: BubbleDto): BubbleInfo {
     problems: bubble.problems ?? [],
     edited: Boolean(bubble.edited),
     layout_overflow: Boolean(bubble.layout.overflow),
+    line_height_ratio: bubble.layout.line_height_ratio ?? 1,
+    layout_area_usage: bubble.layout.area_usage ?? 0,
     writing_mode: bubble.layout.writing_mode || "horizontal",
     text_direction: bubble.layout.text_direction || "ltr",
     justification: bubble.layout.justification || "none",

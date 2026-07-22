@@ -3,12 +3,14 @@ import * as api from "../services/api";
 import * as desktop from "../services/desktop";
 import type { RunTask } from "./useProcessingTask";
 import type { ShowToast } from "./useToasts";
+import type { PagesResponse } from "../types";
 import { APP_NAME } from "../appMeta";
 
 export interface OpenFilesResult {
   beforeCount: number;
   afterCount: number;
   addedCount: number;
+  selectedIndex: number | null;
 }
 
 interface UseProjectDeps {
@@ -16,6 +18,7 @@ interface UseProjectDeps {
   /** Non-blocking success feedback (errors still go through runTask's dialog). */
   showToast: ShowToast;
   loadPagesFromServer: (selectIndex?: number) => Promise<void>;
+  commitPagesFromServer: (data: PagesResponse, selectIndex?: number) => void;
   /** Mark the project as having unsaved changes. */
   markDirty: () => void;
   /** Mark the project as saved/clean (after save, load, or new). */
@@ -30,6 +33,7 @@ export function useProject({
   runTask,
   showToast,
   loadPagesFromServer,
+  commitPagesFromServer,
   markDirty,
   markClean,
   getSelectedIndices,
@@ -62,14 +66,16 @@ export function useProject({
         if (!files || files.length === 0) return; // Cancelled
         const data = await api.openFiles(files);
         if (data.status === "cancelled") return;
-        await loadPagesFromServer();
         const afterCount = typeof data.page_count === "number" ? data.page_count : 0;
         const addedCount = typeof data.added === "number" ? data.added : 0;
         const beforeCount = Math.max(0, afterCount - addedCount);
+        const currentIndex = typeof data.current_index === "number" ? data.current_index : -1;
+        commitPagesFromServer({ pages: data.pages, current_index: currentIndex }, currentIndex);
         result = {
           beforeCount,
           afterCount,
           addedCount,
+          selectedIndex: beforeCount === 0 || addedCount === 1 ? currentIndex : null,
         };
         // Importing images mutates the project.
         if (addedCount > 0) markDirty();
@@ -77,7 +83,7 @@ export function useProject({
       { errorTitle: t("project.failedToOpenFiles"), skipBusy: true }
     );
     return result;
-  }, [runTask, loadPagesFromServer, markDirty, t]);
+  }, [runTask, commitPagesFromServer, markDirty, t]);
 
   /** Reset to an empty project. Returns true on success. */
   const handleNewProject = useCallback(async (): Promise<boolean> => {

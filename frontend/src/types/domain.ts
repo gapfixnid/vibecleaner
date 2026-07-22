@@ -31,6 +31,8 @@ export interface BubbleInfo {
   problems: string[];
   edited: boolean;
   layout_overflow: boolean;
+  line_height_ratio: number;
+  layout_area_usage: number;
   writing_mode: string;
   text_direction: string;
   justification: string;

@@ -3,10 +3,11 @@ import { FolderOpen, ImagePlus, MoveDown } from "lucide-react";
 interface CanvasEmptyStateProps {
   onImportImages: () => void;
   onOpenProject: () => void;
+  isBackendReady?: boolean;
   t: (key: string) => string;
 }
 
-export function CanvasEmptyState({ onImportImages, onOpenProject, t }: CanvasEmptyStateProps) {
+export function CanvasEmptyState({ onImportImages, onOpenProject, isBackendReady = true, t }: CanvasEmptyStateProps) {
   return (
     <section className="canvas-empty-state" aria-labelledby="canvas-empty-title">
       <div className="canvas-empty-art" aria-hidden="true">
@@ -21,7 +22,13 @@ export function CanvasEmptyState({ onImportImages, onOpenProject, t }: CanvasEmp
         <p>{t("canvas.emptyDescription")}</p>
       </div>
       <div className="canvas-empty-actions">
-        <button type="button" className="canvas-empty-primary" onClick={onImportImages}>
+        <button
+          type="button"
+          className="canvas-empty-primary"
+          onClick={onImportImages}
+          disabled={!isBackendReady}
+          aria-busy={!isBackendReady}
+        >
           <ImagePlus size={16} />
           <span>{t("toolbar.addImages")}</span>
         </button>

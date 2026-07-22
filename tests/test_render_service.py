@@ -25,7 +25,17 @@ class FakeRenderer:
         self.fixed_font_size = None
         self.fixed_mask = None
 
-    def find_optimal_font_size(self, text, rect, font_family=None, min_size=None, max_size=None):
+    def find_optimal_font_size(
+        self,
+        text,
+        rect,
+        font_family=None,
+        min_size=None,
+        max_size=None,
+        padding=None,
+        margin=None,
+        target_center_y=None,
+    ):
         self.font_rect = _rect_from_qrectf(rect)
         self.font_family = font_family
         self.min_size = min_size
@@ -39,16 +49,50 @@ class FakeRenderer:
             line_layouts=[],
         )
 
-    def find_optimal_font_size_for_mask(self, text, rect, mask, font_family=None, min_size=None, max_size=None):
+    def find_optimal_font_size_for_mask(
+        self,
+        text,
+        rect,
+        mask,
+        font_family=None,
+        min_size=None,
+        max_size=None,
+        padding=None,
+        margin=None,
+        target_center_y=None,
+    ):
         self.mask_rect = _rect_from_qrectf(rect)
         self.mask_shape = mask.shape
         self.font_family = font_family
         self.min_size = min_size
         self.max_size = max_size
+        self.vertical_center_y = target_center_y
         return SimpleNamespace(
             font=SimpleNamespace(pointSizeF=lambda: 18.0, family=lambda: "Resolved Font"),
             line_layouts=[],
         )
+
+    def find_optimal_layout_in_rect(
+        self,
+        text,
+        rect,
+        font_family=None,
+        min_size=None,
+        max_size=None,
+        alignment="center",
+        padding=None,
+        margin=None,
+    ):
+        font, lines, render_width = self.find_optimal_font_size(
+            text,
+            rect,
+            font_family=font_family,
+            min_size=min_size,
+            max_size=max_size,
+            padding=padding,
+            margin=margin,
+        )
+        return self.layout_lines_in_rect(lines, rect, font, render_width, alignment=alignment)
 
     def layout_text_at_fixed_size(
         self,
@@ -58,16 +102,23 @@ class FakeRenderer:
         mask=None,
         font_family=None,
         alignment="center",
+        padding=None,
+        margin=None,
+        target_center_y=None,
     ):
         self.fixed_font_size = font_size
         self.fixed_mask = mask
         self.font_family = font_family
+        self.vertical_center_y = target_center_y
         return SimpleNamespace(
             font=SimpleNamespace(pixelSize=lambda: font_size, family=lambda: "Resolved Font"),
             line_layouts=[],
             is_overflow=False,
             reached_min_font=False,
         )
+
+    def content_rect(self, rect, padding=None, margin=None):
+        return rect
 
     def make_ellipse_mask(self, width, height, inset=0):
         return np.ones((height, width), dtype=np.uint8)
@@ -110,8 +161,8 @@ class RenderServiceTests(unittest.TestCase):
 
         self.assertEqual(renderer.mask_rect, Rect(0, 0, 100, 80))
         self.assertEqual(renderer.mask_shape, (80, 100))
-        self.assertEqual(renderer.vertical_center_y, 36.0)
-        self.assertEqual(renderer.vertical_bounds, Rect(0, 0, 100, 80))
+        self.assertEqual(renderer.vertical_center_y, 39.5)
+        self.assertIsNone(renderer.vertical_bounds)
 
     def test_auto_font_selection_reaches_renderer_when_no_font_family_is_requested(self):
         renderer = FakeRenderer()
@@ -126,6 +177,45 @@ class RenderServiceTests(unittest.TestCase):
         service.get_layout_for_bubble("translated", bubble, image=None, font_family=None)
 
         self.assertIsNone(renderer.font_family)
+
+    def test_auto_readability_floor_scales_with_page_resolution(self):
+        renderer = FakeRenderer()
+        service = RenderService(
+            renderer=renderer,
+            config=SimpleNamespace(min_font_size=6.0, max_font_size=48.0),
+        )
+        bubble = TextBubble(
+            id=1,
+            box=Rect(0, 0, 300, 160),
+            text="hello",
+            text_class="text_free",
+        )
+
+        service.get_layout_for_bubble(
+            "translated",
+            bubble,
+            image=np.zeros((3000, 2000, 3), dtype=np.uint8),
+            font_family="Test",
+        )
+
+        self.assertEqual(renderer.min_size, 18.0)
+
+    def test_source_center_is_blended_with_mask_center_by_confidence(self):
+        renderer = FakeRenderer()
+        service = RenderService(renderer=renderer)
+        bubble = TextBubble(
+            id=1,
+            box=Rect(0, 0, 100, 80),
+            text_box=Rect(20, 10, 40, 20),
+            text="source",
+            text_class="text_bubble",
+            layout_confidence=0.5,
+        )
+
+        service.get_layout_for_bubble("target", bubble, image=None, font_family="Test")
+
+        # The fallback ellipse has center 39.5; the source box center is 20.
+        self.assertEqual(renderer.vertical_center_y, 29.75)
 
     def test_fixed_font_size_reflows_without_running_auto_sizing(self):
         renderer = FakeRenderer()

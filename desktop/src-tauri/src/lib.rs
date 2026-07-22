@@ -411,6 +411,14 @@ async fn get_page_for_session(
                     .get("layout_overflow")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
+                let line_height_ratio = b
+                    .get("line_height_ratio")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(1.0);
+                let layout_area_usage = b
+                    .get("layout_area_usage")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
                 let status = b.get("status").cloned().unwrap_or_else(|| {
                     serde_json::json!(if translated.is_empty() {
                         "needs_review"
@@ -444,6 +452,8 @@ async fn get_page_for_session(
                     "layout": {
                         "lines": lines,
                         "overflow": layout_overflow,
+                        "line_height_ratio": line_height_ratio,
+                        "area_usage": layout_area_usage,
                         "writing_mode": writing_mode,
                         "text_direction": text_direction,
                         "justification": justification,

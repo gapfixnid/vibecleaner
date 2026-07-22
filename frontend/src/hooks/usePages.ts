@@ -5,6 +5,7 @@ import type { RunTask, ShowError } from "./useProcessingTask";
 
 interface UsePagesDeps {
   currentIndexRef: MutableRefObject<number>;
+  pagesRef: MutableRefObject<PageInfo[]>;
   runTask: RunTask;
   showError: ShowError;
   showConfirm: (
@@ -29,6 +30,7 @@ interface UsePagesDeps {
 /** Owns the page list, current index, and per-page cache-busting versions. */
 export function usePages({
   currentIndexRef,
+  pagesRef,
   runTask,
   showError,
   showConfirm,
@@ -56,11 +58,12 @@ export function usePages({
 
   const clearPagesForBackendRestart = useCallback(() => {
     currentIndexRef.current = -1;
+    pagesRef.current = [];
     setPages([]);
     setCurrentIndex(-1);
     setPageVersions({});
     onPagesCleared();
-  }, [currentIndexRef, onPagesCleared]);
+  }, [currentIndexRef, onPagesCleared, pagesRef]);
 
   const fetchPagesFromServer = useCallback(() => api.getPages(), []);
 
@@ -70,6 +73,7 @@ export function usePages({
       selectIndex?: number,
       options?: { skipPageActivation?: boolean },
     ) => {
+      pagesRef.current = data.pages;
       setPages(data.pages);
       const newIdx = selectIndex !== undefined ? selectIndex : data.current_index;
       currentIndexRef.current = newIdx;
@@ -81,7 +85,7 @@ export function usePages({
         onPagesCleared();
       }
     },
-    [currentIndexRef, onPageActivated, onPagesCleared],
+    [currentIndexRef, onPageActivated, onPagesCleared, pagesRef],
   );
 
   const loadPagesFromServer = useCallback(

@@ -15,7 +15,12 @@ interface UseProjectActionsDeps {
   saveProject: () => Promise<boolean>;
   newProject: () => Promise<boolean>;
   loadProject: () => Promise<number[] | null>;
-  openFiles: (paths?: string[]) => Promise<{ beforeCount: number; afterCount: number; addedCount: number } | undefined>;
+  openFiles: (paths?: string[]) => Promise<{
+    beforeCount: number;
+    afterCount: number;
+    addedCount: number;
+    selectedIndex: number | null;
+  } | undefined>;
   pages: PageInfo[];
   selectedPageIds: number[];
   runTask: RunTask;
@@ -23,7 +28,6 @@ interface UseProjectActionsDeps {
   currentIndexRef: MutableRefObject<number>;
   markDirty: () => void;
   resetPageVersions: () => void;
-  selectPage: (idx: number) => void;
   deletePages: (indices: number[]) => void;
   setSelectedPageIds: Dispatch<SetStateAction<number[]>>;
   setSelectedBubbleId: Dispatch<SetStateAction<number | null>>;
@@ -44,7 +48,6 @@ export function useProjectActions({
   currentIndexRef,
   markDirty,
   resetPageVersions,
-  selectPage,
   deletePages,
   setSelectedPageIds,
   setSelectedBubbleId,
@@ -101,17 +104,11 @@ export function useProjectActions({
     // argument would be a MouseEvent rather than a paths array.
     const result = await openFiles(Array.isArray(paths) ? paths : undefined);
     if (!result || result.addedCount <= 0) return false;
-    const { beforeCount, afterCount, addedCount } = result;
-    if (beforeCount === 0 && addedCount > 0) {
-      selectPage(0);
-      setSelectedPageIds([0]);
-    } else if (addedCount === 1) {
-      const newIndex = afterCount - 1;
-      selectPage(newIndex);
-      setSelectedPageIds([newIndex]);
+    if (result.selectedIndex !== null) {
+      setSelectedPageIds([result.selectedIndex]);
     }
     return true;
-  }, [openFiles, selectPage, setSelectedPageIds]);
+  }, [openFiles, setSelectedPageIds]);
 
   const handleDeletePage = useCallback(
     (idx: number) => {

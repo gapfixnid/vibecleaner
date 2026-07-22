@@ -112,6 +112,8 @@ const bubbleDto = {
   },
   layout: {
     overflow: false,
+    line_height_ratio: 1.12,
+    area_usage: 0.67,
     writing_mode: "vertical",
     text_direction: "rtl",
     justification: "full",
@@ -149,6 +151,8 @@ assert.deepEqual(plain(toBubbleInfo(bubbleDto)), {
   problems: ["check translation"],
   edited: true,
   layout_overflow: false,
+  line_height_ratio: 1.12,
+  layout_area_usage: 0.67,
   writing_mode: "vertical",
   text_direction: "rtl",
   justification: "full",

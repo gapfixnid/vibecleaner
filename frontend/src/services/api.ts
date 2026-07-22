@@ -12,6 +12,7 @@ import type {
   ModelStatus,
   LoadProjectResult,
   ProviderCatalogDto,
+  ImportResultDto,
 } from "../types";
 import { toBubbleInfo, toBubbleUpdateDto } from "./mappers";
 
@@ -76,12 +77,12 @@ export const renamePage = async (pageId: string, name: string): Promise<ActionRe
   return { status: "success", ...res };
 };
 
-export const openDirectory = async (directory: string): Promise<ActionResult> => {
+export const openDirectory = async (directory: string): Promise<ImportResultDto & ActionResult> => {
   const result = await api.importDirectory(directory);
   return { status: "success", ...result };
 };
 
-export const openFiles = async (files: string[]): Promise<ActionResult> => {
+export const openFiles = async (files: string[]): Promise<ImportResultDto & ActionResult> => {
   const result = await api.importImages(files);
   return { status: "success", ...result };
 };

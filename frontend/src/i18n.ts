@@ -67,6 +67,7 @@ export type TranslationKey =
   | "inspector.manual"
   | "inspector.computedFontSize"
   | "inspector.lines"
+  | "inspector.areaUsage"
   | "inspector.layoutOverflowWarning"
   | "inspector.fontStyle"
   | "inspector.bold"
@@ -186,6 +187,8 @@ export type TranslationKey =
   | "backend.retrying"
   | "backend.sessionLostTitle"
   | "backend.sessionLostDesc"
+  | "backend.startingTitle"
+  | "backend.startingDesc"
   | "settings.modelsLoadFailed"
   | "settings.providerGoogle"
   | "settings.providerOllama"
@@ -389,6 +392,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "inspector.manual": "Manual",
     "inspector.computedFontSize": "Applied",
     "inspector.lines": "lines",
+    "inspector.areaUsage": "area",
     "inspector.layoutOverflowWarning": "Text does not fit at this size. Reduce the size or enlarge the bubble.",
     "inspector.fontStyle": "Font Style",
     "inspector.bold": "Bold",
@@ -508,6 +512,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "backend.retrying": "Retrying...",
     "backend.sessionLostTitle": "Unsaved work was lost",
     "backend.sessionLostDesc": "The processing backend restarted, so unsaved pages and edits from the previous session could not be recovered.",
+    "backend.startingTitle": "Preparing your workspace",
+    "backend.startingDesc": "Starting the AI processing engine and loading your project...",
     "settings.modelsLoadFailed": "Failed to load the model list.",
     "settings.providerGoogle": "Google Translate (Free Web · Default)",
     "settings.providerOllama": "Ollama (Local LLM)",
@@ -710,6 +716,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "inspector.manual": "수동",
     "inspector.computedFontSize": "적용 크기",
     "inspector.lines": "줄",
+    "inspector.areaUsage": "영역 사용",
     "inspector.layoutOverflowWarning": "이 크기로는 텍스트가 들어가지 않습니다. 크기를 줄이거나 말풍선을 넓혀 주세요.",
     "inspector.fontStyle": "글꼴 스타일",
     "inspector.bold": "굵게",
@@ -829,6 +836,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "backend.retrying": "다시 시도 중...",
     "backend.sessionLostTitle": "저장하지 않은 작업이 사라졌습니다",
     "backend.sessionLostDesc": "처리 백엔드가 다시 시작되어 이전 세션의 저장하지 않은 페이지와 편집 내용을 복구할 수 없습니다.",
+    "backend.startingTitle": "작업 환경을 준비하고 있습니다",
+    "backend.startingDesc": "AI 처리 엔진을 시작하고 프로젝트를 불러오는 중입니다...",
     "settings.modelsLoadFailed": "모델 목록을 불러오지 못했습니다.",
     "settings.providerGoogle": "Google 번역 (무료 웹 · 기본값)",
     "settings.providerOllama": "Ollama (로컬 LLM)",

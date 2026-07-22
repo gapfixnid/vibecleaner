@@ -9,6 +9,7 @@ import { InitialSetupModal } from "./components/InitialSetupModal";
 import { CustomDialog } from "./components/CustomDialog";
 import { AboutModal } from "./components/AboutModal";
 import { BackendErrorScreen } from "./components/BackendErrorScreen";
+import { StartupLoadingScreen } from "./components/StartupLoadingScreen";
 import { StatusBar } from "./components/StatusBar";
 import { ToastStack } from "./components/Toast";
 import "./styles/apple_theme.css";
@@ -109,6 +110,7 @@ function App() {
     runTask,
     showToast,
     loadPagesFromServer: pagesApi.loadPagesFromServer,
+    commitPagesFromServer: pagesApi.commitPagesFromServer,
     markDirty,
     markClean,
     getSelectedIndices,
@@ -284,7 +286,6 @@ function App() {
     currentIndexRef,
     markDirty,
     resetPageVersions: pagesApi.resetPageVersions,
-    selectPage: pagesApi.handleSelectPage,
     deletePages: pagesApi.handleDeletePages,
     setSelectedPageIds,
     setSelectedBubbleId,
@@ -292,13 +293,14 @@ function App() {
   });
 
   const handleImportImages = useCallback(async (paths?: string[]) => {
+    if (isBootstrapping || backendError) return false;
     const imported = await importImages(paths);
     if (imported) {
       setIsSidebarOpen(true);
       setIsInspectorOpen(true);
     }
     return imported;
-  }, [importImages]);
+  }, [backendError, importImages, isBootstrapping]);
 
   useWindowCloseGuard(isDirty, guardUnsaved);
 
@@ -322,7 +324,7 @@ function App() {
   });
 
   const { isDragOver } = useFileDropImport({
-    enabled: !backendError && settings.setup_completed !== false,
+    enabled: !isBootstrapping && !backendError && settings.setup_completed !== false,
     onDropImages: (imagePaths, skippedCount) => {
       if (skippedCount > 0) {
         showToast("info", t("dnd.skippedFiles").replace("{count}", String(skippedCount)));
@@ -422,6 +424,7 @@ function App() {
           onImageLoaded={finishImageReload}
           onImportImages={handleImportImages}
           onOpenProject={handleOpenProject}
+          isBackendReady={!isBootstrapping && !backendError}
           onToggleSidebar={toggleSidebar}
           isSidebarOpen={isSidebarOpen}
           onToggleInspector={toggleInspector}
@@ -514,6 +517,8 @@ function App() {
           onRetry={handleRetryBackend}
         />
       )}
+
+      {isBootstrapping && !backendError && <StartupLoadingScreen t={t} />}
 
       <style>{`
         .main-workspace {

@@ -45,7 +45,12 @@ class BubbleServiceTests(unittest.TestCase):
             self.state.current_page_idx = 0
 
         fake_font = SimpleNamespace(pointSizeF=lambda: 14.0, family=lambda: "Resolved Font")
-        fake_layout = SimpleNamespace(font=fake_font, line_layouts=[])
+        fake_layout = SimpleNamespace(
+            font=fake_font,
+            line_layouts=[],
+            line_height_ratio=1.12,
+            area_usage=0.67,
+        )
         response = bubble_service.get_bubbles_response(self.state, "page_a", FakeRenderService(fake_layout))
 
         bubble = response["bubbles"][0]
@@ -73,7 +78,12 @@ class BubbleServiceTests(unittest.TestCase):
             self.state.current_page_idx = 0
 
         fake_font = SimpleNamespace(pixelSize=lambda: 17, family=lambda: "Resolved Font")
-        fake_layout = SimpleNamespace(font=fake_font, line_layouts=[])
+        fake_layout = SimpleNamespace(
+            font=fake_font,
+            line_layouts=[],
+            line_height_ratio=1.12,
+            area_usage=0.67,
+        )
         response = bubble_service.get_bubbles_response(self.state, "page_a", FakeRenderService(fake_layout))
 
         bubble = response["bubbles"][0]
@@ -82,6 +92,8 @@ class BubbleServiceTests(unittest.TestCase):
         self.assertEqual(bubble["computed_font_size"], 17)
         self.assertEqual(bubble["font_mode"], "auto")
         self.assertIsNone(bubble["requested_font_size"])
+        self.assertEqual(bubble["line_height_ratio"], 1.12)
+        self.assertEqual(bubble["layout_area_usage"], 0.67)
 
     def test_get_bubbles_response_exposes_fixed_font_contract(self):
         page = MangaPage(

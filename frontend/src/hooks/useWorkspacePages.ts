@@ -56,6 +56,7 @@ export function useWorkspacePages({
 
   const pagesApi = usePages({
     currentIndexRef,
+    pagesRef,
     runTask,
     showError,
     showConfirm,
@@ -67,10 +68,6 @@ export function useWorkspacePages({
   });
 
   const { pages, currentIndex, pageVersions, loadPagesFromServer } = pagesApi;
-
-  useEffect(() => {
-    pagesRef.current = pages;
-  }, [pages]);
 
   useEffect(() => {
     onTranslationChangedRef.current = () => loadPagesFromServer();

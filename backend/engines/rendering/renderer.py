@@ -6,7 +6,7 @@ import numpy as np
 from PySide6.QtGui import QFont, QFontMetricsF
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QRectF, Qt
-from .typesetting import dp_wrap_text, fit_font_size
+from .typesetting import dp_wrap_text, fit_font_size, unicode_break_tokens
 from ...infrastructure.fonts import resolver as font_resolver
 import logging
 
@@ -47,6 +47,8 @@ class TextLayoutResult:
     score: float = 0.0
     is_overflow: bool = False
     reached_min_font: bool = False
+    line_height_ratio: float = 1.0
+    area_usage: float = 0.0
 
 
 class TextRenderer:
@@ -58,6 +60,111 @@ class TextRenderer:
     def __init__(self, min_font_size: float = 6.0, max_font_size: float = 48.0):
         self.min_font_size = float(min_font_size)
         self.max_font_size = float(max_font_size)
+
+    @staticmethod
+    def _inset_value(insets: dict[str, float] | None, side: str) -> float:
+        if not insets:
+            return 0.0
+        try:
+            return max(0.0, float(insets.get(side, 0.0) or 0.0))
+        except (TypeError, ValueError):
+            return 0.0
+
+    def content_rect(
+        self,
+        rect: QRectF,
+        padding: dict[str, float] | None = None,
+        margin: dict[str, float] | None = None,
+    ) -> QRectF:
+        """Return the rectangular text area after planned insets."""
+        explicit_insets = any(
+            self._inset_value(source, side) > 0
+            for source in (padding, margin)
+            for side in ("top", "right", "bottom", "left")
+        )
+        if explicit_insets:
+            left = self._inset_value(padding, "left") + self._inset_value(margin, "left")
+            right = self._inset_value(padding, "right") + self._inset_value(margin, "right")
+            top = self._inset_value(padding, "top") + self._inset_value(margin, "top")
+            bottom = self._inset_value(padding, "bottom") + self._inset_value(margin, "bottom")
+        else:
+            left = right = min(8.0, rect.width() * 0.08)
+            top = bottom = min(6.0, rect.height() * 0.08)
+
+        max_horizontal = max(0.0, rect.width() - 10.0)
+        max_vertical = max(0.0, rect.height() - 10.0)
+        horizontal = left + right
+        vertical = top + bottom
+        if horizontal > max_horizontal and horizontal > 0:
+            scale = max_horizontal / horizontal
+            left *= scale
+            right *= scale
+        if vertical > max_vertical and vertical > 0:
+            scale = max_vertical / vertical
+            top *= scale
+            bottom *= scale
+
+        return QRectF(
+            rect.x() + left,
+            rect.y() + top,
+            max(1.0, rect.width() - left - right),
+            max(1.0, rect.height() - top - bottom),
+        )
+
+    def make_safe_mask(
+        self,
+        mask: np.ndarray,
+        padding: dict[str, float] | None = None,
+        margin: dict[str, float] | None = None,
+        stroke_width: float = 1.0,
+        inset_scale: float = 1.0,
+    ) -> np.ndarray:
+        """Build a boundary-distance safe area from a bubble mask."""
+        import cv2
+
+        mask_bool = np.asarray(mask) > 0
+        if mask_bool.ndim != 2 or not bool(mask_bool.any()):
+            return np.zeros_like(mask_bool, dtype=bool)
+
+        totals = {
+            side: (
+                self._inset_value(padding, side)
+                + self._inset_value(margin, side)
+            ) * max(0.0, float(inset_scale))
+            for side in ("top", "right", "bottom", "left")
+        }
+        if any(value > 0 for value in totals.values()):
+            boundary_clearance = max(
+                float(stroke_width),
+                min(totals.values()) + float(stroke_width),
+            )
+        else:
+            default_padding = max(2.0, min(mask_bool.shape) * 0.03)
+            boundary_clearance = default_padding + float(stroke_width)
+
+        distance = cv2.distanceTransform(mask_bool.astype(np.uint8), cv2.DIST_L2, 5)
+        safe = distance >= boundary_clearance
+
+        # Distance transform supplies the minimum boundary clearance. Apply
+        # directional clearances relative to the mask bounding box as well.
+        mask_ys, mask_xs = np.where(mask_bool)
+        y_min = int(mask_ys.min())
+        y_max = int(mask_ys.max()) + 1
+        x_min = int(mask_xs.min())
+        x_max = int(mask_xs.max()) + 1
+        directional_clearance = {
+            side: max(0, int(round(value + float(stroke_width))))
+            for side, value in totals.items()
+        }
+        if directional_clearance["top"]:
+            safe[: min(y_max, y_min + directional_clearance["top"]), :] = False
+        if directional_clearance["bottom"]:
+            safe[max(y_min, y_max - directional_clearance["bottom"]):, :] = False
+        if directional_clearance["left"]:
+            safe[:, : min(x_max, x_min + directional_clearance["left"])] = False
+        if directional_clearance["right"]:
+            safe[:, max(x_min, x_max - directional_clearance["right"]):] = False
+        return safe
 
     def _automatic_min_font_size(self, min_size: float, max_size: float) -> float:
         return min(max_size, max(min_size, self.AUTO_READABILITY_MIN_FONT_SIZE))
@@ -193,6 +300,8 @@ class TextRenderer:
         font_family: str | None = None,
         min_size: float | None = None,
         max_size: float | None = None,
+        padding: dict[str, float] | None = None,
+        margin: dict[str, float] | None = None,
     ) -> tuple[QFont, list[str], float]:
         """
         Employs binary search to find the maximum font size that fits the text inside rect.
@@ -212,10 +321,9 @@ class TextRenderer:
         configured_min_size = float(self.min_font_size if min_size is None else min_size)
         min_size = self._automatic_min_font_size(configured_min_size, max_size)
 
-        padding_x = min(8.0, rect.width() * 0.08)
-        padding_y = min(6.0, rect.height() * 0.08)
-        width = max(10.0, rect.width() - padding_x * 2)
-        height = max(10.0, rect.height() - padding_y * 2)
+        content_rect = self.content_rect(rect, padding=padding, margin=margin)
+        width = max(1.0, content_rect.width())
+        height = max(1.0, content_rect.height())
         
         # We first try to find a font size where words do not need to be broken (allow_char_break=False)
         low = min_size
@@ -300,10 +408,12 @@ class TextRenderer:
         render_width: float,
         alignment: str = 'center',
         min_size: float | None = None,
+        line_height_ratio: float = 1.0,
     ) -> TextLayoutResult:
         min_size = float(self.min_font_size if min_size is None else min_size)
         metrics = QFontMetricsF(font)
-        line_height = metrics.height()
+        glyph_height = metrics.height()
+        line_height = max(glyph_height, glyph_height * line_height_ratio)
         total_height = line_height * len(lines)
         y_offset = max(0.0, (rect.height() - total_height) / 2.0)
 
@@ -326,6 +436,8 @@ class TextRenderer:
             for index, line in enumerate(lines)
         ]
         is_overflow = total_height > rect.height() or any(metrics.horizontalAdvance(line) > render_width for line in lines)
+        text_area = sum(max(1.0, metrics.horizontalAdvance(line)) * glyph_height * 0.72 for line in lines)
+        available_area = max(1.0, rect.width() * rect.height())
         return TextLayoutResult(
             font=font,
             lines=lines,
@@ -333,7 +445,127 @@ class TextRenderer:
             line_layouts=line_layouts,
             is_overflow=is_overflow,
             reached_min_font=font_pixel_size(font) <= int(round(min_size)),
+            line_height_ratio=line_height_ratio,
+            area_usage=min(1.0, text_area / available_area),
         )
+
+    def find_optimal_layout_in_rect(
+        self,
+        text: str,
+        rect: QRectF,
+        font_family: str | None = None,
+        min_size: float | None = None,
+        max_size: float | None = None,
+        alignment: str = "center",
+        padding: dict[str, float] | None = None,
+        margin: dict[str, float] | None = None,
+    ) -> TextLayoutResult:
+        """Choose rectangle font size, wrapping, and line spacing together."""
+        if font_family is None:
+            resolved_font, chain = font_resolver.resolve(text, target_lang="Korean")
+            font_family = resolved_font.name
+            logger.debug(f"Font resolved (rect): {font_family} (chain: {' → '.join(chain)})")
+        else:
+            app = QApplication.instance()
+            if app is None or not app.font().family():
+                font_family = "Segoe UI"
+
+        max_size = float(self.max_font_size if max_size is None else max_size)
+        configured_min = float(self.min_font_size if min_size is None else min_size)
+        minimum = self._automatic_min_font_size(configured_min, max_size)
+        content_rect = self.content_rect(rect, padding=padding, margin=margin)
+        dynamic_max = max(
+            minimum,
+            min(max_size, content_rect.height() * 0.70, content_rect.width() * 0.70),
+        )
+        candidate_sizes = self._candidate_font_sizes(minimum, dynamic_max)
+
+        for allow_char_break in (False, True):
+            best_layout = self._best_rect_layout_for_candidates(
+                text,
+                content_rect,
+                font_family,
+                candidate_sizes,
+                alignment,
+                minimum,
+                allow_char_break,
+            )
+            if best_layout is not None:
+                return best_layout
+
+        font = QFont(font_family)
+        _set_font_pixel_size(font, minimum)
+        lines = self.wrap_korean_text(
+            text,
+            content_rect.width(),
+            font,
+            allow_char_break=True,
+        ) or [text]
+        fallback = self.layout_lines_in_rect(
+            lines,
+            content_rect,
+            font,
+            content_rect.width(),
+            alignment=alignment,
+            min_size=minimum,
+            line_height_ratio=1.0,
+        )
+        fallback.is_overflow = True
+        return fallback
+
+    def _best_rect_layout_for_candidates(
+        self,
+        text: str,
+        rect: QRectF,
+        font_family: str,
+        candidate_sizes: list[float],
+        alignment: str,
+        min_size: float,
+        allow_char_break: bool,
+    ) -> TextLayoutResult | None:
+        best_layout = None
+        best_key = None
+        preferred_max_lines = 3 if rect.width() > rect.height() * 1.6 else 4
+
+        for size in candidate_sizes:
+            font = QFont(font_family)
+            _set_font_pixel_size(font, size)
+            lines = self.wrap_korean_text(
+                text,
+                rect.width(),
+                font,
+                allow_char_break=allow_char_break,
+            )
+            if lines is None:
+                continue
+            metrics = QFontMetricsF(font)
+            advances = [float(metrics.horizontalAdvance(line)) for line in lines]
+            for line_height_ratio in (1.12, 1.06, 1.0, 1.18):
+                layout = self.layout_lines_in_rect(
+                    lines,
+                    rect,
+                    font,
+                    rect.width(),
+                    alignment=alignment,
+                    min_size=min_size,
+                    line_height_ratio=line_height_ratio,
+                )
+                if layout.is_overflow:
+                    continue
+                utilization = [advance / max(1.0, rect.width()) for advance in advances]
+                balance = float(np.std(utilization)) if len(utilization) > 1 else 0.0
+                key = (
+                    self._bad_line_break_count(lines, text),
+                    max(0, len(lines) - preferred_max_lines),
+                    -font_pixel_size(font),
+                    balance,
+                    abs(layout.area_usage - 0.62),
+                    abs(line_height_ratio - 1.12),
+                )
+                if best_key is None or key < best_key:
+                    best_key = key
+                    best_layout = layout
+        return best_layout
 
     def layout_text_at_fixed_size(
         self,
@@ -343,6 +575,9 @@ class TextRenderer:
         mask: np.ndarray | None = None,
         font_family: str | None = None,
         alignment: str = "center",
+        padding: dict[str, float] | None = None,
+        margin: dict[str, float] | None = None,
+        target_center_y: float | None = None,
     ) -> TextLayoutResult:
         """Lay out text without changing the caller's requested font size."""
         if font_family is None:
@@ -359,22 +594,16 @@ class TextRenderer:
         _set_font_pixel_size(font, requested_size)
 
         if mask is not None:
-            original_mask = np.asarray(mask) > 0
-            mask_bool = original_mask
-            if original_mask.ndim == 2 and bool(original_mask.any()):
-                import cv2
-
-                mh, mw = original_mask.shape[:2]
-                border_thickness = max(2, int(min(mw, mh) * 0.03))
-                kernel = cv2.getStructuringElement(
-                    cv2.MORPH_ELLIPSE,
-                    (border_thickness, border_thickness),
+            candidate_masks = [
+                self.make_safe_mask(
+                    mask,
+                    padding=padding,
+                    margin=margin,
+                    stroke_width=max(1.0, requested_size / 12.0),
+                    inset_scale=scale,
                 )
-                mask_bool = cv2.erode(original_mask.astype(np.uint8), kernel, iterations=1) > 0
-
-            candidate_masks = [mask_bool]
-            if not np.array_equal(original_mask, mask_bool):
-                candidate_masks.append(original_mask)
+                for scale in (1.0, 0.7)
+            ]
 
             for candidate_mask in candidate_masks:
                 if candidate_mask.ndim != 2 or not bool(candidate_mask.any()):
@@ -389,6 +618,7 @@ class TextRenderer:
                         allow_char_break=allow_char_break,
                         dynamic_max=requested_size,
                         min_size=0.0,
+                        target_center_y=target_center_y,
                     )
                     if layout is not None:
                         layout.reached_min_font = False
@@ -403,41 +633,46 @@ class TextRenderer:
                 requested_size,
                 font_family=font_family,
                 alignment=alignment,
+                padding=padding,
+                margin=margin,
+                target_center_y=target_center_y,
             )
             fallback.is_overflow = True
             return fallback
 
-        padding_x = min(8.0, rect.width() * 0.08)
-        padding_y = min(6.0, rect.height() * 0.08)
-        inner_rect = QRectF(
-            rect.x() + padding_x,
-            rect.y() + padding_y,
-            max(10.0, rect.width() - padding_x * 2),
-            max(10.0, rect.height() - padding_y * 2),
-        )
+        inner_rect = self.content_rect(rect, padding=padding, margin=margin)
+        for allow_char_break in (False, True):
+            layout = self._best_rect_layout_for_candidates(
+                text,
+                inner_rect,
+                font_family,
+                [requested_size],
+                alignment,
+                0.0,
+                allow_char_break,
+            )
+            if layout is not None:
+                layout.reached_min_font = False
+                return layout
+
         lines = self.wrap_korean_text(
             text,
             inner_rect.width(),
             font,
-            allow_char_break=False,
-        )
-        if lines is None:
-            lines = self.wrap_korean_text(
-                text,
-                inner_rect.width(),
-                font,
-                allow_char_break=True,
-            )
-        layout = self.layout_lines_in_rect(
-            lines or [text],
+            allow_char_break=True,
+        ) or [text]
+        fallback = self.layout_lines_in_rect(
+            lines,
             inner_rect,
             font,
             inner_rect.width(),
             alignment=alignment,
             min_size=0.0,
+            line_height_ratio=1.0,
         )
-        layout.reached_min_font = False
-        return layout
+        fallback.is_overflow = True
+        fallback.reached_min_font = False
+        return fallback
 
     def center_layout_vertically(
         self,
@@ -477,6 +712,8 @@ class TextRenderer:
             score=layout.score,
             is_overflow=layout.is_overflow,
             reached_min_font=layout.reached_min_font,
+            line_height_ratio=layout.line_height_ratio,
+            area_usage=layout.area_usage,
         )
 
     def make_ellipse_mask(self, width: int, height: int, inset: int = 0) -> np.ndarray:
@@ -500,6 +737,9 @@ class TextRenderer:
         font_family: str | None = None,
         min_size: float | None = None,
         max_size: float | None = None,
+        padding: dict[str, float] | None = None,
+        margin: dict[str, float] | None = None,
+        target_center_y: float | None = None,
     ) -> TextLayoutResult:
         if font_family is None:
             resolved_font, chain = font_resolver.resolve(text, target_lang="Korean")
@@ -509,67 +749,82 @@ class TextRenderer:
         configured_min_size = float(self.min_font_size if min_size is None else min_size)
         min_size = self._automatic_min_font_size(configured_min_size, max_size)
 
-        # Preprocess mask: Erode to reserve padding away from speech bubble outlines
-        original_mask = np.asarray(mask) > 0
-        if mask is not None and mask.ndim == 2 and np.any(mask):
-            import cv2
-            mh, mw = mask.shape[:2]
-            border_thickness = max(2, int(min(mw, mh) * 0.03))
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (border_thickness, border_thickness))
-            mask = cv2.erode(mask, kernel, iterations=1)
-
         mask_bool = np.asarray(mask) > 0
         if mask_bool.ndim != 2 or not bool(mask_bool.any()):
-            font, lines, render_width = self.find_optimal_font_size(text, rect, font_family, min_size, max_size)
-            return self.layout_lines_in_rect(lines, rect, font, render_width, min_size=min_size)
+            font, lines, render_width = self.find_optimal_font_size(
+                text,
+                rect,
+                font_family,
+                min_size,
+                max_size,
+                padding=padding,
+                margin=margin,
+            )
+            content_rect = self.content_rect(rect, padding=padding, margin=margin)
+            return self.layout_lines_in_rect(lines, content_rect, font, render_width, min_size=min_size)
 
         dynamic_max = min(max_size, max(min_size, rect.height() * 0.85, rect.width() * 0.65))
         candidate_sizes = self._candidate_font_sizes(min_size, dynamic_max)
-        best_layout = self._best_layout_for_font_candidates(
-            text,
-            rect,
-            mask_bool,
-            font_family,
-            candidate_sizes,
-            allow_char_break=False,
-            dynamic_max=dynamic_max,
-            min_size=min_size,
-        )
-
-        if best_layout is None:
-            best_layout = self._best_layout_for_font_candidates(
-                text,
-                rect,
+        safe_masks = [
+            self.make_safe_mask(
                 mask_bool,
-                font_family,
-                candidate_sizes,
-                allow_char_break=True,
-                dynamic_max=dynamic_max,
-                min_size=min_size,
+                padding=padding,
+                margin=margin,
+                stroke_width=max(1.0, dynamic_max / 12.0),
+                inset_scale=scale,
             )
-
-        if best_layout is not None:
-            return best_layout
-
-        # The eroded mask protects the bubble outline, but can become too
-        # restrictive for very dense text. Retry with the original mask before
-        # falling back to a rectangular layout that may overflow.
-        if not np.array_equal(original_mask, mask_bool):
+            for scale in (1.0, 0.7)
+        ]
+        best_layout = None
+        for safe_mask in safe_masks:
             best_layout = self._best_layout_for_font_candidates(
                 text,
                 rect,
-                original_mask,
+                safe_mask,
                 font_family,
                 candidate_sizes,
-                allow_char_break=True,
+                allow_char_break=False,
                 dynamic_max=dynamic_max,
                 min_size=min_size,
+                target_center_y=target_center_y,
             )
             if best_layout is not None:
                 return best_layout
 
-        font, lines, render_width = self.find_optimal_font_size(text, rect, font_family, min_size, max_size)
-        return self.layout_lines_in_rect(lines, rect, font, render_width, min_size=min_size)
+        for safe_mask in safe_masks:
+            best_layout = self._best_layout_for_font_candidates(
+                text,
+                rect,
+                safe_mask,
+                font_family,
+                candidate_sizes,
+                allow_char_break=True,
+                dynamic_max=dynamic_max,
+                min_size=min_size,
+                target_center_y=target_center_y,
+            )
+            if best_layout is not None:
+                return best_layout
+
+        font, lines, render_width = self.find_optimal_font_size(
+            text,
+            rect,
+            font_family,
+            min_size,
+            max_size,
+            padding=padding,
+            margin=margin,
+        )
+        content_rect = self.content_rect(rect, padding=padding, margin=margin)
+        fallback = self.layout_lines_in_rect(
+            lines,
+            content_rect,
+            font,
+            render_width,
+            min_size=min_size,
+        )
+        fallback.is_overflow = True
+        return fallback
 
     def _candidate_font_sizes(self, min_size: float, max_size: float) -> list[float]:
         if max_size <= min_size:
@@ -594,34 +849,62 @@ class TextRenderer:
         allow_char_break: bool,
         dynamic_max: float,
         min_size: float,
+        target_center_y: float | None = None,
     ) -> TextLayoutResult | None:
         best_layout = None
-        best_score = float("inf")
+        best_key = None
+        if rect.width() > rect.height() * 1.6:
+            preferred_max_lines = 3
+        elif rect.height() > rect.width() * 1.6:
+            preferred_max_lines = 6
+        else:
+            preferred_max_lines = 4
 
         for size in candidate_sizes:
             font = QFont(font_family)
             _set_font_pixel_size(font, size)
-            layout = self._layout_text_in_mask(
-                text,
-                rect,
-                mask,
-                font,
-                allow_char_break=allow_char_break,
-                min_size=min_size,
-            )
-            if layout is None:
-                continue
+            for line_height_ratio in (1.12, 1.06, 1.0, 1.18):
+                layout = self._layout_text_in_mask(
+                    text,
+                    rect,
+                    mask,
+                    font,
+                    allow_char_break=allow_char_break,
+                    min_size=min_size,
+                    line_height_ratio=line_height_ratio,
+                    target_center_y=target_center_y,
+                )
+                if layout is None:
+                    continue
 
-            # Reward readable font sizes strongly enough that the optimizer
-            # does not prefer excessive wrapping merely to minimize unused
-            # mask area.
-            font_reward = (size / max(1.0, dynamic_max)) * 0.45
-            candidate_score = layout.score - font_reward
-            if candidate_score < best_score:
-                best_score = candidate_score
-                best_layout = layout
+                bad_breaks = self._bad_line_break_count(layout.lines, text)
+                excess_lines = max(0, len(layout.lines) - preferred_max_lines)
+                key = (
+                    bad_breaks,
+                    excess_lines,
+                    -font_pixel_size(layout.font),
+                    layout.score,
+                    abs(line_height_ratio - 1.12),
+                )
+                if best_key is None or key < best_key:
+                    best_key = key
+                    best_layout = layout
 
         return best_layout
+
+    def _bad_line_break_count(self, lines: list[str], text: str) -> int:
+        if len(text.strip()) <= 1:
+            return 0
+        bad = 0
+        for line in lines:
+            stripped = line.strip()
+            if len(stripped) <= 1:
+                bad += 1
+            if stripped[:1] in _LINE_START_PUNCTUATION:
+                bad += 1
+            if stripped[-1:] in _LINE_END_PUNCTUATION:
+                bad += 1
+        return bad
 
     def _layout_text_in_mask(
         self,
@@ -631,10 +914,13 @@ class TextRenderer:
         font: QFont,
         allow_char_break: bool,
         min_size: float,
+        line_height_ratio: float = 1.0,
+        target_center_y: float | None = None,
     ) -> TextLayoutResult | None:
         metrics = QFontMetricsF(font)
-        line_height = max(1.0, metrics.height())
-        slots = self._line_slots_from_mask(mask, rect, line_height)
+        glyph_height = max(1.0, metrics.height())
+        line_height = max(glyph_height, glyph_height * line_height_ratio)
+        slots = self._line_slots_from_mask(mask, rect, glyph_height, line_height)
         if not slots:
             return None
 
@@ -660,9 +946,20 @@ class TextRenderer:
                 for line, slot in zip(wrapped, used_slots)
             ]
 
-            score = self._layout_score(line_layouts, advances, used_slots, rect, mask, line_height, wrap_score)
+            score = self._layout_score(
+                line_layouts,
+                advances,
+                used_slots,
+                rect,
+                mask,
+                line_height,
+                wrap_score,
+                target_center_y=target_center_y,
+            )
             if score < best_score:
                 best_score = score
+                text_area = sum(max(1.0, advance) * glyph_height * 0.72 for advance in advances)
+                safe_area = float(max(1, np.count_nonzero(mask)))
                 best_result = TextLayoutResult(
                     font=font,
                     lines=wrapped,
@@ -671,6 +968,8 @@ class TextRenderer:
                     score=score,
                     is_overflow=False,
                     reached_min_font=font_pixel_size(font) <= int(round(min_size)),
+                    line_height_ratio=line_height_ratio,
+                    area_usage=min(1.0, text_area / safe_area),
                 )
 
         return best_result
@@ -684,13 +983,20 @@ class TextRenderer:
         mask: np.ndarray,
         line_height: float,
         wrap_score: float,
+        target_center_y: float | None = None,
     ) -> float:
         if not line_layouts:
             return float("inf")
 
         used_center = (line_layouts[0].y + line_layouts[-1].y + line_height) / 2.0
-        rect_center = rect.y() + rect.height() / 2.0
-        center_penalty = abs(used_center - rect_center) / max(1.0, rect.height())
+        mask_ys = np.where(mask)[0]
+        mask_center = (
+            rect.y() + float(np.mean(mask_ys))
+            if mask_ys.size
+            else rect.y() + rect.height() / 2.0
+        )
+        desired_center = mask_center if target_center_y is None else float(target_center_y)
+        center_penalty = abs(used_center - desired_center) / max(1.0, rect.height())
         vertical_fill = (len(line_layouts) * line_height) / max(1.0, rect.height())
         avg_util = float(
             np.mean([advance / max(1.0, slot.width) for advance, slot in zip(advances, slots)])
@@ -711,44 +1017,59 @@ class TextRenderer:
             - avg_util * 0.10
         )
 
-    def _line_slots_from_mask(self, mask: np.ndarray, rect: QRectF, line_height: float) -> list[TextLineLayout]:
+    def _line_slots_from_mask(
+        self,
+        mask: np.ndarray,
+        rect: QRectF,
+        glyph_height: float,
+        line_advance: float | None = None,
+    ) -> list[TextLineLayout]:
         ys, _ = np.where(mask)
         if ys.size == 0:
             return []
 
         y_min = int(ys.min())
         y_max = int(ys.max()) + 1
-        band_height = max(1, int(round(line_height)))
+        band_height = max(1, int(np.ceil(glyph_height)))
+        line_advance = max(glyph_height, float(line_advance or glyph_height))
+        advance_pixels = max(1, int(round(line_advance)))
         min_width = max(10.0, rect.width() * 0.12)
         slots: list[TextLineLayout] = []
+        mask_xs = np.where(mask)[1]
+        mask_center_x = float(np.mean(mask_xs)) if mask_xs.size else mask.shape[1] / 2.0
 
         top = y_min
         while top + band_height <= y_max:
-            band = mask[top : top + band_height, :]
-            row_mins = []
-            row_maxs = []
-            for row in band:
-                xs = np.where(row)[0]
-                if xs.size:
-                    row_mins.append(int(xs.min()))
-                    row_maxs.append(int(xs.max()) + 1)
-
-            if len(row_mins) >= max(1, int(band_height * 0.6)):
-                x1 = float(np.percentile(row_mins, 75))
-                x2 = float(np.percentile(row_maxs, 25))
-                width = x2 - x1
-                if width >= min_width:
+            band = np.asarray(mask[top : top + band_height, :], dtype=bool)
+            if band.shape[0] == band_height and bool(np.all(np.any(band, axis=1))):
+                common = np.all(band, axis=0).astype(np.int8)
+                changes = np.diff(np.pad(common, (1, 1)))
+                starts = np.where(changes == 1)[0]
+                ends = np.where(changes == -1)[0]
+                runs = [
+                    (int(start), int(end))
+                    for start, end in zip(starts, ends)
+                    if end - start >= min_width
+                ]
+                if runs:
+                    x1, x2 = max(
+                        runs,
+                        key=lambda run: (
+                            run[1] - run[0],
+                            -abs((run[0] + run[1]) / 2.0 - mask_center_x),
+                        ),
+                    )
                     slots.append(
                         TextLineLayout(
                             text="",
                             x=rect.x() + x1,
                             y=rect.y() + top,
-                            width=width,
-                            height=line_height,
+                            width=float(x2 - x1),
+                            height=line_advance,
                         )
                     )
 
-            top += band_height
+            top += advance_pixels
 
         return slots
 
@@ -804,13 +1125,13 @@ class TextRenderer:
             return None
 
         candidates = []
-        word_tokens = [token for token in paragraph.split(" ") if token]
-        if word_tokens:
-            candidates.append((word_tokens, " "))
-        if allow_char_break or " " not in paragraph:
-            char_tokens = [char for char in paragraph if not char.isspace()]
-            if char_tokens:
-                candidates.append((char_tokens, ""))
+        primary_tokens = unicode_break_tokens(paragraph)
+        if primary_tokens:
+            candidates.append((primary_tokens, ""))
+        if allow_char_break:
+            grapheme_tokens = unicode_break_tokens(paragraph, allow_grapheme_breaks=True)
+            if grapheme_tokens and grapheme_tokens != primary_tokens:
+                candidates.append((grapheme_tokens, ""))
 
         metrics = QFontMetricsF(font)
         best = None

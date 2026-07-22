@@ -34,6 +34,7 @@ interface CanvasProps {
   onImageLoaded?: () => void;
   onImportImages: () => void;
   onOpenProject: () => void;
+  isBackendReady?: boolean;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
   onToggleInspector: () => void;
@@ -67,6 +68,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onImageLoaded,
   onImportImages,
   onOpenProject,
+  isBackendReady = true,
   onToggleSidebar,
   isSidebarOpen,
   onToggleInspector,
@@ -206,7 +208,12 @@ export const Canvas: React.FC<CanvasProps> = ({
       {isMultiPageSelection ? (
         <CanvasMultiSelectEmpty selectedPageCount={selectedPageCount} />
       ) : !displayImageUrl ? (
-        <CanvasEmptyState onImportImages={onImportImages} onOpenProject={onOpenProject} t={t ?? ((key) => key)} />
+        <CanvasEmptyState
+          onImportImages={onImportImages}
+          onOpenProject={onOpenProject}
+          isBackendReady={isBackendReady}
+          t={t ?? ((key) => key)}
+        />
       ) : (
         <CanvasImageStage
           ref={viewportRef}
@@ -449,9 +456,15 @@ export const Canvas: React.FC<CanvasProps> = ({
           box-shadow: 0 6px 18px color-mix(in srgb, var(--system-blue) 24%, transparent);
         }
 
-        .canvas-empty-primary:hover {
+        .canvas-empty-primary:hover:not(:disabled) {
           background: var(--system-blue-hover);
           border-color: var(--system-blue-hover);
+        }
+
+        .canvas-empty-primary:disabled {
+          cursor: wait;
+          opacity: 0.55;
+          box-shadow: none;
         }
 
         .canvas-empty-secondary {

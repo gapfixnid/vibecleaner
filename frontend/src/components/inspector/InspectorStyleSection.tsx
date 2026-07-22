@@ -97,7 +97,7 @@ export function InspectorStyleSection({
             </span>
           </div>
           <div className="font-layout-summary">
-            {t("inspector.computedFontSize")} {selectedBubble.computed_font_size}px · {selectedBubble.lines.length} {t("inspector.lines")}
+            {t("inspector.computedFontSize")} {selectedBubble.computed_font_size}px · {selectedBubble.lines.length} {t("inspector.lines")} · {t("inspector.areaUsage")} {Math.round(selectedBubble.layout_area_usage * 100)}%
           </div>
           {selectedBubble.layout_overflow && (
             <div className="font-overflow-warning" role="status">

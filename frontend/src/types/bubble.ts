@@ -24,6 +24,8 @@ export interface TextLineDto {
 export interface TextLayoutDto {
   lines: TextLineDto[];
   overflow: boolean;
+  line_height_ratio?: number;
+  area_usage?: number;
   writing_mode?: string;
   text_direction?: string;
   justification?: string;
