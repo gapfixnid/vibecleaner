@@ -258,7 +258,8 @@ function App() {
 
   const { backendError, isRetryingBackend, isBootstrapping, handleRetryBackend } = useBackendBootstrap({
     setSettings,
-    loadPagesFromServer,
+    fetchPagesFromServer: pagesApi.fetchPagesFromServer,
+    commitPagesFromServer: pagesApi.commitPagesFromServer,
     onBackendGenerationChange: resetForBackendRestart,
   });
 

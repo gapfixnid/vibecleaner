@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, type MutableRefObject } from "react";
 import * as api from "../services/api";
-import type { PageInfo } from "../types";
+import type { PageInfo, PagesResponse } from "../types";
 import type { RunTask, ShowError } from "./useProcessingTask";
 
 interface UsePagesDeps {
@@ -62,33 +62,43 @@ export function usePages({
     onPagesCleared();
   }, [currentIndexRef, onPagesCleared]);
 
+  const fetchPagesFromServer = useCallback(() => api.getPages(), []);
+
+  const commitPagesFromServer = useCallback(
+    (
+      data: PagesResponse,
+      selectIndex?: number,
+      options?: { skipPageActivation?: boolean },
+    ) => {
+      setPages(data.pages);
+      const newIdx = selectIndex !== undefined ? selectIndex : data.current_index;
+      currentIndexRef.current = newIdx;
+      setCurrentIndex(newIdx);
+      if (options?.skipPageActivation) return;
+      if (newIdx >= 0) {
+        onPageActivated(newIdx);
+      } else {
+        onPagesCleared();
+      }
+    },
+    [currentIndexRef, onPageActivated, onPagesCleared],
+  );
+
   const loadPagesFromServer = useCallback(
     async (
       selectIndex?: number,
       options?: { skipPageActivation?: boolean; throwOnError?: boolean },
     ) => {
       try {
-        const data = await api.getPages();
-        setPages(data.pages);
-        const newIdx = selectIndex !== undefined ? selectIndex : data.current_index;
-        currentIndexRef.current = newIdx;
-        setCurrentIndex(newIdx);
-        if (options?.skipPageActivation) {
-          // Metadata-only change (e.g. rename) — skip bubble fetch
-          return;
-        }
-        if (newIdx >= 0) {
-          onPageActivated(newIdx);
-        } else {
-          onPagesCleared();
-        }
+        const data = await fetchPagesFromServer();
+        commitPagesFromServer(data, selectIndex, options);
       } catch (e) {
         console.error("Failed to fetch pages", e);
         if (options?.throwOnError) throw e;
         showError(t("pages.loadFailedTitle"), t("pages.loadFailedMessage"));
       }
     },
-    [currentIndexRef, onPageActivated, onPagesCleared, showError, t]
+    [commitPagesFromServer, fetchPagesFromServer, showError, t]
   );
 
   const handleSelectPage = useCallback(
@@ -224,6 +234,8 @@ export function usePages({
     bumpPageVersion,
     resetPageVersions,
     clearPagesForBackendRestart,
+    fetchPagesFromServer,
+    commitPagesFromServer,
     loadPagesFromServer,
     handleSelectPage,
     handleDuplicatePage,

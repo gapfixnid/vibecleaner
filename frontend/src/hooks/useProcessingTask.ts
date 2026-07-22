@@ -64,6 +64,18 @@ const POLL_INTERVAL_MS = 500;
 /** Sentinel error for user-initiated cancellation (not a real failure). */
 const CANCELLED = "__job_cancelled__";
 
+interface ProcessingTaskRuntime {
+  getJob: typeof api.getJob;
+  cancelJob: typeof api.cancelJob;
+  pollIntervalMs: number;
+}
+
+const DEFAULT_RUNTIME: ProcessingTaskRuntime = {
+  getJob: api.getJob,
+  cancelJob: api.cancelJob,
+  pollIntervalMs: POLL_INTERVAL_MS,
+};
+
 /**
  * Owns the global processing state and provides:
  * - `runTask`: a wrapper that toggles busy state and surfaces failures through
@@ -77,7 +89,8 @@ export function useProcessingTask(
   showError: ShowError,
   t: (key: string) => string = (key) => key,
   /** Called once when a user-requested cancellation completes (e.g. show a toast). */
-  notifyCancelled?: () => void
+  notifyCancelled?: () => void,
+  runtime: ProcessingTaskRuntime = DEFAULT_RUNTIME,
 ) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isWaitingForImageReload, setIsWaitingForImageReload] = useState(false);
@@ -108,9 +121,9 @@ export function useProcessingTask(
     const jobId = currentJobIdRef.current;
     if (jobId) {
       // Best effort: the poll loop exits via cancelRequestedRef regardless.
-      api.cancelJob(jobId).catch(() => {});
+      runtime.cancelJob(jobId).catch(() => {});
     }
-  }, []);
+  }, [runtime]);
 
   const waitForJob = useCallback(
     async (startedJob: JobStatus, fallbackStatus: string, options?: WaitForJobOptions): Promise<unknown> => {
@@ -163,8 +176,8 @@ export function useProcessingTask(
           if (Date.now() > deadline) {
             throw new Error(`${job.kind || "Job"} timed out`);
           }
-          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-          job = await api.getJob(job.job_id);
+          await new Promise((resolve) => setTimeout(resolve, runtime.pollIntervalMs));
+          job = await runtime.getJob(job.job_id);
           publish(job);
           if (pollingGeneration === pollingGenerationRef.current) {
             options?.onProgress?.(job);
@@ -179,7 +192,7 @@ export function useProcessingTask(
         }
       }
     },
-    []
+    [runtime]
   );
 
   const runTask = useCallback(

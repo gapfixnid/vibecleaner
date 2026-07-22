@@ -11,6 +11,7 @@ from backend.core.models import MangaPage
 from backend.core.state.project_state import ProjectState
 from backend.infrastructure.storage.project_schema import (
     CURRENT_PROJECT_SCHEMA_VERSION,
+    ORIGINAL_PAGE_ID_EXTENSION,
     PROJECT_FORMAT,
 )
 
@@ -121,3 +122,40 @@ def test_load_save_round_trip_preserves_additive_extension_fields(tmp_path):
     assert saved_bubble["future_bubble_field"] == "keep"
     assert saved_bubble["style"]["future_style_field"] == 42
     assert saved_bubble["layout_plan"]["future_layout_field"] == "keep"
+
+
+def test_malicious_project_page_id_is_rekeyed_before_runtime_and_round_trip(tmp_path):
+    source = tmp_path / "malicious.vibe"
+    destination = tmp_path / "safe.vibe"
+    success, encoded = project_route.cv2.imencode(".png", np.zeros((8, 12, 3), dtype=np.uint8))
+    assert success
+    metadata = {
+        "format": PROJECT_FORMAT,
+        "schema_version": CURRENT_PROJECT_SCHEMA_VERSION,
+        "app_version": "external",
+        "version": "2.0",
+        "current_index": 0,
+        "selected_indices": [0],
+        "pages": [{
+            "page_id": r"..\outside",
+            "file_name": "page_0_orig.png",
+            "original_file_path": "source.png",
+            "inpaint_file_name": None,
+            "bubbles": [],
+        }],
+    }
+    with zipfile.ZipFile(source, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("project.json", json.dumps(metadata))
+        archive.writestr("images/page_0_orig.png", encoded.tobytes())
+
+    container = SimpleNamespace(project_state=ProjectState(), cache_tasks=DeferredCacheTasks())
+    project_route.load_project(file_path=str(source), container=container)
+    loaded_page = container.project_state.pages[0]
+    assert len(loaded_page.page_id) == 32
+    assert loaded_page.project_extensions[ORIGINAL_PAGE_ID_EXTENSION] == r"..\outside"
+
+    project_route.save_project(file_path=str(destination), selected_indices="[0]", container=container)
+    with zipfile.ZipFile(destination, "r") as archive:
+        saved_page = json.loads(archive.read("project.json"))["pages"][0]
+    assert saved_page["page_id"] == loaded_page.page_id
+    assert saved_page[ORIGINAL_PAGE_ID_EXTENSION] == r"..\outside"

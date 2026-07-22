@@ -3,15 +3,24 @@ import * as api from "../services/api";
 import * as desktop from "../services/desktop";
 import { mergeBackendStatus } from "../lib/backendStatus";
 import type { BackendStatus } from "../types/backend";
-import type { Settings } from "../types";
+import type { PagesResponse, Settings } from "../types";
+
+interface BackendTransport {
+  getBackendStatus: typeof desktop.getBackendStatus;
+  retryBackend: typeof desktop.retryBackend;
+  onBackendStatusChanged: typeof desktop.onBackendStatusChanged;
+}
+
+const reportBackendError = (message: string, error: unknown) => console.error(message, error);
 
 interface UseBackendBootstrapDeps {
   setSettings: Dispatch<SetStateAction<Settings>>;
-  loadPagesFromServer: (
-    selectIndex?: number,
-    options?: { skipPageActivation?: boolean; throwOnError?: boolean },
-  ) => Promise<void>;
+  fetchPagesFromServer: () => Promise<PagesResponse>;
+  commitPagesFromServer: (pages: PagesResponse) => void;
   onBackendGenerationChange: () => void | Promise<void>;
+  fetchSettingsFromServer?: () => Promise<Settings>;
+  backendTransport?: BackendTransport;
+  reportError?: (message: string, error: unknown) => void;
 }
 
 export interface BackendErrorInfo {
@@ -21,8 +30,12 @@ export interface BackendErrorInfo {
 
 export function useBackendBootstrap({
   setSettings,
-  loadPagesFromServer,
+  fetchPagesFromServer,
+  commitPagesFromServer,
   onBackendGenerationChange,
+  fetchSettingsFromServer = api.getSettings,
+  backendTransport = desktop,
+  reportError = reportBackendError,
 }: UseBackendBootstrapDeps) {
   const [backendError, setBackendError] = useState<BackendErrorInfo | null>(null);
   const [isRetryingBackend, setIsRetryingBackend] = useState(false);
@@ -31,11 +44,6 @@ export function useBackendBootstrap({
   const handledRunningGenerationRef = useRef<number | null>(null);
   const hydratingGenerationRef = useRef<number | null>(null);
   const resetGenerationRef = useRef<number | null>(null);
-
-  const loadSettingsFromServer = useCallback(async () => {
-    const data = await api.getSettings();
-    setSettings(data);
-  }, [setSettings]);
 
   const applyStatus = useCallback(async (incoming: BackendStatus) => {
     const current = statusRef.current;
@@ -63,15 +71,19 @@ export function useBackendBootstrap({
           await onBackendGenerationChange();
           resetGenerationRef.current = generation;
         }
-        await loadSettingsFromServer();
         if (statusRef.current?.generation !== generation || statusRef.current.phase !== "running") return;
-        await loadPagesFromServer(undefined, { throwOnError: true });
+        const [settings, pages] = await Promise.all([
+          fetchSettingsFromServer(),
+          fetchPagesFromServer(),
+        ]);
         if (statusRef.current?.generation !== generation || statusRef.current.phase !== "running") return;
+        setSettings(settings);
+        commitPagesFromServer(pages);
         handledRunningGenerationRef.current = generation;
         setBackendError(null);
         setIsBootstrapping(false);
       } catch (error) {
-        console.error("Failed to hydrate backend state", error);
+        reportError("Failed to hydrate backend state", error);
         if (statusRef.current?.generation === generation && statusRef.current.phase === "running") {
           setBackendError({
             code: "unreachable",
@@ -95,7 +107,7 @@ export function useBackendBootstrap({
       setBackendError({ code: "unreachable", detail: merged.error?.message ?? null });
       setIsBootstrapping(false);
     }
-  }, [loadPagesFromServer, loadSettingsFromServer, onBackendGenerationChange]);
+  }, [commitPagesFromServer, fetchPagesFromServer, fetchSettingsFromServer, onBackendGenerationChange, reportError, setSettings]);
 
   useEffect(() => {
     let disposed = false;
@@ -103,10 +115,10 @@ export function useBackendBootstrap({
 
     const initialize = async () => {
       try {
-        unlisten = await desktop.onBackendStatusChanged((status) => {
+        unlisten = await backendTransport.onBackendStatusChanged((status) => {
           if (!disposed) void applyStatus(status);
         });
-        const status = await desktop.getBackendStatus();
+        const status = await backendTransport.getBackendStatus();
         if (!disposed) await applyStatus(status);
       } catch (error) {
         if (!disposed) {
@@ -123,12 +135,12 @@ export function useBackendBootstrap({
       disposed = true;
       unlisten();
     };
-  }, [applyStatus]);
+  }, [applyStatus, backendTransport]);
 
   const handleRetryBackend = useCallback(async () => {
     setIsRetryingBackend(true);
     try {
-      const status = await desktop.retryBackend();
+      const status = await backendTransport.retryBackend();
       await applyStatus(status);
     } catch (error) {
       console.error("retry_backend invocation failed", error);
@@ -139,7 +151,7 @@ export function useBackendBootstrap({
     } finally {
       setIsRetryingBackend(false);
     }
-  }, [applyStatus]);
+  }, [applyStatus, backendTransport]);
 
   return {
     backendError,

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import re
 from typing import Any, Callable, Mapping
+import uuid
 
 from ...core.version import __version__ as APP_VERSION
 
@@ -12,6 +14,8 @@ PROJECT_FORMAT = "vibecleaner-project"
 CURRENT_PROJECT_SCHEMA_VERSION = 2
 CURRENT_PROJECT_VERSION = "2.0"  # Compatibility alias for existing readers.
 LEGACY_PROJECT_SCHEMA_VERSION = 1
+SAFE_PAGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+ORIGINAL_PAGE_ID_EXTENSION = "vibecleaner_original_page_id"
 
 
 class ProjectSchemaError(ValueError):
@@ -91,7 +95,42 @@ def _normalize_current_schema(metadata: dict[str, Any]) -> dict[str, Any]:
     normalized["schema_version"] = CURRENT_PROJECT_SCHEMA_VERSION
     normalized["version"] = CURRENT_PROJECT_VERSION
     normalized.setdefault("app_version", "unknown")
+    _normalize_page_ids(normalized)
     return normalized
+
+
+def _normalize_page_ids(metadata: dict[str, Any]) -> None:
+    """Replace unsafe or duplicate persisted IDs before they reach routes/files."""
+    pages = metadata.get("pages")
+    if not isinstance(pages, list):
+        return
+
+    seen: set[str] = set()
+    normalized_pages: list[Any] = []
+    for raw_page in pages:
+        if not isinstance(raw_page, Mapping):
+            normalized_pages.append(raw_page)
+            continue
+
+        page = deepcopy(dict(raw_page))
+        original_id = page.get("page_id")
+        is_safe = (
+            isinstance(original_id, str)
+            and SAFE_PAGE_ID_PATTERN.fullmatch(original_id) is not None
+            and original_id not in seen
+        )
+        if not is_safe:
+            if "page_id" in page:
+                page[ORIGINAL_PAGE_ID_EXTENSION] = deepcopy(original_id)
+            replacement = uuid.uuid4().hex
+            while replacement in seen:
+                replacement = uuid.uuid4().hex
+            page["page_id"] = replacement
+
+        seen.add(page["page_id"])
+        normalized_pages.append(page)
+
+    metadata["pages"] = normalized_pages
 
 
 def _validate_current_schema(metadata: Mapping[str, Any]) -> None:
@@ -107,6 +146,11 @@ def _validate_current_schema(metadata: Mapping[str, Any]) -> None:
         raise InvalidProjectSchemaError("Project field 'pages' must be a list")
     if any(not isinstance(page, Mapping) for page in pages):
         raise InvalidProjectSchemaError("Every project page must be an object")
+    page_ids = [page.get("page_id") for page in pages]
+    if any(not isinstance(page_id, str) or SAFE_PAGE_ID_PATTERN.fullmatch(page_id) is None for page_id in page_ids):
+        raise InvalidProjectSchemaError("Every project page_id must be a safe path identifier")
+    if len(page_ids) != len(set(page_ids)):
+        raise InvalidProjectSchemaError("Project page_id values must be unique")
 
 
 def normalize_project_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:

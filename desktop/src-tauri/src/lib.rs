@@ -6,7 +6,85 @@ mod image_protocol;
 use backend_client::RequestClass;
 use backend_process::{BackendManager, BackendSession, BackendStatus};
 use error::{BridgeError, CommandResult};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use std::path::{Path, PathBuf};
 use tauri::Manager;
+
+fn encode_path_segment(value: &str, kind: &str) -> CommandResult<String> {
+    let forbidden = value.is_empty()
+        || value.len() > 128
+        || matches!(value, "." | "..")
+        || value
+            .chars()
+            .any(|character| matches!(character, '/' | '\\' | '#' | '?'))
+        || value.chars().any(char::is_control);
+    if forbidden {
+        return Err(BridgeError::new(
+            "INVALID_PATH_IDENTIFIER",
+            format!("Invalid {kind}."),
+            false,
+        ));
+    }
+    Ok(utf8_percent_encode(value, NON_ALPHANUMERIC).to_string())
+}
+
+fn page_api_path(page_id: &str, suffix: &str) -> CommandResult<String> {
+    Ok(format!(
+        "/api/pages/{}{suffix}",
+        encode_path_segment(page_id, "page_id")?
+    ))
+}
+
+fn job_api_path(job_id: &str, suffix: &str) -> CommandResult<String> {
+    Ok(format!(
+        "/api/jobs/{}{suffix}",
+        encode_path_segment(job_id, "job_id")?
+    ))
+}
+
+fn batch_export_path(output_dir: &Path, ordinal: usize) -> CommandResult<PathBuf> {
+    let canonical_dir = std::fs::canonicalize(output_dir).map_err(|error| {
+        BridgeError::new(
+            "INVALID_EXPORT_DIRECTORY",
+            format!("Cannot resolve export directory: {error}"),
+            false,
+        )
+    })?;
+    if !canonical_dir.is_dir() {
+        return Err(BridgeError::new(
+            "INVALID_EXPORT_DIRECTORY",
+            "The export destination is not a directory.",
+            false,
+        ));
+    }
+
+    let candidate = canonical_dir.join(format!("page_{:04}.png", ordinal + 1));
+    let checked_path = match std::fs::symlink_metadata(&candidate) {
+        Ok(_) => std::fs::canonicalize(&candidate).map_err(|error| {
+            BridgeError::new(
+                "INVALID_EXPORT_PATH",
+                format!("Cannot resolve export path: {error}"),
+                false,
+            )
+        })?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => candidate.clone(),
+        Err(error) => {
+            return Err(BridgeError::new(
+                "INVALID_EXPORT_PATH",
+                format!("Cannot inspect export path: {error}"),
+                false,
+            ))
+        }
+    };
+    if !checked_path.starts_with(&canonical_dir) {
+        return Err(BridgeError::new(
+            "INVALID_EXPORT_PATH",
+            "The export path escapes the selected directory.",
+            false,
+        ));
+    }
+    Ok(candidate)
+}
 
 async fn forward_get<T: serde::de::DeserializeOwned>(
     session: &BackendSession,
@@ -242,8 +320,8 @@ async fn get_page_for_session(
         .cloned()
         .ok_or_else(|| "Page not found".to_string())?;
 
-    let bubbles_res: serde_json::Value =
-        forward_get(session, &format!("/api/pages/{}/bubbles", page_id)).await?;
+    let bubbles_path = page_api_path(&page_id, "/bubbles")?;
+    let bubbles_res: serde_json::Value = forward_get(session, &bubbles_path).await?;
     let bubbles = bubbles_res
         .get("bubbles")
         .cloned()
@@ -495,14 +573,19 @@ async fn save_project(
 fn page_ref_fields(
     index: Option<i64>,
     page_id: Option<String>,
-) -> Result<Vec<(String, String)>, String> {
+) -> CommandResult<Vec<(String, String)>> {
     if let Some(pid) = page_id.filter(|s| !s.is_empty()) {
+        encode_path_segment(&pid, "page_id")?;
         return Ok(vec![("page_id".to_string(), pid)]);
     }
     if let Some(idx) = index {
         return Ok(vec![("index".to_string(), idx.to_string())]);
     }
-    Err("index 또는 page_id가 필요합니다.".to_string())
+    Err(BridgeError::new(
+        "INVALID_PAGE_REFERENCE",
+        "index 또는 page_id가 필요합니다.",
+        false,
+    ))
 }
 
 #[tauri::command]
@@ -542,9 +625,13 @@ async fn duplicate_pages_batch(
     page_ids: Option<Vec<String>>,
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
+    let page_ids = page_ids.unwrap_or_default();
+    for page_id in &page_ids {
+        encode_path_segment(page_id, "page_id")?;
+    }
     let payload = serde_json::json!({
         "page_indices": page_indices.unwrap_or_default(),
-        "page_ids": page_ids.unwrap_or_default(),
+        "page_ids": page_ids,
     });
     forward_post(&session, "/api/pages/duplicate-batch", &payload).await
 }
@@ -571,9 +658,13 @@ async fn delete_pages_batch(
     page_ids: Option<Vec<String>>,
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
+    let page_ids = page_ids.unwrap_or_default();
+    for page_id in &page_ids {
+        encode_path_segment(page_id, "page_id")?;
+    }
     let payload = serde_json::json!({
         "page_indices": page_indices.unwrap_or_default(),
-        "page_ids": page_ids.unwrap_or_default(),
+        "page_ids": page_ids,
     });
     forward_post(&session, "/api/pages/delete-batch", &payload).await
 }
@@ -603,12 +694,8 @@ async fn rename_page(
     name: String,
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
-    forward_form(
-        &session,
-        &format!("/api/pages/{}/rename", page_id),
-        vec![("name".to_string(), name)],
-    )
-    .await
+    let path = page_api_path(&page_id, "/rename")?;
+    forward_form(&session, &path, vec![("name".to_string(), name)]).await
 }
 
 async fn start_page_job(
@@ -616,7 +703,8 @@ async fn start_page_job(
     page_id: String,
     action: &str,
 ) -> CommandResult<serde_json::Value> {
-    forward_empty_post(session, &format!("/api/pages/{}/{}", page_id, action)).await
+    let path = page_api_path(&page_id, &format!("/{action}"))?;
+    forward_empty_post(session, &path).await
 }
 
 #[tauri::command]
@@ -644,9 +732,13 @@ async fn translate_batch(
     page_ids: Option<Vec<String>>,
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
+    let page_ids = page_ids.unwrap_or_default();
+    for page_id in &page_ids {
+        encode_path_segment(page_id, "page_id")?;
+    }
     let payload = serde_json::json!({
         "page_indices": page_indices.unwrap_or_default(),
-        "page_ids": page_ids.unwrap_or_default(),
+        "page_ids": page_ids,
     });
     forward_post(&session, "/api/pages/translate-batch", &payload).await
 }
@@ -657,12 +749,8 @@ async fn get_job(
     job_id: String,
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
-    forward_get_class(
-        &session,
-        &format!("/api/jobs/{}", job_id),
-        RequestClass::JobPoll,
-    )
-    .await
+    let path = job_api_path(&job_id, "")?;
+    forward_get_class(&session, &path, RequestClass::JobPoll).await
 }
 
 #[tauri::command]
@@ -671,7 +759,8 @@ async fn cancel_job(
     job_id: String,
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
-    forward_empty_post(&session, &format!("/api/jobs/{}/cancel", job_id)).await
+    let path = job_api_path(&job_id, "/cancel")?;
+    forward_empty_post(&session, &path).await
 }
 
 #[tauri::command]
@@ -684,8 +773,8 @@ async fn update_bubble(
     let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
 
-    let bubbles_res: serde_json::Value =
-        forward_get(&session, &format!("/api/pages/{}/bubbles", page_id)).await?;
+    let bubbles_path = page_api_path(&page_id, "/bubbles")?;
+    let bubbles_res: serde_json::Value = forward_get(&session, &bubbles_path).await?;
     let bubbles = bubbles_res
         .get("bubbles")
         .cloned()
@@ -765,12 +854,7 @@ async fn update_bubble(
 
     bubbles_arr[bubble_index] = current_bubble;
 
-    let _: serde_json::Value = forward_post(
-        &session,
-        &format!("/api/pages/{}/bubbles", page_id),
-        &bubbles_arr,
-    )
-    .await?;
+    let _: serde_json::Value = forward_post(&session, &bubbles_path, &bubbles_arr).await?;
 
     let page_dto = get_page_for_session(&session, page_id).await?;
     let bubbles_arr = page_dto
@@ -794,12 +878,8 @@ async fn update_bubbles(
     bubbles: serde_json::Value,
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
-    forward_post(
-        &session,
-        &format!("/api/pages/{}/bubbles", page_id),
-        &bubbles,
-    )
-    .await
+    let path = page_api_path(&page_id, "/bubbles")?;
+    forward_post(&session, &path, &bubbles).await
 }
 
 #[tauri::command]
@@ -839,7 +919,7 @@ async fn reocr_bubble(
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
-    let url = format!("/api/pages/{}/bubbles/{}/ocr", page_id, id_num);
+    let url = page_api_path(&page_id, &format!("/bubbles/{id_num}/ocr"))?;
     let _: serde_json::Value = forward_post(&session, &url, &serde_json::json!({})).await?;
 
     layout_bubble_for_session(&session, page_id, bubble_id).await
@@ -853,7 +933,7 @@ async fn retranslate_bubble(
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
-    let url = format!("/api/pages/{}/bubbles/{}/translate", page_id, id_num);
+    let url = page_api_path(&page_id, &format!("/bubbles/{id_num}/translate"))?;
     let job_status: serde_json::Value = forward_empty_post(&session, &url).await?;
 
     let job_id = job_status
@@ -872,12 +952,9 @@ async fn retranslate_bubble(
             ));
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let status: serde_json::Value = forward_get_class(
-            &session,
-            &format!("/api/jobs/{}", job_id),
-            RequestClass::JobPoll,
-        )
-        .await?;
+        let job_path = job_api_path(&job_id, "")?;
+        let status: serde_json::Value =
+            forward_get_class(&session, &job_path, RequestClass::JobPoll).await?;
         let state = status
             .get("status")
             .and_then(|v| v.as_str())
@@ -904,7 +981,7 @@ async fn autofit_bubble(
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
-    let url = format!("/api/pages/{}/bubbles/{}/inpaint", page_id, id_num);
+    let url = page_api_path(&page_id, &format!("/bubbles/{id_num}/inpaint"))?;
     let job_status: serde_json::Value = forward_empty_post(&session, &url).await?;
 
     let job_id = job_status
@@ -923,12 +1000,9 @@ async fn autofit_bubble(
             ));
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let status: serde_json::Value = forward_get_class(
-            &session,
-            &format!("/api/jobs/{}", job_id),
-            RequestClass::JobPoll,
-        )
-        .await?;
+        let job_path = job_api_path(&job_id, "")?;
+        let status: serde_json::Value =
+            forward_get_class(&session, &job_path, RequestClass::JobPoll).await?;
         let state = status
             .get("status")
             .and_then(|v| v.as_str())
@@ -956,8 +1030,8 @@ async fn delete_bubble(
     let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
 
-    let bubbles_res: serde_json::Value =
-        forward_get(&session, &format!("/api/pages/{}/bubbles", page_id)).await?;
+    let bubbles_path = page_api_path(&page_id, "/bubbles")?;
+    let bubbles_res: serde_json::Value = forward_get(&session, &bubbles_path).await?;
     let bubbles = bubbles_res
         .get("bubbles")
         .cloned()
@@ -966,12 +1040,7 @@ async fn delete_bubble(
     let mut bubbles_arr = bubbles.as_array().ok_or("Invalid bubbles array")?.clone();
     bubbles_arr.retain(|b| b.get("id").and_then(|v| v.as_i64()) != Some(id_num));
 
-    let _: serde_json::Value = forward_post(
-        &session,
-        &format!("/api/pages/{}/bubbles", page_id),
-        &bubbles_arr,
-    )
-    .await?;
+    let _: serde_json::Value = forward_post(&session, &bubbles_path, &bubbles_arr).await?;
 
     get_page_for_session(&session, page_id).await
 }
@@ -983,12 +1052,8 @@ async fn export_page_to_path(
     save_path: String,
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
-    forward_form(
-        &session,
-        &format!("/api/pages/{}/export", page_id),
-        vec![("save_path".to_string(), save_path)],
-    )
-    .await
+    let path = page_api_path(&page_id, "/export")?;
+    forward_form(&session, &path, vec![("save_path".to_string(), save_path)]).await
 }
 
 #[tauri::command]
@@ -1006,17 +1071,20 @@ async fn export_pages(
         .get("output_dir")
         .and_then(|v| v.as_str())
         .unwrap_or("./export");
+    let output_dir = Path::new(output_dir);
 
     let mut exported_paths = vec![];
 
-    for page_id in page_ids {
+    for (ordinal, page_id) in page_ids.iter().enumerate() {
         let page_id_str = page_id
             .as_str()
             .ok_or_else(|| "Invalid page_id".to_string())?;
-        let save_path = format!("{}/{}.png", output_dir, page_id_str);
+        let path = page_api_path(page_id_str, "/export")?;
+        let save_path = batch_export_path(output_dir, ordinal)?;
+        let save_path = save_path.to_string_lossy().into_owned();
         let _: serde_json::Value = forward_form_class(
             &session,
-            &format!("/api/pages/{}/export", page_id_str),
+            &path,
             vec![("save_path".to_string(), save_path.clone())],
             RequestClass::Export,
         )
@@ -1183,4 +1251,53 @@ pub fn run() {
             app_handle.state::<BackendManager>().shutdown(app_handle);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn path_segments_are_encoded_and_dangerous_inputs_are_rejected() {
+        assert_eq!(
+            page_api_path("page name", "/bubbles").unwrap(),
+            "/api/pages/page%20name/bubbles"
+        );
+        for value in [
+            "",
+            ".",
+            "..",
+            "../escape",
+            r"..\escape",
+            "page?x",
+            "page#x",
+            "line\nfeed",
+        ] {
+            assert_eq!(
+                encode_path_segment(value, "page_id").unwrap_err().code,
+                "INVALID_PATH_IDENTIFIER"
+            );
+        }
+    }
+
+    #[test]
+    fn batch_export_uses_fixed_filenames_inside_the_canonical_directory() {
+        let unique = format!(
+            "vibecleaner-export-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let directory = std::env::temp_dir().join(unique);
+        std::fs::create_dir(&directory).unwrap();
+
+        let export_path = batch_export_path(&directory, 0).unwrap();
+        let canonical_directory = std::fs::canonicalize(&directory).unwrap();
+        assert_eq!(export_path, canonical_directory.join("page_0001.png"));
+        assert!(export_path.starts_with(&canonical_directory));
+
+        std::fs::remove_dir(&directory).unwrap();
+    }
 }

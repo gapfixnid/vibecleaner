@@ -7,8 +7,8 @@
     "dev": "tauri dev --config desktop/src-tauri/tauri.dev.conf.json",
     "build": "tauri build",
     "build:sidecar:runtime": "powershell -ExecutionPolicy Bypass -File scripts/build-runtime-sidecar.ps1",
-    "verify:packaging": "python scripts/verify-packaging.py",
-    "verify:packaging:models": "python scripts/verify-packaging.py --require-model-files",
+    "verify:packaging": ".\\venv\\Scripts\\python.exe scripts/verify-packaging.py",
+    "verify:packaging:models": ".\\venv\\Scripts\\python.exe scripts/verify-packaging.py --require-model-files",
     "sync-version": "node scripts/sync-version.mjs"
   },
   "devDependencies": {

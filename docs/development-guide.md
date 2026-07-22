@@ -111,6 +111,8 @@ $env:TAURI_CONFIG='{"bundle":{"resources":[]}}'; cargo test --manifest-path desk
 ```
 
 You may replace the first executable with `python` when intentionally using a global environment.
+The same Python, frontend, and Rust checks run on every push to `main` and on
+pull requests through `.github/workflows/ci.yml`.
 
 ## Packaging
 

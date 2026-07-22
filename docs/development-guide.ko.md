@@ -109,6 +109,9 @@ npm --prefix frontend run lint
 $env:TAURI_CONFIG='{"bundle":{"resources":[]}}'; cargo test --manifest-path desktop/src-tauri/Cargo.toml
 ```
 
+동일한 Python, 프런트엔드, Rust 검사는 `.github/workflows/ci.yml`을 통해
+`main` 브랜치 push와 pull request마다 실행됩니다.
+
 전역 Python을 사용하는 환경에서는 첫 명령의 실행 파일만 `python`으로 바꿀 수 있습니다.
 
 ## 패키징

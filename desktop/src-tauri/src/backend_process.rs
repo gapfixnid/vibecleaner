@@ -97,17 +97,29 @@ impl BackendSession {
     pub fn ensure_current(&self) -> CommandResult<()> {
         let runtime = self.runtime.upgrade().ok_or_else(BridgeError::restarted)?;
         let runtime = lock_runtime(&runtime);
-        let is_current = runtime.generation == self.generation
-            && runtime.phase == BackendPhase::Running
-            && runtime
-                .client
-                .as_ref()
-                .is_some_and(|client| Arc::ptr_eq(client, &self.client));
-        if !is_current {
-            Err(BridgeError::restarted())
-        } else {
-            Ok(())
+        if runtime.generation != self.generation {
+            return Err(BridgeError::restarted());
         }
+        if runtime.phase == BackendPhase::Failed {
+            return Err(runtime.error.clone().unwrap_or_else(|| {
+                BridgeError::new("BACKEND_EXITED", "The backend exited unexpectedly.", true)
+            }));
+        }
+        if runtime.phase != BackendPhase::Running {
+            return Err(BridgeError::new(
+                "BACKEND_UNAVAILABLE",
+                "The backend is not running.",
+                true,
+            ));
+        }
+        if !runtime
+            .client
+            .as_ref()
+            .is_some_and(|client| Arc::ptr_eq(client, &self.client))
+        {
+            return Err(BridgeError::restarted());
+        }
+        Ok(())
     }
 }
 
@@ -643,7 +655,7 @@ mod tests {
     }
 
     #[test]
-    fn backend_session_is_invalidated_when_phase_stops() {
+    fn backend_session_reports_unavailable_when_phase_stops() {
         let manager = BackendManager::new();
         let client = Arc::new(BackendClient::new(49153, Some("token".to_string())).unwrap());
         {
@@ -656,7 +668,34 @@ mod tests {
         lock_runtime(&manager.runtime).phase = BackendPhase::Stopping;
         assert_eq!(
             session.ensure_current().unwrap_err().code,
-            "BACKEND_RESTARTED"
+            "BACKEND_UNAVAILABLE"
         );
+    }
+
+    #[test]
+    fn backend_session_preserves_same_generation_crash_error() {
+        let manager = BackendManager::new();
+        let client = Arc::new(BackendClient::new(49154, Some("token".to_string())).unwrap());
+        {
+            let mut runtime = lock_runtime(&manager.runtime);
+            runtime.generation = 10;
+            runtime.phase = BackendPhase::Running;
+            runtime.client = Some(client);
+        }
+        let session = manager.session_snapshot().unwrap();
+        {
+            let mut runtime = lock_runtime(&manager.runtime);
+            runtime.phase = BackendPhase::Failed;
+            runtime.client = None;
+            runtime.error = Some(BridgeError::new(
+                "BACKEND_EXITED",
+                "The backend crashed.",
+                true,
+            ));
+        }
+
+        let error = session.ensure_current().unwrap_err();
+        assert_eq!(error.code, "BACKEND_EXITED");
+        assert_eq!(error.message, "The backend crashed.");
     }
 }

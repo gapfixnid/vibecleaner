@@ -69,6 +69,15 @@ Browser code never receives the backend port or token. Images use the
 forwards only response headers needed to render and cache an image. Other API
 traffic stays behind Tauri commands.
 
+Persisted project page IDs are normalized to unique
+`[A-Za-z0-9_-]{1,128}` values before pages enter runtime state. Unsafe or
+duplicate values are replaced with UUID hex IDs and retained only in the
+`vibecleaner_original_page_id` extension field. Every Tauri page/job route
+uses the shared path-segment encoder and rejects raw separators, fragments,
+queries, control characters, and dot segments. Batch export uses fixed ordinal
+filenames and verifies the canonical destination remains inside the selected
+output directory; persisted IDs are never used as filesystem names.
+
 When a newer generation reaches `running`, React atomically stops job polling,
 clears pages, bubbles, selections, image versions, dirty state, loading state,
 and the active project path before reloading settings and pages. If the prior
@@ -76,7 +85,9 @@ generation held in-memory work, the user is warned that unsaved work was lost.
 Polling and task epochs are advanced at the same boundary, so completions and
 `finally` handlers from the previous backend cannot clear a newer job or busy
 state. The running generation is recorded as hydrated only after both settings
-and pages load successfully and the generation is still current.
+and pages load successfully and the generation is still current. Settings and
+pages are fetched first and committed together, so a generation change during
+hydration cannot leave either half of stale state visible.
 
 `backend/main.py` owns FastAPI app creation. `backend/core/container.py` is the
 composition root that wires concrete runtime dependencies.
