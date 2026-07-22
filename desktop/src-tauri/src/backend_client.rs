@@ -301,11 +301,79 @@ pub fn random_id() -> CommandResult<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::mpsc;
+    use std::thread;
+
+    fn fake_backend(
+        response: &'static str,
+        response_delay: Duration,
+    ) -> (u16, mpsc::Receiver<String>, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (request_tx, request_rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut bytes = [0_u8; 8192];
+            let read = stream.read(&mut bytes).unwrap();
+            request_tx
+                .send(String::from_utf8_lossy(&bytes[..read]).into_owned())
+                .unwrap();
+            thread::sleep(response_delay);
+            let _ = stream.write_all(response.as_bytes());
+        });
+        (port, request_rx, handle)
+    }
 
     #[test]
     fn random_ids_are_url_safe_and_unpadded() {
         let id = random_id().unwrap();
         assert!(!id.contains('='));
         assert_eq!(URL_SAFE_NO_PAD.decode(&id).unwrap().len(), 16);
+    }
+
+    #[tokio::test]
+    async fn authenticated_requests_send_token_and_request_id_headers() {
+        let (port, request_rx, handle) = fake_backend(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+            Duration::ZERO,
+        );
+        let client = BackendClient::new(port, Some("session-secret".to_string())).unwrap();
+        let _: serde_json::Value = client.get_json("/api/settings").await.unwrap();
+        let request = request_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        let request = request.to_ascii_lowercase();
+        assert!(request.starts_with("get /api/settings http/1.1"));
+        assert!(request.contains("x-vibecleaner-token: session-secret"));
+        assert!(request.contains("x-vibecleaner-request-id:"));
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn redirects_are_returned_as_errors_instead_of_followed() {
+        let (port, _request_rx, handle) = fake_backend(
+            "HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/rogue\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            Duration::ZERO,
+        );
+        let client = BackendClient::new(port, Some("session-secret".to_string())).unwrap();
+        let error = client
+            .get_json::<serde_json::Value>("/api/settings")
+            .await
+            .unwrap_err();
+        assert_eq!(error.http_status, Some(302));
+        assert_eq!(error.code, "BACKEND_HTTP_ERROR");
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn health_requests_use_the_short_timeout() {
+        let (port, _request_rx, handle) = fake_backend(
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            Duration::from_millis(900),
+        );
+        let client = BackendClient::new(port, None).unwrap();
+        let error = client.health("challenge").await.unwrap_err();
+        assert_eq!(error.code, "BACKEND_TIMEOUT");
+        handle.join().unwrap();
     }
 }

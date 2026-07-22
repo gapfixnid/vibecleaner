@@ -16,10 +16,10 @@ pub fn handle_image_request(
 ) {
     tauri::async_runtime::spawn(async move {
         let response = match validated_backend_path(&request) {
-            Ok(path) => match manager.client_snapshot() {
-                Ok((generation, client)) => match client.get_bytes(&path).await {
+            Ok(path) => match manager.session_snapshot() {
+                Ok(session) => match session.client.get_bytes(&path).await {
                     Ok(backend_response) => {
-                        if manager.ensure_generation(generation).is_err() {
+                        if session.ensure_current().is_err() {
                             error_response(StatusCode::SERVICE_UNAVAILABLE)
                         } else {
                             let mut builder = Response::builder().status(backend_response.status);

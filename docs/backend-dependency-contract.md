@@ -43,6 +43,14 @@ canonical message `vibecleaner-health-v1:<challenge>`. The shared client does
 not use system proxies or redirects and validates its generation after every
 response.
 
+Every Tauri API command captures one `BackendSession` at command entry. That
+session pins both the shared client and its generation for all reads,
+mutations, and job-poll requests performed by the command. Requests validate
+the session before sending and after receiving a response; composite commands
+also validate it before returning assembled data. A command must never acquire
+a second session midway through its work or combine values from two backend
+generations.
+
 The child watcher reports `BACKEND_EXITED` only when all of these remain true:
 
 - the watched generation is current;
@@ -65,6 +73,10 @@ When a newer generation reaches `running`, React atomically stops job polling,
 clears pages, bubbles, selections, image versions, dirty state, loading state,
 and the active project path before reloading settings and pages. If the prior
 generation held in-memory work, the user is warned that unsaved work was lost.
+Polling and task epochs are advanced at the same boundary, so completions and
+`finally` handlers from the previous backend cannot clear a newer job or busy
+state. The running generation is recorded as hydrated only after both settings
+and pages load successfully and the generation is still current.
 
 `backend/main.py` owns FastAPI app creation. `backend/core/container.py` is the
 composition root that wires concrete runtime dependencies.

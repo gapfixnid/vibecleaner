@@ -7,7 +7,10 @@ import type { Settings } from "../types";
 
 interface UseBackendBootstrapDeps {
   setSettings: Dispatch<SetStateAction<Settings>>;
-  loadPagesFromServer: () => Promise<void>;
+  loadPagesFromServer: (
+    selectIndex?: number,
+    options?: { skipPageActivation?: boolean; throwOnError?: boolean },
+  ) => Promise<void>;
   onBackendGenerationChange: () => void | Promise<void>;
 }
 
@@ -26,14 +29,12 @@ export function useBackendBootstrap({
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const statusRef = useRef<BackendStatus | null>(null);
   const handledRunningGenerationRef = useRef<number | null>(null);
+  const hydratingGenerationRef = useRef<number | null>(null);
+  const resetGenerationRef = useRef<number | null>(null);
 
   const loadSettingsFromServer = useCallback(async () => {
-    try {
-      const data = await api.getSettings();
-      setSettings(data);
-    } catch (error) {
-      console.error("Failed to load settings from server", error);
-    }
+    const data = await api.getSettings();
+    setSettings(data);
   }, [setSettings]);
 
   const applyStatus = useCallback(async (incoming: BackendStatus) => {
@@ -48,15 +49,41 @@ export function useBackendBootstrap({
     }
     if (merged.phase === "running") {
       if (handledRunningGenerationRef.current === merged.generation) return;
+      if (hydratingGenerationRef.current === merged.generation) return;
       const previousGeneration = handledRunningGenerationRef.current;
-      handledRunningGenerationRef.current = merged.generation;
-      if (previousGeneration !== null && merged.generation > previousGeneration) {
-        await onBackendGenerationChange();
+      const generation = merged.generation;
+      hydratingGenerationRef.current = generation;
+      setIsBootstrapping(true);
+      try {
+        if (
+          previousGeneration !== null
+          && generation > previousGeneration
+          && resetGenerationRef.current !== generation
+        ) {
+          await onBackendGenerationChange();
+          resetGenerationRef.current = generation;
+        }
+        await loadSettingsFromServer();
+        if (statusRef.current?.generation !== generation || statusRef.current.phase !== "running") return;
+        await loadPagesFromServer(undefined, { throwOnError: true });
+        if (statusRef.current?.generation !== generation || statusRef.current.phase !== "running") return;
+        handledRunningGenerationRef.current = generation;
+        setBackendError(null);
+        setIsBootstrapping(false);
+      } catch (error) {
+        console.error("Failed to hydrate backend state", error);
+        if (statusRef.current?.generation === generation && statusRef.current.phase === "running") {
+          setBackendError({
+            code: "unreachable",
+            detail: error instanceof Error ? error.message : String(error),
+          });
+          setIsBootstrapping(false);
+        }
+      } finally {
+        if (hydratingGenerationRef.current === generation) {
+          hydratingGenerationRef.current = null;
+        }
       }
-      setBackendError(null);
-      await loadSettingsFromServer();
-      await loadPagesFromServer();
-      setIsBootstrapping(false);
       return;
     }
     if (merged.phase === "failed") {

@@ -4,69 +4,69 @@ mod error;
 mod image_protocol;
 
 use backend_client::RequestClass;
-use backend_process::{BackendManager, BackendStatus};
+use backend_process::{BackendManager, BackendSession, BackendStatus};
 use error::{BridgeError, CommandResult};
 use tauri::Manager;
 
 async fn forward_get<T: serde::de::DeserializeOwned>(
-    manager: &BackendManager,
+    session: &BackendSession,
     path: &str,
 ) -> CommandResult<T> {
-    let (generation, client) = manager.client_snapshot()?;
-    let result = client.get_json(path).await;
-    manager.ensure_generation(generation)?;
+    session.ensure_current()?;
+    let result = session.client.get_json(path).await;
+    session.ensure_current()?;
     result
 }
 
 async fn forward_get_class<T: serde::de::DeserializeOwned>(
-    manager: &BackendManager,
+    session: &BackendSession,
     path: &str,
     class: RequestClass,
 ) -> CommandResult<T> {
-    let (generation, client) = manager.client_snapshot()?;
-    let result = client.get_json_with_class(path, class).await;
-    manager.ensure_generation(generation)?;
+    session.ensure_current()?;
+    let result = session.client.get_json_with_class(path, class).await;
+    session.ensure_current()?;
     result
 }
 
 async fn forward_post<T: serde::de::DeserializeOwned, P: serde::Serialize + ?Sized>(
-    manager: &BackendManager,
+    session: &BackendSession,
     path: &str,
     payload: &P,
 ) -> CommandResult<T> {
-    let (generation, client) = manager.client_snapshot()?;
-    let result = client.post_json(path, payload).await;
-    manager.ensure_generation(generation)?;
+    session.ensure_current()?;
+    let result = session.client.post_json(path, payload).await;
+    session.ensure_current()?;
     result
 }
 
 async fn forward_empty_post<T: serde::de::DeserializeOwned>(
-    manager: &BackendManager,
+    session: &BackendSession,
     path: &str,
 ) -> CommandResult<T> {
-    let (generation, client) = manager.client_snapshot()?;
-    let result = client.post_empty(path).await;
-    manager.ensure_generation(generation)?;
+    session.ensure_current()?;
+    let result = session.client.post_empty(path).await;
+    session.ensure_current()?;
     result
 }
 
 async fn forward_form<T: serde::de::DeserializeOwned>(
-    manager: &BackendManager,
+    session: &BackendSession,
     path: &str,
     fields: Vec<(String, String)>,
 ) -> CommandResult<T> {
-    forward_form_class(manager, path, fields, RequestClass::Metadata).await
+    forward_form_class(session, path, fields, RequestClass::Metadata).await
 }
 
 async fn forward_form_class<T: serde::de::DeserializeOwned>(
-    manager: &BackendManager,
+    session: &BackendSession,
     path: &str,
     fields: Vec<(String, String)>,
     class: RequestClass,
 ) -> CommandResult<T> {
-    let (generation, client) = manager.client_snapshot()?;
-    let result = client.post_form(path, &fields, class).await;
-    manager.ensure_generation(generation)?;
+    session.ensure_current()?;
+    let result = session.client.post_form(path, &fields, class).await;
+    session.ensure_current()?;
     result
 }
 
@@ -140,8 +140,9 @@ fn save_file(
 async fn get_project(
     manager: tauri::State<'_, BackendManager>,
 ) -> CommandResult<serde_json::Value> {
-    let pages_res: serde_json::Value = forward_get(&manager, "/api/pages").await?;
-    let settings_res: serde_json::Value = forward_get(&manager, "/api/settings").await?;
+    let session = manager.session_snapshot()?;
+    let pages_res: serde_json::Value = forward_get(&session, "/api/pages").await?;
+    let settings_res: serde_json::Value = forward_get(&session, "/api/settings").await?;
 
     let pages = pages_res
         .get("pages")
@@ -203,6 +204,7 @@ async fn get_project(
         .and_then(|p| p.get("id").and_then(|id| id.as_str()))
         .map(|s| s.to_string());
 
+    session.ensure_current()?;
     Ok(serde_json::json!({
         "id": "current_project",
         "name": "My Project",
@@ -217,7 +219,15 @@ async fn get_page(
     manager: tauri::State<'_, BackendManager>,
     page_id: String,
 ) -> CommandResult<serde_json::Value> {
-    let pages_res: serde_json::Value = forward_get(&manager, "/api/pages").await?;
+    let session = manager.session_snapshot()?;
+    get_page_for_session(&session, page_id).await
+}
+
+async fn get_page_for_session(
+    session: &BackendSession,
+    page_id: String,
+) -> CommandResult<serde_json::Value> {
+    let pages_res: serde_json::Value = forward_get(session, "/api/pages").await?;
     let pages = pages_res
         .get("pages")
         .cloned()
@@ -233,7 +243,7 @@ async fn get_page(
         .ok_or_else(|| "Page not found".to_string())?;
 
     let bubbles_res: serde_json::Value =
-        forward_get(&manager, &format!("/api/pages/{}/bubbles", page_id)).await?;
+        forward_get(session, &format!("/api/pages/{}/bubbles", page_id)).await?;
     let bubbles = bubbles_res
         .get("bubbles")
         .cloned()
@@ -388,6 +398,7 @@ async fn get_page(
         .cloned()
         .unwrap_or(serde_json::json!([]));
 
+    session.ensure_current()?;
     Ok(serde_json::json!({
         "id": page_id,
         "index": page_info.get("index").cloned().unwrap_or(serde_json::json!(0)),
@@ -407,11 +418,12 @@ async fn import_images(
     manager: tauri::State<'_, BackendManager>,
     paths: Option<Vec<String>>,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let paths_vec = paths.unwrap_or_default();
     let files_json = serde_json::to_string(&paths_vec)
         .map_err(|error| BridgeError::new("BACKEND_INVALID_RESPONSE", error.to_string(), false))?;
     forward_form(
-        &manager,
+        &session,
         "/api/project/open-files",
         vec![("files_json".to_string(), files_json)],
     )
@@ -423,8 +435,9 @@ async fn import_directory(
     manager: tauri::State<'_, BackendManager>,
     directory: String,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     forward_form(
-        &manager,
+        &session,
         "/api/project/open-directory",
         vec![("directory".to_string(), directory)],
     )
@@ -433,14 +446,16 @@ async fn import_directory(
 
 #[tauri::command]
 async fn get_pages(manager: tauri::State<'_, BackendManager>) -> CommandResult<serde_json::Value> {
-    forward_get(&manager, "/api/pages").await
+    let session = manager.session_snapshot()?;
+    forward_get(&session, "/api/pages").await
 }
 
 #[tauri::command]
 async fn new_project(
     manager: tauri::State<'_, BackendManager>,
 ) -> CommandResult<serde_json::Value> {
-    forward_empty_post(&manager, "/api/project/new").await
+    let session = manager.session_snapshot()?;
+    forward_empty_post(&session, "/api/project/new").await
 }
 
 #[tauri::command]
@@ -448,8 +463,9 @@ async fn load_project(
     manager: tauri::State<'_, BackendManager>,
     file_path: String,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     forward_form(
-        &manager,
+        &session,
         "/api/project/load",
         vec![("file_path".to_string(), file_path)],
     )
@@ -462,10 +478,11 @@ async fn save_project(
     file_path: String,
     selected_indices: Option<Vec<i64>>,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let selected_json = serde_json::to_string(&selected_indices.unwrap_or_default())
         .map_err(|e| format!("선택 페이지 직렬화 실패: {e}"))?;
     forward_form(
-        &manager,
+        &session,
         "/api/project/save",
         vec![
             ("file_path".to_string(), file_path),
@@ -494,8 +511,9 @@ async fn select_page(
     index: Option<i64>,
     page_id: Option<String>,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     forward_form(
-        &manager,
+        &session,
         "/api/pages/select",
         page_ref_fields(index, page_id)?,
     )
@@ -508,8 +526,9 @@ async fn duplicate_page(
     index: Option<i64>,
     page_id: Option<String>,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     forward_form(
-        &manager,
+        &session,
         "/api/pages/duplicate",
         page_ref_fields(index, page_id)?,
     )
@@ -522,11 +541,12 @@ async fn duplicate_pages_batch(
     page_indices: Option<Vec<i64>>,
     page_ids: Option<Vec<String>>,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let payload = serde_json::json!({
         "page_indices": page_indices.unwrap_or_default(),
         "page_ids": page_ids.unwrap_or_default(),
     });
-    forward_post(&manager, "/api/pages/duplicate-batch", &payload).await
+    forward_post(&session, "/api/pages/duplicate-batch", &payload).await
 }
 
 #[tauri::command]
@@ -535,8 +555,9 @@ async fn delete_page(
     index: Option<i64>,
     page_id: Option<String>,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     forward_form(
-        &manager,
+        &session,
         "/api/pages/delete",
         page_ref_fields(index, page_id)?,
     )
@@ -549,11 +570,12 @@ async fn delete_pages_batch(
     page_indices: Option<Vec<i64>>,
     page_ids: Option<Vec<String>>,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let payload = serde_json::json!({
         "page_indices": page_indices.unwrap_or_default(),
         "page_ids": page_ids.unwrap_or_default(),
     });
-    forward_post(&manager, "/api/pages/delete-batch", &payload).await
+    forward_post(&session, "/api/pages/delete-batch", &payload).await
 }
 
 #[tauri::command]
@@ -562,8 +584,9 @@ async fn reorder_pages(
     from_index: i64,
     to_index: i64,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     forward_form(
-        &manager,
+        &session,
         "/api/pages/reorder",
         vec![
             ("from_index".to_string(), from_index.to_string()),
@@ -579,8 +602,9 @@ async fn rename_page(
     page_id: String,
     name: String,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     forward_form(
-        &manager,
+        &session,
         &format!("/api/pages/{}/rename", page_id),
         vec![("name".to_string(), name)],
     )
@@ -588,11 +612,11 @@ async fn rename_page(
 }
 
 async fn start_page_job(
-    manager: &BackendManager,
+    session: &BackendSession,
     page_id: String,
     action: &str,
 ) -> CommandResult<serde_json::Value> {
-    forward_empty_post(manager, &format!("/api/pages/{}/{}", page_id, action)).await
+    forward_empty_post(session, &format!("/api/pages/{}/{}", page_id, action)).await
 }
 
 #[tauri::command]
@@ -600,7 +624,8 @@ async fn inpaint_page(
     manager: tauri::State<'_, BackendManager>,
     page_id: String,
 ) -> CommandResult<serde_json::Value> {
-    start_page_job(&manager, page_id, "inpaint").await
+    let session = manager.session_snapshot()?;
+    start_page_job(&session, page_id, "inpaint").await
 }
 
 #[tauri::command]
@@ -608,7 +633,8 @@ async fn translate_all_page(
     manager: tauri::State<'_, BackendManager>,
     page_id: String,
 ) -> CommandResult<serde_json::Value> {
-    start_page_job(&manager, page_id, "translate-all").await
+    let session = manager.session_snapshot()?;
+    start_page_job(&session, page_id, "translate-all").await
 }
 
 #[tauri::command]
@@ -617,11 +643,12 @@ async fn translate_batch(
     page_indices: Option<Vec<i64>>,
     page_ids: Option<Vec<String>>,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let payload = serde_json::json!({
         "page_indices": page_indices.unwrap_or_default(),
         "page_ids": page_ids.unwrap_or_default(),
     });
-    forward_post(&manager, "/api/pages/translate-batch", &payload).await
+    forward_post(&session, "/api/pages/translate-batch", &payload).await
 }
 
 #[tauri::command]
@@ -629,7 +656,13 @@ async fn get_job(
     manager: tauri::State<'_, BackendManager>,
     job_id: String,
 ) -> CommandResult<serde_json::Value> {
-    forward_get(&manager, &format!("/api/jobs/{}", job_id)).await
+    let session = manager.session_snapshot()?;
+    forward_get_class(
+        &session,
+        &format!("/api/jobs/{}", job_id),
+        RequestClass::JobPoll,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -637,7 +670,8 @@ async fn cancel_job(
     manager: tauri::State<'_, BackendManager>,
     job_id: String,
 ) -> CommandResult<serde_json::Value> {
-    forward_empty_post(&manager, &format!("/api/jobs/{}/cancel", job_id)).await
+    let session = manager.session_snapshot()?;
+    forward_empty_post(&session, &format!("/api/jobs/{}/cancel", job_id)).await
 }
 
 #[tauri::command]
@@ -647,10 +681,11 @@ async fn update_bubble(
     bubble_id: String,
     patch: serde_json::Value,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
 
     let bubbles_res: serde_json::Value =
-        forward_get(&manager, &format!("/api/pages/{}/bubbles", page_id)).await?;
+        forward_get(&session, &format!("/api/pages/{}/bubbles", page_id)).await?;
     let bubbles = bubbles_res
         .get("bubbles")
         .cloned()
@@ -731,13 +766,13 @@ async fn update_bubble(
     bubbles_arr[bubble_index] = current_bubble;
 
     let _: serde_json::Value = forward_post(
-        &manager,
+        &session,
         &format!("/api/pages/{}/bubbles", page_id),
         &bubbles_arr,
     )
     .await?;
 
-    let page_dto = get_page(manager, page_id).await?;
+    let page_dto = get_page_for_session(&session, page_id).await?;
     let bubbles_arr = page_dto
         .get("bubbles")
         .and_then(|v| v.as_array())
@@ -748,6 +783,7 @@ async fn update_bubble(
         .cloned()
         .ok_or_else(|| "Updated bubble not found".to_string())?;
 
+    session.ensure_current()?;
     Ok(updated_bubble)
 }
 
@@ -757,8 +793,9 @@ async fn update_bubbles(
     page_id: String,
     bubbles: serde_json::Value,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     forward_post(
-        &manager,
+        &session,
         &format!("/api/pages/{}/bubbles", page_id),
         &bubbles,
     )
@@ -771,7 +808,16 @@ async fn layout_bubble(
     page_id: String,
     bubble_id: String,
 ) -> CommandResult<serde_json::Value> {
-    let page_dto = get_page(manager, page_id).await?;
+    let session = manager.session_snapshot()?;
+    layout_bubble_for_session(&session, page_id, bubble_id).await
+}
+
+async fn layout_bubble_for_session(
+    session: &BackendSession,
+    page_id: String,
+    bubble_id: String,
+) -> CommandResult<serde_json::Value> {
+    let page_dto = get_page_for_session(session, page_id).await?;
     let bubbles_arr = page_dto
         .get("bubbles")
         .and_then(|v| v.as_array())
@@ -781,6 +827,7 @@ async fn layout_bubble(
         .find(|b| b.get("id").and_then(|id| id.as_str()) == Some(&bubble_id))
         .cloned()
         .ok_or_else(|| "Bubble not found".to_string())?;
+    session.ensure_current()?;
     Ok(bubble)
 }
 
@@ -790,11 +837,12 @@ async fn reocr_bubble(
     page_id: String,
     bubble_id: String,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
     let url = format!("/api/pages/{}/bubbles/{}/ocr", page_id, id_num);
-    let _: serde_json::Value = forward_post(&manager, &url, &serde_json::json!({})).await?;
+    let _: serde_json::Value = forward_post(&session, &url, &serde_json::json!({})).await?;
 
-    layout_bubble(manager, page_id, bubble_id).await
+    layout_bubble_for_session(&session, page_id, bubble_id).await
 }
 
 #[tauri::command]
@@ -803,9 +851,10 @@ async fn retranslate_bubble(
     page_id: String,
     bubble_id: String,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
     let url = format!("/api/pages/{}/bubbles/{}/translate", page_id, id_num);
-    let job_status: serde_json::Value = forward_empty_post(&manager, &url).await?;
+    let job_status: serde_json::Value = forward_empty_post(&session, &url).await?;
 
     let job_id = job_status
         .get("job_id")
@@ -824,7 +873,7 @@ async fn retranslate_bubble(
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let status: serde_json::Value = forward_get_class(
-            &manager,
+            &session,
             &format!("/api/jobs/{}", job_id),
             RequestClass::JobPoll,
         )
@@ -844,7 +893,7 @@ async fn retranslate_bubble(
         }
     }
 
-    layout_bubble(manager, page_id, bubble_id).await
+    layout_bubble_for_session(&session, page_id, bubble_id).await
 }
 
 #[tauri::command]
@@ -853,9 +902,10 @@ async fn autofit_bubble(
     page_id: String,
     bubble_id: String,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
     let url = format!("/api/pages/{}/bubbles/{}/inpaint", page_id, id_num);
-    let job_status: serde_json::Value = forward_empty_post(&manager, &url).await?;
+    let job_status: serde_json::Value = forward_empty_post(&session, &url).await?;
 
     let job_id = job_status
         .get("job_id")
@@ -874,7 +924,7 @@ async fn autofit_bubble(
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let status: serde_json::Value = forward_get_class(
-            &manager,
+            &session,
             &format!("/api/jobs/{}", job_id),
             RequestClass::JobPoll,
         )
@@ -894,7 +944,7 @@ async fn autofit_bubble(
         }
     }
 
-    layout_bubble(manager, page_id, bubble_id).await
+    layout_bubble_for_session(&session, page_id, bubble_id).await
 }
 
 #[tauri::command]
@@ -903,10 +953,11 @@ async fn delete_bubble(
     page_id: String,
     bubble_id: String,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
 
     let bubbles_res: serde_json::Value =
-        forward_get(&manager, &format!("/api/pages/{}/bubbles", page_id)).await?;
+        forward_get(&session, &format!("/api/pages/{}/bubbles", page_id)).await?;
     let bubbles = bubbles_res
         .get("bubbles")
         .cloned()
@@ -916,13 +967,13 @@ async fn delete_bubble(
     bubbles_arr.retain(|b| b.get("id").and_then(|v| v.as_i64()) != Some(id_num));
 
     let _: serde_json::Value = forward_post(
-        &manager,
+        &session,
         &format!("/api/pages/{}/bubbles", page_id),
         &bubbles_arr,
     )
     .await?;
 
-    get_page(manager, page_id).await
+    get_page_for_session(&session, page_id).await
 }
 
 #[tauri::command]
@@ -931,8 +982,9 @@ async fn export_page_to_path(
     page_id: String,
     save_path: String,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     forward_form(
-        &manager,
+        &session,
         &format!("/api/pages/{}/export", page_id),
         vec![("save_path".to_string(), save_path)],
     )
@@ -944,6 +996,7 @@ async fn export_pages(
     manager: tauri::State<'_, BackendManager>,
     options: serde_json::Value,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let page_ids = options
         .get("page_ids")
         .and_then(|v| v.as_array())
@@ -962,7 +1015,7 @@ async fn export_pages(
             .ok_or_else(|| "Invalid page_id".to_string())?;
         let save_path = format!("{}/{}.png", output_dir, page_id_str);
         let _: serde_json::Value = forward_form_class(
-            &manager,
+            &session,
             &format!("/api/pages/{}/export", page_id_str),
             vec![("save_path".to_string(), save_path.clone())],
             RequestClass::Export,
@@ -971,6 +1024,7 @@ async fn export_pages(
         exported_paths.push(save_path);
     }
 
+    session.ensure_current()?;
     Ok(serde_json::json!({
         "success": !exported_paths.is_empty(),
         "exported_paths": exported_paths,
@@ -982,14 +1036,16 @@ async fn export_pages(
 async fn get_settings(
     manager: tauri::State<'_, BackendManager>,
 ) -> CommandResult<serde_json::Value> {
-    forward_get(&manager, "/api/settings").await
+    let session = manager.session_snapshot()?;
+    forward_get(&session, "/api/settings").await
 }
 
 #[tauri::command]
 async fn get_provider_catalog(
     manager: tauri::State<'_, BackendManager>,
 ) -> CommandResult<serde_json::Value> {
-    forward_get(&manager, "/api/providers/catalog").await
+    let session = manager.session_snapshot()?;
+    forward_get(&session, "/api/providers/catalog").await
 }
 
 #[tauri::command]
@@ -997,22 +1053,25 @@ async fn update_settings(
     manager: tauri::State<'_, BackendManager>,
     settings: serde_json::Value,
 ) -> CommandResult<serde_json::Value> {
-    let _: serde_json::Value = forward_post(&manager, "/api/settings", &settings).await?;
-    get_settings(manager).await
+    let session = manager.session_snapshot()?;
+    let _: serde_json::Value = forward_post(&session, "/api/settings", &settings).await?;
+    forward_get(&session, "/api/settings").await
 }
 
 #[tauri::command]
 async fn get_model_status(
     manager: tauri::State<'_, BackendManager>,
 ) -> CommandResult<serde_json::Value> {
-    forward_get(&manager, "/api/models/status").await
+    let session = manager.session_snapshot()?;
+    forward_get(&session, "/api/models/status").await
 }
 
 #[tauri::command]
 async fn download_required_models(
     manager: tauri::State<'_, BackendManager>,
 ) -> CommandResult<serde_json::Value> {
-    forward_post(&manager, "/api/models/download", &serde_json::json!({})).await
+    let session = manager.session_snapshot()?;
+    forward_post(&session, "/api/models/download", &serde_json::json!({})).await
 }
 
 #[tauri::command]
@@ -1022,12 +1081,13 @@ async fn get_translation_models(
     api_key: String,
     base_url: String,
 ) -> CommandResult<serde_json::Value> {
+    let session = manager.session_snapshot()?;
     let payload = serde_json::json!({
         "provider": provider,
         "api_key": api_key,
         "base_url": base_url
     });
-    forward_post(&manager, "/api/translation/models", &payload).await
+    forward_post(&session, "/api/translation/models", &payload).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

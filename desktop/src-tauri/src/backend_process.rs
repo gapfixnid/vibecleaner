@@ -86,6 +86,31 @@ pub struct BackendManager {
     restart_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
+#[derive(Clone)]
+pub struct BackendSession {
+    pub generation: u64,
+    pub client: Arc<BackendClient>,
+    runtime: Weak<Mutex<BackendRuntime>>,
+}
+
+impl BackendSession {
+    pub fn ensure_current(&self) -> CommandResult<()> {
+        let runtime = self.runtime.upgrade().ok_or_else(BridgeError::restarted)?;
+        let runtime = lock_runtime(&runtime);
+        let is_current = runtime.generation == self.generation
+            && runtime.phase == BackendPhase::Running
+            && runtime
+                .client
+                .as_ref()
+                .is_some_and(|client| Arc::ptr_eq(client, &self.client));
+        if !is_current {
+            Err(BridgeError::restarted())
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl BackendManager {
     pub fn new() -> Self {
         Self {
@@ -107,7 +132,7 @@ impl BackendManager {
         status_from_runtime(&runtime)
     }
 
-    pub fn client_snapshot(&self) -> CommandResult<(u64, Arc<BackendClient>)> {
+    pub fn session_snapshot(&self) -> CommandResult<BackendSession> {
         let runtime = lock_runtime(&self.runtime);
         if runtime.phase != BackendPhase::Running {
             return Err(runtime.error.clone().unwrap_or_else(|| {
@@ -121,15 +146,11 @@ impl BackendManager {
                 true,
             )
         })?;
-        Ok((runtime.generation, client))
-    }
-
-    pub fn ensure_generation(&self, generation: u64) -> CommandResult<()> {
-        if lock_runtime(&self.runtime).generation != generation {
-            Err(BridgeError::restarted())
-        } else {
-            Ok(())
-        }
+        Ok(BackendSession {
+            generation: runtime.generation,
+            client,
+            runtime: Arc::downgrade(&self.runtime),
+        })
     }
 
     pub async fn start(&self, app: AppHandle) -> BackendStatus {
@@ -602,5 +623,40 @@ mod tests {
         let proof = URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes());
         assert!(token.verify_health_proof(&challenge, &proof));
         assert!(!token.verify_health_proof("wrong", &proof));
+    }
+
+    #[test]
+    fn backend_session_is_invalidated_when_generation_changes() {
+        let manager = BackendManager::new();
+        let client = Arc::new(BackendClient::new(49152, Some("token".to_string())).unwrap());
+        {
+            let mut runtime = lock_runtime(&manager.runtime);
+            runtime.generation = 7;
+            runtime.phase = BackendPhase::Running;
+            runtime.client = Some(client);
+        }
+        let session = manager.session_snapshot().unwrap();
+        assert!(session.ensure_current().is_ok());
+        lock_runtime(&manager.runtime).generation = 8;
+        let error = session.ensure_current().unwrap_err();
+        assert_eq!(error.code, "BACKEND_RESTARTED");
+    }
+
+    #[test]
+    fn backend_session_is_invalidated_when_phase_stops() {
+        let manager = BackendManager::new();
+        let client = Arc::new(BackendClient::new(49153, Some("token".to_string())).unwrap());
+        {
+            let mut runtime = lock_runtime(&manager.runtime);
+            runtime.generation = 9;
+            runtime.phase = BackendPhase::Running;
+            runtime.client = Some(client);
+        }
+        let session = manager.session_snapshot().unwrap();
+        lock_runtime(&manager.runtime).phase = BackendPhase::Stopping;
+        assert_eq!(
+            session.ensure_current().unwrap_err().code,
+            "BACKEND_RESTARTED"
+        );
     }
 }

@@ -15,7 +15,7 @@ $VenvFullPath = Join-Path $RepoRoot $VenvPath
 $RuntimePython = Join-Path $VenvFullPath "Scripts\python.exe"
 $DistExe = Join-Path $RepoRoot "dist\$SidecarName.exe"
 $OutputExe = Join-Path $OutputDir "$SidecarName.exe"
-$FontSource = Join-Path $BackendRoot "app\assets\fonts"
+$FontSource = Join-Path $BackendRoot "infrastructure\assets\fonts"
 
 if (-not (Test-Path $RuntimePython)) {
     & $Python -m venv $VenvFullPath
@@ -37,7 +37,7 @@ try {
         --onefile `
         --name $SidecarName `
         --paths $BackendRoot `
-        --add-data "$FontSource;app\assets\fonts" `
+        --add-data "$FontSource;backend\infrastructure\assets\fonts" `
         --exclude-module torch `
         --exclude-module torchvision `
         --exclude-module torchmetrics `

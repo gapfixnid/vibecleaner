@@ -63,7 +63,10 @@ export function usePages({
   }, [currentIndexRef, onPagesCleared]);
 
   const loadPagesFromServer = useCallback(
-    async (selectIndex?: number, options?: { skipPageActivation?: boolean }) => {
+    async (
+      selectIndex?: number,
+      options?: { skipPageActivation?: boolean; throwOnError?: boolean },
+    ) => {
       try {
         const data = await api.getPages();
         setPages(data.pages);
@@ -81,6 +84,7 @@ export function usePages({
         }
       } catch (e) {
         console.error("Failed to fetch pages", e);
+        if (options?.throwOnError) throw e;
         showError(t("pages.loadFailedTitle"), t("pages.loadFailedMessage"));
       }
     },

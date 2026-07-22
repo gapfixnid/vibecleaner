@@ -87,6 +87,7 @@ export function useProcessingTask(
   const currentJobIdRef = useRef<string | null>(null);
   const cancelRequestedRef = useRef(false);
   const pollingGenerationRef = useRef(0);
+  const taskEpochRef = useRef(0);
   /** Exposed so callers can branch after runTask returns. Reset after each runTask. */
   const wasCancelledRef = useRef(false);
   const notifyCancelledRef = useRef(notifyCancelled);
@@ -116,11 +117,12 @@ export function useProcessingTask(
       if (!startedJob?.job_id) {
         return startedJob;
       }
+      const pollingGeneration = pollingGenerationRef.current + 1;
+      pollingGenerationRef.current = pollingGeneration;
       currentJobIdRef.current = startedJob.job_id;
-      const pollingGeneration = pollingGenerationRef.current;
       cancelRequestedRef.current = false;
       const publish = (job: JobStatus) => {
-        if (!isMountedRef.current) return;
+        if (!isMountedRef.current || pollingGeneration !== pollingGenerationRef.current) return;
         setActiveJob({
           jobId: job.job_id,
           kind: job.kind || null,
@@ -164,11 +166,15 @@ export function useProcessingTask(
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
           job = await api.getJob(job.job_id);
           publish(job);
-          options?.onProgress?.(job);
+          if (pollingGeneration === pollingGenerationRef.current) {
+            options?.onProgress?.(job);
+          }
         }
       } finally {
-        currentJobIdRef.current = null;
-        if (isMountedRef.current) {
+        if (pollingGeneration === pollingGenerationRef.current) {
+          currentJobIdRef.current = null;
+        }
+        if (isMountedRef.current && pollingGeneration === pollingGenerationRef.current) {
           setActiveJob(null);
         }
       }
@@ -179,10 +185,12 @@ export function useProcessingTask(
   const runTask = useCallback(
     async <T,>(_label: string, fn: () => Promise<T>, options?: RunTaskOptions): Promise<T | undefined> => {
       const busy = !options?.skipBusy;
+      const taskEpoch = taskEpochRef.current;
       wasCancelledRef.current = false;
       if (busy) setIsProcessing(true);
       try {
         const result = await fn();
+        if (taskEpoch !== taskEpochRef.current) return undefined;
         if (busy && !options?.keepBusyOnSuccess) {
           setIsProcessing(false);
         }
@@ -191,6 +199,7 @@ export function useProcessingTask(
         const err = e as { response?: { data?: { detail?: string } }; message?: string };
         // User-initiated cancellation is a normal stop, not an error.
         if (err?.message === CANCELLED) {
+          if (taskEpoch !== taskEpochRef.current) return undefined;
           wasCancelledRef.current = true;
           if (busy) setIsProcessing(false);
           // Only notify for explicit user cancellations, not unmount aborts.
@@ -199,8 +208,10 @@ export function useProcessingTask(
           }
           return undefined;
         }
-        showError(options?.errorTitle || t("task.failed"), err?.response?.data?.detail || err?.message || String(e));
-        if (busy) setIsProcessing(false);
+        if (taskEpoch === taskEpochRef.current) {
+          showError(options?.errorTitle || t("task.failed"), err?.response?.data?.detail || err?.message || String(e));
+          if (busy) setIsProcessing(false);
+        }
         return undefined;
       }
     },
@@ -219,6 +230,7 @@ export function useProcessingTask(
 
   const resetForBackendRestart = useCallback(() => {
     pollingGenerationRef.current += 1;
+    taskEpochRef.current += 1;
     cancelRequestedRef.current = true;
     currentJobIdRef.current = null;
     wasCancelledRef.current = false;
