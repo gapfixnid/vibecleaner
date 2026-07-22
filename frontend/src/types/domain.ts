@@ -19,6 +19,8 @@ export interface BubbleInfo {
   font_family: string;
   computed_font_family: string;
   font_size: number;
+  font_mode: "auto" | "fixed";
+  requested_font_size: number | null;
   computed_font_size: number;
   bold: boolean;
   italic: boolean;
@@ -52,6 +54,8 @@ export interface BubbleUpdate {
   font_family: string;
   computed_font_family?: string;
   font_size: number;
+  font_mode: "auto" | "fixed";
+  requested_font_size: number | null;
   computed_font_size: number;
   bold: boolean;
   italic: boolean;

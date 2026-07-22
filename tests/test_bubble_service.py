@@ -80,6 +80,35 @@ class BubbleServiceTests(unittest.TestCase):
         self.assertEqual(bubble["font_family"], "")
         self.assertEqual(bubble["computed_font_family"], "Resolved Font")
         self.assertEqual(bubble["computed_font_size"], 17)
+        self.assertEqual(bubble["font_mode"], "auto")
+        self.assertIsNone(bubble["requested_font_size"])
+
+    def test_get_bubbles_response_exposes_fixed_font_contract(self):
+        page = MangaPage(
+            file_path="sample.png",
+            cv_image=np.zeros((64, 64, 3), dtype=np.uint8),
+            bubbles=[
+                TextBubble(
+                    id=1,
+                    box=Rect(1, 2, 30, 40),
+                    translated="안녕",
+                    font_size=22,
+                )
+            ],
+        )
+        page.page_id = "page_a"
+        with self.state.lock:
+            self.state.pages = [page]
+            self.state.current_page_idx = 0
+
+        fake_font = SimpleNamespace(pixelSize=lambda: 22, family=lambda: "Resolved Font")
+        fake_layout = SimpleNamespace(font=fake_font, line_layouts=[], is_overflow=False)
+        response = bubble_service.get_bubbles_response(self.state, "page_a", FakeRenderService(fake_layout))
+
+        bubble = response["bubbles"][0]
+        self.assertEqual(bubble["font_mode"], "fixed")
+        self.assertEqual(bubble["requested_font_size"], 22)
+        self.assertEqual(bubble["computed_font_size"], 22)
 
     def test_get_bubbles_response_marks_layout_overflow_from_render_result(self):
         page = MangaPage(

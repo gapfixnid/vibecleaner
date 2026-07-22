@@ -62,6 +62,12 @@ export type TranslationKey =
   | "inspector.typographyDesign"
   | "inspector.fontFamily"
   | "inspector.fontSize"
+  | "inspector.fontMode"
+  | "inspector.autoFit"
+  | "inspector.manual"
+  | "inspector.computedFontSize"
+  | "inspector.lines"
+  | "inspector.layoutOverflowWarning"
   | "inspector.fontStyle"
   | "inspector.bold"
   | "inspector.italic"
@@ -378,6 +384,12 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "inspector.typographyDesign": "Typography & Design",
     "inspector.fontFamily": "Font Family",
     "inspector.fontSize": "Font Size",
+    "inspector.fontMode": "Font size mode",
+    "inspector.autoFit": "Auto fit",
+    "inspector.manual": "Manual",
+    "inspector.computedFontSize": "Applied",
+    "inspector.lines": "lines",
+    "inspector.layoutOverflowWarning": "Text does not fit at this size. Reduce the size or enlarge the bubble.",
     "inspector.fontStyle": "Font Style",
     "inspector.bold": "Bold",
     "inspector.italic": "Italic",
@@ -693,6 +705,12 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "inspector.typographyDesign": "타이포그래피 및 디자인",
     "inspector.fontFamily": "글꼴",
     "inspector.fontSize": "글꼴 크기",
+    "inspector.fontMode": "글꼴 크기 모드",
+    "inspector.autoFit": "자동 맞춤",
+    "inspector.manual": "수동",
+    "inspector.computedFontSize": "적용 크기",
+    "inspector.lines": "줄",
+    "inspector.layoutOverflowWarning": "이 크기로는 텍스트가 들어가지 않습니다. 크기를 줄이거나 말풍선을 넓혀 주세요.",
     "inspector.fontStyle": "글꼴 스타일",
     "inspector.bold": "굵게",
     "inspector.italic": "기울임",

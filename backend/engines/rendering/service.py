@@ -55,6 +55,33 @@ class RenderService:
     ) -> TextLayoutResult:
         layout_rect = self._text_layout_rect(bubble)
         mask = self._build_bubble_layout_mask(bubble, image)
+        alignment = getattr(bubble, 'alignment', 'center') or 'center'
+        requested_font_size = int(getattr(bubble, "font_size", 0) or 0)
+
+        if requested_font_size > 0:
+            fixed_rect = _to_qrectf(bubble.box) if mask is not None else layout_rect
+            layout = self.renderer.layout_text_at_fixed_size(
+                text,
+                fixed_rect,
+                requested_font_size,
+                mask=mask,
+                font_family=font_family,
+                alignment=alignment,
+            )
+            if (
+                mask is not None
+                and bubble.text_box is not None
+                and bubble.text_box.width > 1
+                and bubble.text_box.height > 1
+            ):
+                target_center_y = bubble.text_box.y + bubble.text_box.height / 2.0
+                return self.renderer.center_layout_vertically(
+                    layout,
+                    target_center_y=target_center_y,
+                    bounds=_to_qrectf(bubble.box),
+                )
+            return layout
+
         if mask is not None:
             layout = self.renderer.find_optimal_font_size_for_mask(
                 text,
@@ -80,7 +107,6 @@ class RenderService:
             min_size=self._min_font_size(),
             max_size=self._max_font_size(),
         )
-        alignment = getattr(bubble, 'alignment', 'center') or 'center'
         return self.renderer.layout_lines_in_rect(lines, layout_rect, font, render_width, alignment=alignment)
 
     def _text_layout_rect(self, bubble: TextBubble) -> QRectF:

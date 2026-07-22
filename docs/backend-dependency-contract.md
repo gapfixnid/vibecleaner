@@ -78,6 +78,20 @@ queries, control characters, and dot segments. Batch export uses fixed ordinal
 filenames and verifies the canonical destination remains inside the selected
 output directory; persisted IDs are never used as filesystem names.
 
+## Typesetting Font-Size Contract
+
+Persisted `font_size` remains backward compatible: `0` selects automatic
+fitting and a positive integer selects a fixed size. Bubble responses expose
+the normalized contract as `font_mode` (`auto` or `fixed`),
+`requested_font_size` (only for fixed mode), and `computed_font_size`.
+
+Automatic mode chooses the font size, wrapping, and line positions together.
+Fixed mode preserves the requested pixel size and recomputes wrapping and line
+positions at that size. If the text cannot fit, it reports layout overflow; it
+must not silently shrink. Canvas preview and export both use
+`computed_font_size` from the layout, so glyph size and line geometry always
+come from the same calculation.
+
 When a newer generation reaches `running`, React atomically stops job polling,
 clears pages, bubbles, selections, image versions, dirty state, loading state,
 and the active project path before reloading settings and pages. If the prior

@@ -37,6 +37,7 @@ vm.runInNewContext(compiled.outputText, sandbox, { filename: modulePath });
 const {
   hasBubbleTextEdits,
   shouldUpdateBubbleField,
+  applyBubbleFieldUpdate,
 } = sandbox.module.exports;
 
 const bubble = {
@@ -73,3 +74,11 @@ assert.equal(
   true,
   "changed style fields should trigger an update",
 );
+
+const automatic = applyBubbleFieldUpdate(bubble, "font_size", 0);
+assert.equal(automatic.font_mode, "auto");
+assert.equal(automatic.requested_font_size, null);
+
+const fixed = applyBubbleFieldUpdate(automatic, "font_size", 24);
+assert.equal(fixed.font_mode, "fixed");
+assert.equal(fixed.requested_font_size, 24);

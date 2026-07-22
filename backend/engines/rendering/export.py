@@ -72,7 +72,9 @@ class ExportService:
                 text, b, image=page.cv_image, font_family=bubble_font_family
             )
             font = layout.font
-            font_size = b.font_size if b.font_size > 0 else font_pixel_size(font)
+            # Layout is the single source of truth for line positions and
+            # glyph size in both automatic and fixed modes.
+            font_size = font_pixel_size(font)
             if font_size <= 0:
                 font_size = 12
             font.setPixelSize(font_size)

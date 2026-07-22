@@ -43,3 +43,17 @@ def test_automatic_layout_still_uses_larger_font_when_text_fits():
 
     assert layout.font.pixelSize() > renderer.AUTO_READABILITY_MIN_FONT_SIZE
     assert layout.is_overflow is False
+
+
+def test_fixed_layout_preserves_requested_size_when_text_overflows():
+    renderer = _renderer()
+    layout = renderer.layout_text_at_fixed_size(
+        "이 문장은 아주 작은 상자 안에 들어가기에는 너무 긴 고정 크기 번역입니다.",
+        QRectF(0, 0, 44, 24),
+        24,
+        font_family="Arial",
+    )
+
+    assert layout.font.pixelSize() == 24
+    assert layout.is_overflow is True
+    assert layout.reached_min_font is False

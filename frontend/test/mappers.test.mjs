@@ -102,6 +102,8 @@ const bubbleDto = {
     font_family: "",
     computed_font_family: "Resolved Font",
     font_size: 18,
+    font_mode: "fixed",
+    requested_font_size: 18,
     computed_font_size: 16,
     bold: true,
     italic: false,
@@ -135,6 +137,8 @@ assert.deepEqual(plain(toBubbleInfo(bubbleDto)), {
   font_family: "",
   computed_font_family: "Resolved Font",
   font_size: 18,
+  font_mode: "fixed",
+  requested_font_size: 18,
   computed_font_size: 16,
   bold: true,
   italic: false,
@@ -166,6 +170,8 @@ const updateDto = toBubbleUpdateDto({
   translated: "안녕",
   font_family: "Pretendard Variable",
   font_size: 18,
+  font_mode: "fixed",
+  requested_font_size: 18,
   computed_font_size: 16,
   bold: true,
   italic: false,
@@ -193,3 +199,11 @@ assert.equal(
   false,
   "bubble update DTO should not include UI-only computed_font_size",
 );
+
+const autoUpdateDto = toBubbleUpdateDto({
+  ...toBubbleInfo(bubbleDto),
+  font_mode: "auto",
+  requested_font_size: null,
+  font_size: 0,
+});
+assert.equal(autoUpdateDto.font_size, 0, "automatic mode should persist the legacy zero sentinel");

@@ -335,6 +335,110 @@ class TextRenderer:
             reached_min_font=font_pixel_size(font) <= int(round(min_size)),
         )
 
+    def layout_text_at_fixed_size(
+        self,
+        text: str,
+        rect: QRectF,
+        font_size: float,
+        mask: np.ndarray | None = None,
+        font_family: str | None = None,
+        alignment: str = "center",
+    ) -> TextLayoutResult:
+        """Lay out text without changing the caller's requested font size."""
+        if font_family is None:
+            resolved_font, chain = font_resolver.resolve(text, target_lang="Korean")
+            font_family = resolved_font.name
+            logger.debug(f"Font resolved (fixed): {font_family} (chain: {' → '.join(chain)})")
+        else:
+            app = QApplication.instance()
+            if app is None or not app.font().family():
+                font_family = "Segoe UI"
+
+        requested_size = max(1.0, float(font_size))
+        font = QFont(font_family)
+        _set_font_pixel_size(font, requested_size)
+
+        if mask is not None:
+            original_mask = np.asarray(mask) > 0
+            mask_bool = original_mask
+            if original_mask.ndim == 2 and bool(original_mask.any()):
+                import cv2
+
+                mh, mw = original_mask.shape[:2]
+                border_thickness = max(2, int(min(mw, mh) * 0.03))
+                kernel = cv2.getStructuringElement(
+                    cv2.MORPH_ELLIPSE,
+                    (border_thickness, border_thickness),
+                )
+                mask_bool = cv2.erode(original_mask.astype(np.uint8), kernel, iterations=1) > 0
+
+            candidate_masks = [mask_bool]
+            if not np.array_equal(original_mask, mask_bool):
+                candidate_masks.append(original_mask)
+
+            for candidate_mask in candidate_masks:
+                if candidate_mask.ndim != 2 or not bool(candidate_mask.any()):
+                    continue
+                for allow_char_break in (False, True):
+                    layout = self._best_layout_for_font_candidates(
+                        text,
+                        rect,
+                        candidate_mask,
+                        font_family,
+                        [requested_size],
+                        allow_char_break=allow_char_break,
+                        dynamic_max=requested_size,
+                        min_size=0.0,
+                    )
+                    if layout is not None:
+                        layout.reached_min_font = False
+                        return layout
+
+            # Preserve the requested size even when the shape-aware layout
+            # cannot fit. A rectangular fallback still gives the UI useful
+            # line positions while the overflow flag remains authoritative.
+            fallback = self.layout_text_at_fixed_size(
+                text,
+                rect,
+                requested_size,
+                font_family=font_family,
+                alignment=alignment,
+            )
+            fallback.is_overflow = True
+            return fallback
+
+        padding_x = min(8.0, rect.width() * 0.08)
+        padding_y = min(6.0, rect.height() * 0.08)
+        inner_rect = QRectF(
+            rect.x() + padding_x,
+            rect.y() + padding_y,
+            max(10.0, rect.width() - padding_x * 2),
+            max(10.0, rect.height() - padding_y * 2),
+        )
+        lines = self.wrap_korean_text(
+            text,
+            inner_rect.width(),
+            font,
+            allow_char_break=False,
+        )
+        if lines is None:
+            lines = self.wrap_korean_text(
+                text,
+                inner_rect.width(),
+                font,
+                allow_char_break=True,
+            )
+        layout = self.layout_lines_in_rect(
+            lines or [text],
+            inner_rect,
+            font,
+            inner_rect.width(),
+            alignment=alignment,
+            min_size=0.0,
+        )
+        layout.reached_min_font = False
+        return layout
+
     def center_layout_vertically(
         self,
         layout: TextLayoutResult,

@@ -30,6 +30,11 @@ export function InspectorStyleSection({
   updateBubbleField,
   t = (key) => key,
 }: InspectorStyleSectionProps) {
+  const isAutoFontSize = selectedBubble.font_mode === "auto";
+  const fixedFontSize = selectedBubble.requested_font_size
+    ?? selectedBubble.computed_font_size
+    ?? fontSizeDraft;
+
   return (
     <div className="section-panel">
       <div className="section-title-simple">{t("inspector.typographyDesign")}</div>
@@ -55,21 +60,50 @@ export function InspectorStyleSection({
 
       <div className="form-row size-row">
         <label className="form-label">{t("inspector.fontSize")}</label>
-        <div className="form-control-right font-size-controls" style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px" }}>
-          <input
-            type="range"
-            min={settings.min_font_size || 6}
-            max={settings.max_font_size || 48}
-            className="apple-slider"
-            value={fontSizeDraft}
-            onChange={(e) => setFontSizeDraft(parseInt(e.target.value))}
-            onMouseUp={() => updateBubbleField("font_size", fontSizeDraft)}
-            onKeyUp={() => updateBubbleField("font_size", fontSizeDraft)}
-            style={{ flex: 1 }}
-          />
-          <span className="size-indicator" style={{ minWidth: "48px", textAlign: "right" }}>
-            {fontSizeDraft}px
-          </span>
+        <div className="form-control-right font-mode-controls">
+          <div className="font-mode-switch" role="group" aria-label={t("inspector.fontMode")}>
+            <button
+              className={`font-mode-button ${isAutoFontSize ? "active" : ""}`}
+              type="button"
+              aria-pressed={isAutoFontSize}
+              onClick={() => updateBubbleField("font_size", 0)}
+            >
+              {t("inspector.autoFit")}
+            </button>
+            <button
+              className={`font-mode-button ${!isAutoFontSize ? "active" : ""}`}
+              type="button"
+              aria-pressed={!isAutoFontSize}
+              onClick={() => updateBubbleField("font_size", Math.round(fixedFontSize))}
+            >
+              {t("inspector.manual")}
+            </button>
+          </div>
+          <div className="font-size-controls">
+            <input
+              type="range"
+              min={settings.min_font_size || 6}
+              max={settings.max_font_size || 48}
+              className="apple-slider"
+              value={fontSizeDraft}
+              disabled={isAutoFontSize}
+              onChange={(e) => setFontSizeDraft(parseInt(e.target.value))}
+              onMouseUp={() => updateBubbleField("font_size", fontSizeDraft)}
+              onKeyUp={() => updateBubbleField("font_size", fontSizeDraft)}
+              style={{ flex: 1 }}
+            />
+            <span className="size-indicator" style={{ minWidth: "48px", textAlign: "right" }}>
+              {isAutoFontSize ? selectedBubble.computed_font_size : fontSizeDraft}px
+            </span>
+          </div>
+          <div className="font-layout-summary">
+            {t("inspector.computedFontSize")} {selectedBubble.computed_font_size}px · {selectedBubble.lines.length} {t("inspector.lines")}
+          </div>
+          {selectedBubble.layout_overflow && (
+            <div className="font-overflow-warning" role="status">
+              {t("inspector.layoutOverflowWarning")}
+            </div>
+          )}
         </div>
       </div>
 

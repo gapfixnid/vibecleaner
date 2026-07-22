@@ -4,6 +4,8 @@ export interface TextStyleDto {
   font_family: string;
   computed_font_family?: string;
   font_size: number;
+  font_mode?: "auto" | "fixed";
+  requested_font_size?: number | null;
   bold: boolean;
   italic: boolean;
   color: string;

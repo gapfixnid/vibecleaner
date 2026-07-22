@@ -25,6 +25,25 @@ export function shouldUpdateBubbleField(
   return !Object.is(selectedBubble[key], value);
 }
 
+export function applyBubbleFieldUpdate(
+  selectedBubble: BubbleInfo,
+  key: keyof BubbleInfo,
+  value: BubbleInfo[keyof BubbleInfo],
+): BubbleInfo {
+  if (key === "font_size" && typeof value === "number") {
+    return {
+      ...selectedBubble,
+      font_size: value,
+      font_mode: value > 0 ? "fixed" : "auto",
+      requested_font_size: value > 0 ? value : null,
+    };
+  }
+  return {
+    ...selectedBubble,
+    [key]: value,
+  };
+}
+
 function draftFontSize(bubble: BubbleInfo, settings: Settings): number {
   return bubble.font_size || bubble.computed_font_size || settings.default_font_size || 18;
 }
@@ -122,6 +141,8 @@ export function useBubbleEditing({
     selectedBubble?.text,
     selectedBubble?.translated,
     selectedBubble?.font_size,
+    selectedBubble?.font_mode,
+    selectedBubble?.requested_font_size,
     selectedBubble?.computed_font_size,
     selectedBubble?.color,
   ]);
@@ -129,10 +150,7 @@ export function useBubbleEditing({
   const updateBubbleField = useCallback(
     (key: keyof BubbleInfo, value: BubbleInfo[keyof BubbleInfo]) => {
       if (!selectedBubble || !shouldUpdateBubbleField(selectedBubble, key, value)) return;
-      onUpdateBubble({
-        ...selectedBubble,
-        [key]: value,
-      });
+      onUpdateBubble(applyBubbleFieldUpdate(selectedBubble, key, value));
     },
     [onUpdateBubble, selectedBubble],
   );

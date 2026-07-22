@@ -31,6 +31,8 @@ function toBubbleUpdate(b: BubbleInfo): BubbleUpdate {
     translated: b.translated,
     font_family: b.font_family,
     font_size: b.font_size,
+    font_mode: b.font_mode,
+    requested_font_size: b.requested_font_size,
     computed_font_size: b.computed_font_size,
     bold: b.bold,
     italic: b.italic,

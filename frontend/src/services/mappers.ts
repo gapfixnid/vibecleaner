@@ -47,6 +47,10 @@ export function toBubbleInfo(bubble: BubbleDto): BubbleInfo {
     font_family: bubble.style.font_family,
     computed_font_family: bubble.style.computed_font_family || "",
     font_size: bubble.style.font_size,
+    font_mode: bubble.style.font_mode ?? (bubble.style.font_size > 0 ? "fixed" : "auto"),
+    requested_font_size: bubble.style.requested_font_size ?? (
+      bubble.style.font_size > 0 ? bubble.style.font_size : null
+    ),
     computed_font_size: bubble.style.computed_font_size || 12,
     bold: bubble.style.bold,
     italic: bubble.style.italic,
@@ -90,6 +94,8 @@ export function toBubbleUpdateDto(bubble: BubbleUpdate): BubbleUpdateDto {
     text: bubble.text,
     translated: bubble.translated,
     font_family: bubble.font_family,
+    // font_size remains the persisted compatibility field: zero selects
+    // automatic fitting and a positive value selects fixed mode.
     font_size: bubble.font_size,
     bold: bubble.bold,
     italic: bubble.italic,

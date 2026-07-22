@@ -354,6 +354,18 @@ async fn get_page_for_session(
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
                 let font_size = b.get("font_size").and_then(|v| v.as_i64()).unwrap_or(0);
+                let font_mode = b
+                    .get("font_mode")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(if font_size > 0 { "fixed" } else { "auto" });
+                let requested_font_size =
+                    b.get("requested_font_size").cloned().unwrap_or_else(|| {
+                        if font_size > 0 {
+                            serde_json::json!(font_size)
+                        } else {
+                            serde_json::Value::Null
+                        }
+                    });
                 let computed_font_size = b
                     .get("computed_font_size")
                     .and_then(|v| v.as_i64())
@@ -421,6 +433,8 @@ async fn get_page_for_session(
                         "font_family": font_family,
                         "computed_font_family": computed_font_family,
                         "font_size": font_size,
+                        "font_mode": font_mode,
+                        "requested_font_size": requested_font_size,
                         "computed_font_size": computed_font_size,
                         "bold": bold,
                         "italic": italic,

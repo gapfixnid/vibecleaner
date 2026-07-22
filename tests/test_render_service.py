@@ -22,6 +22,8 @@ class FakeRenderer:
         self.vertical_bounds = None
         self.min_size = None
         self.max_size = None
+        self.fixed_font_size = None
+        self.fixed_mask = None
 
     def find_optimal_font_size(self, text, rect, font_family=None, min_size=None, max_size=None):
         self.font_rect = _rect_from_qrectf(rect)
@@ -46,6 +48,25 @@ class FakeRenderer:
         return SimpleNamespace(
             font=SimpleNamespace(pointSizeF=lambda: 18.0, family=lambda: "Resolved Font"),
             line_layouts=[],
+        )
+
+    def layout_text_at_fixed_size(
+        self,
+        text,
+        rect,
+        font_size,
+        mask=None,
+        font_family=None,
+        alignment="center",
+    ):
+        self.fixed_font_size = font_size
+        self.fixed_mask = mask
+        self.font_family = font_family
+        return SimpleNamespace(
+            font=SimpleNamespace(pixelSize=lambda: font_size, family=lambda: "Resolved Font"),
+            line_layouts=[],
+            is_overflow=False,
+            reached_min_font=False,
         )
 
     def make_ellipse_mask(self, width, height, inset=0):
@@ -105,6 +126,24 @@ class RenderServiceTests(unittest.TestCase):
         service.get_layout_for_bubble("translated", bubble, image=None, font_family=None)
 
         self.assertIsNone(renderer.font_family)
+
+    def test_fixed_font_size_reflows_without_running_auto_sizing(self):
+        renderer = FakeRenderer()
+        service = RenderService(renderer=renderer)
+        bubble = TextBubble(
+            id=1,
+            box=Rect(0, 0, 100, 80),
+            text="hello",
+            text_class="text_free",
+            font_size=24,
+        )
+
+        layout = service.get_layout_for_bubble("translated", bubble, image=None, font_family="Test")
+
+        self.assertEqual(renderer.fixed_font_size, 24)
+        self.assertIsNone(renderer.fixed_mask)
+        self.assertEqual(layout.font.pixelSize(), 24)
+        self.assertIsNone(renderer.font_rect)
 
 if __name__ == "__main__":
     unittest.main()

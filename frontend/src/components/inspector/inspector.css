@@ -253,6 +253,58 @@
   width: 100%;
 }
 
+.font-mode-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.font-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+}
+
+.font-mode-button {
+  border: 0;
+  border-radius: 4px;
+  padding: 4px 6px;
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.font-mode-button.active {
+  color: var(--text-primary);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.apple-slider:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.font-layout-summary {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.font-overflow-warning {
+  border-radius: 5px;
+  padding: 5px 7px;
+  color: #9a3412;
+  background: rgba(251, 146, 60, 0.14);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
 .apple-slider {
   flex: 1;
   accent-color: var(--system-blue);
