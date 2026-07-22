@@ -67,6 +67,21 @@ npm run dev
 
 This starts Tauri, Vite, and the local Python backend together. Running `npm --prefix frontend run dev` alone opens a browser-only UI without the Tauri command bridge or backend launcher.
 
+The desktop launcher generates a per-process session token and passes it to the
+backend. Starting `backend/main.py` manually therefore also requires a canonical
+unpadded Base64URL token that decodes to exactly 32 bytes:
+
+```powershell
+$env:VIBECLEANER_SESSION_TOKEN = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+python backend/main.py --port 8000
+```
+
+The value above is development-only. Never use a fixed token in application
+code. The backend removes the environment variable after startup, and all API
+routes except `/health` require the token header. The production CSP does not
+allow direct browser access to the loopback backend; images are served through
+the Tauri `vibecleaner-image` protocol.
+
 ## NVIDIA GPU acceleration
 
 The default requirements use CPU ONNX Runtime. Replace it in the same virtual environment to enable CUDA:
@@ -89,8 +104,10 @@ The output should include `CUDAExecutionProvider`. Check the NVIDIA driver and C
 
 ```powershell
 .\venv\Scripts\python.exe -m pytest -q
+npm --prefix frontend test
 npm --prefix frontend run build
 npm --prefix frontend run lint
+$env:TAURI_CONFIG='{"bundle":{"resources":[]}}'; cargo test --manifest-path desktop/src-tauri/Cargo.toml
 ```
 
 You may replace the first executable with `python` when intentionally using a global environment.

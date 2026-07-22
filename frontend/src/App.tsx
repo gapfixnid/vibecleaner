@@ -28,6 +28,7 @@ import { useAppSettings } from "./hooks/useAppSettings";
 import { useWorkspacePages } from "./hooks/useWorkspacePages";
 import { createTranslator } from "./i18n";
 import { usePanelWidths } from "./hooks/usePanelWidths";
+import { resetBackendSessionState } from "./lib/backendSessionReset";
 
 function App() {
   // --- Cross-cutting concerns (dialog + processing) ---
@@ -67,6 +68,7 @@ function App() {
     waitForJob,
     runTask,
     finishImageReload,
+    resetForBackendRestart: resetProcessingForBackendRestart,
   } = useProcessingTask(showError, t, notifyCancelled);
 
   // --- Domain hooks ---
@@ -91,7 +93,6 @@ function App() {
   const {
     activeBubble,
     activePage,
-    backendUrl: currentBackendUrl,
     bubblesApi,
     buildPageImageUrl,
     currentIndex,
@@ -102,6 +103,7 @@ function App() {
     pages,
     pagesApi,
     selectionApi,
+    resetForBackendRestart: resetWorkspaceForBackendRestart,
   } = workspacePages;
   const projectApi = useProject({
     runTask,
@@ -112,6 +114,7 @@ function App() {
     getSelectedIndices,
     t,
   });
+  const resetProjectForBackendRestart = projectApi.resetForBackendRestart;
   useEffect(() => {
     persistedProjectRef.current = projectApi.currentProjectPath !== null;
   }, [projectApi.currentProjectPath]);
@@ -228,9 +231,35 @@ function App() {
     t,
   });
 
+  const backendSessionWorkRef = useRef(false);
+  useEffect(() => {
+    backendSessionWorkRef.current = isDirty || pages.length > 0 || bubbles.length > 0 || activeJob !== null;
+  }, [activeJob, bubbles.length, isDirty, pages.length]);
+
+  const resetForBackendRestart = useCallback(() => {
+    resetBackendSessionState({
+      hasInMemoryWork: backendSessionWorkRef.current,
+      resetProcessing: resetProcessingForBackendRestart,
+      resetWorkspace: resetWorkspaceForBackendRestart,
+      resetProject: resetProjectForBackendRestart,
+      markClean,
+      warnAboutSessionLoss: () => {
+        showAlert("warning", t("backend.sessionLostTitle"), t("backend.sessionLostDesc"));
+      },
+    });
+  }, [
+    markClean,
+    resetProjectForBackendRestart,
+    resetProcessingForBackendRestart,
+    resetWorkspaceForBackendRestart,
+    showAlert,
+    t,
+  ]);
+
   const { backendError, isRetryingBackend, isBootstrapping, handleRetryBackend } = useBackendBootstrap({
     setSettings,
     loadPagesFromServer,
+    onBackendGenerationChange: resetForBackendRestart,
   });
 
   const {
@@ -355,7 +384,6 @@ function App() {
               onRenamePage={handleRenamePage}
               onTranslatePages={handleContextTranslate}
               onSaveImages={handleContextSaveImages}
-              backendUrl={currentBackendUrl}
               isLoading={isBootstrapping}
               t={t}
             />
@@ -450,7 +478,6 @@ function App() {
           onClose={() => setIsSettingsOpen(false)}
           settings={settings}
           onSave={handleSaveSettings}
-          backendUrl={currentBackendUrl}
           theme={theme}
           setTheme={setTheme}
           themes={themes}

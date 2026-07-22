@@ -17,17 +17,19 @@ import type {
 import type { ProviderCatalogDto } from "../types/provider";
 import type { ProjectDto, PageDto, PagesDto, SettingsDto } from "../types/project";
 import type { BubbleDto, BubblePatchDto } from "../types/bubble";
+import { normalizeBridgeError } from "../lib/bridgeError";
 
 async function callTauri<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   try {
     return await invoke<T>(cmd, args);
   } catch (err: unknown) {
-    const details = typeof err === "object" && err !== null ? err as Record<string, unknown> : null;
-    const msg = typeof err === "string"
-      ? err
-      : typeof details?.message === "string" ? details.message : String(err);
-    const code = typeof details?.code === "string" ? details.code : "TAURI_ERROR";
-    throw new ApiError(code, msg, err);
+    const normalized = normalizeBridgeError(err);
+    throw new ApiError(
+      normalized.code,
+      normalized.message,
+      normalized.details,
+      normalized.retryable,
+    );
   }
 }
 

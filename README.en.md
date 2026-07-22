@@ -28,6 +28,7 @@ You can let the app create a first pass, compare it with the original, and corre
 - Multi-page selection shows its page count and batch translation action in the canvas floating bar.
 - Compare appears only for a translated single page, with smooth floating-bar transitions.
 - The slimmer title bar keeps only the app name and a menu beside the window controls.
+- Desktop-to-backend traffic now uses per-session authentication and a validated image protocol.
 
 ## Getting started
 

@@ -67,6 +67,20 @@ npm run dev
 
 이 명령은 Tauri, Vite, 로컬 Python 백엔드를 함께 시작합니다. `npm --prefix frontend run dev`만 실행하면 브라우저 UI만 열리므로 Tauri 명령과 백엔드 기능은 동작하지 않습니다.
 
+데스크톱 런처는 프로세스마다 새 세션 토큰을 만들어 백엔드에 전달합니다.
+따라서 `backend/main.py`를 직접 실행할 때도 디코딩 결과가 정확히 32바이트인
+패딩 없는 Base64URL 토큰이 필요합니다.
+
+```powershell
+$env:VIBECLEANER_SESSION_TOKEN = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+python backend/main.py --port 8000
+```
+
+위 값은 개발 예시일 뿐이며 애플리케이션 코드에 고정 토큰을 넣으면 안 됩니다.
+백엔드는 시작 직후 환경 변수를 제거하고 `/health` 이외의 모든 API에서 토큰
+헤더를 검사합니다. 운영 CSP는 브라우저가 loopback 백엔드에 직접 연결하지
+못하게 하며, 이미지는 Tauri의 `vibecleaner-image` protocol을 통해 제공합니다.
+
 ## NVIDIA GPU 사용
 
 기본 의존성은 CPU용 ONNX Runtime입니다. CUDA를 사용하려면 같은 `venv`에서 런타임을 교체합니다.
@@ -89,8 +103,10 @@ npm run dev
 
 ```powershell
 .\venv\Scripts\python.exe -m pytest -q
+npm --prefix frontend test
 npm --prefix frontend run build
 npm --prefix frontend run lint
+$env:TAURI_CONFIG='{"bundle":{"resources":[]}}'; cargo test --manifest-path desktop/src-tauri/Cargo.toml
 ```
 
 전역 Python을 사용하는 환경에서는 첫 명령의 실행 파일만 `python`으로 바꿀 수 있습니다.

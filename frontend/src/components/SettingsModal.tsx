@@ -27,7 +27,6 @@ interface SettingsModalProps {
   onClose: () => void;
   settings: Settings;
   onSave: (updated: Settings) => void;
-  backendUrl: string;
   theme: string;
   setTheme: (id: string) => void;
   themes: ThemeMeta[];

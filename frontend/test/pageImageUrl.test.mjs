@@ -21,13 +21,18 @@ const sandbox = {
   exports: {},
   module: { exports: {} },
   URLSearchParams,
+  window: {
+    __TAURI_INTERNALS__: {
+      convertFileSrc: (path, protocol) =>
+        `http://${protocol}.localhost/${encodeURIComponent(path)}`,
+    },
+  },
 };
 sandbox.exports = sandbox.module.exports;
 vm.runInNewContext(compiled.outputText, sandbox, { filename: modulePath });
 
 const { buildPageImageUrl } = sandbox.module.exports;
 
-const backendUrl = "http://127.0.0.1:8000";
 const firstProjectPage = {
   page_id: "page_old",
   index: 0,
@@ -40,24 +45,25 @@ const nextProjectPage = {
 };
 
 const firstUrl = buildPageImageUrl({
-  backendUrl,
   page: firstProjectPage,
   pageVersion: 0,
 });
 const nextUrl = buildPageImageUrl({
-  backendUrl,
   page: nextProjectPage,
   pageVersion: 0,
 });
 const inpaintedUrl = buildPageImageUrl({
-  backendUrl,
   page: { ...nextProjectPage, has_inpaint: true },
   pageVersion: 2,
   preview: false,
 });
 
 assert.notEqual(firstUrl, nextUrl, "new project pages with the same index must not share an image URL");
-assert.match(nextUrl, /\/api\/pages\/page_new\/image/, "URL cache key must include the stable page id");
-assert.match(nextUrl, /v=0/, "URL cache key must include the page image version");
-assert.match(inpaintedUrl, /type=inpainted/, "inpainted pages should request the inpainted image");
-assert.match(inpaintedUrl, /preview=false/, "full resolution requests should disable preview");
+assert.match(nextUrl, /^http:\/\/vibecleaner-image\.localhost\//, "images must use the custom protocol");
+assert.doesNotMatch(nextUrl, /127\.0\.0\.1|localhost:\d+/, "images must not expose the backend port");
+const decodedNextUrl = decodeURIComponent(new URL(nextUrl).pathname.slice(1));
+const decodedInpaintedUrl = decodeURIComponent(new URL(inpaintedUrl).pathname.slice(1));
+assert.match(decodedNextUrl, /\/api\/pages\/page_new\/image/, "URL cache key must include the stable page id");
+assert.match(decodedNextUrl, /v=0/, "URL cache key must include the page image version");
+assert.match(decodedInpaintedUrl, /type=inpainted/, "inpainted pages should request the inpainted image");
+assert.match(decodedInpaintedUrl, /preview=false/, "full resolution requests should disable preview");

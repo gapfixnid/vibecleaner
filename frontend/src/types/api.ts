@@ -141,11 +141,13 @@ export interface vibeCleanerApi {
 export class ApiError extends Error {
   public code: string;
   public details?: unknown;
+  public retryable?: boolean;
 
-  constructor(code: string, message: string, details?: unknown) {
+  constructor(code: string, message: string, details?: unknown, retryable?: boolean) {
     super(message);
     this.code = code;
     this.details = details;
+    this.retryable = retryable;
     this.name = "ApiError";
   }
 }

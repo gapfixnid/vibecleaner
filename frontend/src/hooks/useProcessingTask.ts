@@ -86,6 +86,7 @@ export function useProcessingTask(
   const isMountedRef = useRef(true);
   const currentJobIdRef = useRef<string | null>(null);
   const cancelRequestedRef = useRef(false);
+  const pollingGenerationRef = useRef(0);
   /** Exposed so callers can branch after runTask returns. Reset after each runTask. */
   const wasCancelledRef = useRef(false);
   const notifyCancelledRef = useRef(notifyCancelled);
@@ -116,6 +117,7 @@ export function useProcessingTask(
         return startedJob;
       }
       currentJobIdRef.current = startedJob.job_id;
+      const pollingGeneration = pollingGenerationRef.current;
       cancelRequestedRef.current = false;
       const publish = (job: JobStatus) => {
         if (!isMountedRef.current) return;
@@ -133,6 +135,9 @@ export function useProcessingTask(
         let job = startedJob;
         while (true) {
           if (!isMountedRef.current) {
+            throw new Error(CANCELLED);
+          }
+          if (pollingGeneration !== pollingGenerationRef.current) {
             throw new Error(CANCELLED);
           }
           if (cancelRequestedRef.current) {
@@ -212,6 +217,16 @@ export function useProcessingTask(
     });
   }, []);
 
+  const resetForBackendRestart = useCallback(() => {
+    pollingGenerationRef.current += 1;
+    cancelRequestedRef.current = true;
+    currentJobIdRef.current = null;
+    wasCancelledRef.current = false;
+    setActiveJob(null);
+    setIsWaitingForImageReload(false);
+    setIsProcessing(false);
+  }, []);
+
   return {
     isProcessing,
     setIsProcessing,
@@ -222,6 +237,7 @@ export function useProcessingTask(
     waitForJob,
     runTask,
     finishImageReload,
+    resetForBackendRestart,
     wasCancelled: wasCancelledRef,
   } as const;
 }

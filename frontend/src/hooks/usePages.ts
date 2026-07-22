@@ -54,6 +54,14 @@ export function usePages({
     setPageVersions({});
   }, []);
 
+  const clearPagesForBackendRestart = useCallback(() => {
+    currentIndexRef.current = -1;
+    setPages([]);
+    setCurrentIndex(-1);
+    setPageVersions({});
+    onPagesCleared();
+  }, [currentIndexRef, onPagesCleared]);
+
   const loadPagesFromServer = useCallback(
     async (selectIndex?: number, options?: { skipPageActivation?: boolean }) => {
       try {
@@ -211,6 +219,7 @@ export function usePages({
     pageVersions,
     bumpPageVersion,
     resetPageVersions,
+    clearPagesForBackendRestart,
     loadPagesFromServer,
     handleSelectPage,
     handleDuplicatePage,

@@ -15,7 +15,7 @@ const settingsModal = fs.readFileSync(path.join(frontendDir, "src/components/Set
 assert.match(types, /interface ProviderCatalogDto/);
 assert.match(types, /config_schema: ProviderConfigFieldDto\[\]/);
 assert.match(client, /callTauri<ProviderCatalogDto>\("get_provider_catalog"\)/);
-assert.match(rust, /forward_get\(port_state\.0, "\/api\/providers\/catalog"\)/);
+assert.match(rust, /forward_get\(&manager, "\/api\/providers\/catalog"\)/);
 assert.match(rust, /get_provider_catalog,/);
 assert.match(settingsModal, /api\.getProviderCatalog\(\)/);
 assert.match(settingsModal, /translationProviderManifests\.map/);

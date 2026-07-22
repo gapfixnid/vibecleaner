@@ -39,6 +39,10 @@ export function useProject({
   // Used so "Save Project" writes back to the same file without re-prompting.
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
 
+  const resetForBackendRestart = useCallback(() => {
+    setCurrentProjectPath(null);
+  }, []);
+
   /** Import images. Opens a file dialog unless explicit paths are given
    *  (e.g. OS drag-and-drop). */
   const handleOpenFiles = useCallback(async (presetPaths?: string[]): Promise<OpenFilesResult | undefined> => {
@@ -159,5 +163,6 @@ export function useProject({
     handleNewProject,
     handleLoadProject,
     handleSaveProject,
+    resetForBackendRestart,
   };
 }

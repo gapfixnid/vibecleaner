@@ -4,11 +4,9 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
-from urllib.parse import urlparse
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # This entry point runs in three modes:
@@ -33,18 +31,12 @@ from backend.api.routes.catalog import router as catalog_router
 from backend.api.routes.pages import router as pages_router
 from backend.api.routes.project import router as project_router
 from backend.api.routes.settings import router as settings_router
+from backend.api.routes.health import router as health_router
+from backend.api.security import SESSION_TOKEN_ENV, SessionAuthMiddleware, canonical_token
 
 
 configure_logging()
 logger = logging.getLogger(APP_NAME)
-
-ALLOWED_BROWSER_ORIGINS = {
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "tauri://localhost",
-    "http://tauri.localhost",
-}
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -74,23 +66,8 @@ async def lifespan(app: FastAPI):
             shutdown()
 
 
-def _referer_origin(referer: str | None) -> str | None:
-    if not referer:
-        return None
-    parsed = urlparse(referer)
-    if not parsed.scheme or not parsed.netloc:
-        return None
-    return f"{parsed.scheme}://{parsed.netloc}"
-
-
-async def reject_untrusted_browser_origins(request: Request, call_next):
-    origin = request.headers.get("origin") or _referer_origin(request.headers.get("referer"))
-    if origin and origin not in ALLOWED_BROWSER_ORIGINS:
-        return JSONResponse({"detail": "Forbidden origin"}, status_code=403)
-    return await call_next(request)
-
-
 def include_routes(app: FastAPI) -> None:
+    app.include_router(health_router)
     app.include_router(catalog_router)
     app.include_router(settings_router)
     app.include_router(project_router)
@@ -106,24 +83,23 @@ async def _page_image_load_handler(request: Request, exc: PageImageLoadError):
     return JSONResponse({"detail": "Failed to load page image"}, status_code=500)
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(title=f"{APP_NAME} backend", version=APP_VERSION, lifespan=lifespan)
+def create_app(session_token: str) -> FastAPI:
+    token_bytes = canonical_token(session_token)
+    app = FastAPI(
+        title=f"{APP_NAME} backend",
+        version=APP_VERSION,
+        lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
+    app.state.session_token_bytes = token_bytes
     app.state.container = build_container()
     app.add_exception_handler(PageNotFoundError, _page_not_found_handler)
     app.add_exception_handler(PageImageLoadError, _page_image_load_handler)
-    app.middleware("http")(reject_untrusted_browser_origins)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=sorted(ALLOWED_BROWSER_ORIGINS),
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    app.add_middleware(SessionAuthMiddleware)
     include_routes(app)
     return app
-
-
-app = create_app()
 
 
 if __name__ == "__main__":
@@ -131,6 +107,15 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8000, help="Port to run the API server on")
     args = parser.parse_args()
 
+    session_token = os.environ.pop(SESSION_TOKEN_ENV, None)
+    if session_token is None:
+        logger.critical("Missing local backend session token")
+        raise SystemExit(2)
+    try:
+        app = create_app(session_token)
+    except ValueError as exc:
+        logger.critical("Invalid local backend session token: %s", exc)
+        raise SystemExit(2) from exc
     start_pipeline_warmup(app.state.container)
     logger.info("Starting FastAPI server on port %d", args.port)
     uvicorn.run(app, host="127.0.0.1", port=args.port)

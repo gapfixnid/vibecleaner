@@ -1,14 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-
-export interface BackendStatus {
-  running: boolean;
-  error: string | null;
-  port: number;
-}
-
-export const getApiPort = async (): Promise<number> => {
-  return await invoke<number>("get_api_port");
-};
+import { listen } from "@tauri-apps/api/event";
+import type { BackendStatus } from "../types/backend";
 
 export const getBackendStatus = async (): Promise<BackendStatus> => {
   return await invoke<BackendStatus>("get_backend_status");
@@ -16,6 +8,12 @@ export const getBackendStatus = async (): Promise<BackendStatus> => {
 
 export const retryBackend = async (): Promise<BackendStatus> => {
   return await invoke<BackendStatus>("retry_backend");
+};
+
+export const onBackendStatusChanged = async (
+  handler: (status: BackendStatus) => void,
+): Promise<() => void> => {
+  return listen<BackendStatus>("backend-status-changed", (event) => handler(event.payload));
 };
 
 export const selectDirectory = async (): Promise<string | null> => {

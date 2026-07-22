@@ -1,7 +1,6 @@
 import type { PageInfo } from "../types";
 
 interface BuildPageImageUrlOptions {
-  backendUrl: string;
   page: Pick<PageInfo, "page_id" | "index" | "has_inpaint">;
   pageVersion?: number;
   preview?: boolean;
@@ -10,7 +9,6 @@ interface BuildPageImageUrlOptions {
 }
 
 export function buildPageImageUrl({
-  backendUrl,
   page,
   pageVersion = 0,
   preview = true,
@@ -31,5 +29,9 @@ export function buildPageImageUrl({
     params.set("preview", preview ? "true" : "false");
   }
 
-  return `${backendUrl}/api/pages/${pageId}/image?${params.toString()}`;
+  const path = `/api/pages/${pageId}/image?${params.toString()}`;
+  const internals = (window as Window & {
+    __TAURI_INTERNALS__?: { convertFileSrc: (path: string, protocol: string) => string };
+  }).__TAURI_INTERNALS__;
+  return internals?.convertFileSrc(path, "vibecleaner-image") ?? path;
 }

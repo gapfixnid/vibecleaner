@@ -86,8 +86,20 @@ export function useWorkspacePages({
     selectPage: pagesApi.handleSelectPage,
     clearBubbleSelection,
   });
+  const { setSelectedPageIds } = selectionApi;
+  const { clearBubbles } = bubblesApi;
+  const { clearPagesForBackendRestart } = pagesApi;
 
-  const { backendUrl, buildPageImageUrl } = usePageImageRequests({
+  const resetForBackendRestart = useCallback(() => {
+    selectionRef.current = [];
+    currentIndexRef.current = -1;
+    pagesRef.current = [];
+    setSelectedPageIds([]);
+    clearBubbles();
+    clearPagesForBackendRestart();
+  }, [clearBubbles, clearPagesForBackendRestart, setSelectedPageIds]);
+
+  const { buildPageImageUrl } = usePageImageRequests({
     pages,
     currentIndex,
     pageVersions,
@@ -100,7 +112,6 @@ export function useWorkspacePages({
   return {
     activeBubble,
     activePage,
-    backendUrl,
     bubblesApi,
     buildPageImageUrl,
     currentIndex,
@@ -111,5 +122,6 @@ export function useWorkspacePages({
     pages,
     pagesApi,
     selectionApi,
+    resetForBackendRestart,
   };
 }

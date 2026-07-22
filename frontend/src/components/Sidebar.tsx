@@ -122,7 +122,6 @@ interface SidebarProps {
   onTranslatePages: (idx: number) => void;
   /** Save image(s) for the right-clicked page (or the whole multi-selection). */
   onSaveImages: (idx: number) => void;
-  backendUrl: string;
   /** Image version per page — bumps when the underlying image changes. */
   pageVersions: Record<number, number>;
   /** True while the backend is booting — shows skeleton rows instead of the empty state. */
@@ -144,7 +143,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRenamePage,
   onTranslatePages,
   onSaveImages,
-  backendUrl,
   pageVersions,
   isLoading,
   t = (key) => key,
@@ -367,7 +365,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             : "not-started";
                       const pageStateLabel = t(`sidebar.status.${pageState}`);
                       const thumbUrl = buildPageImageUrl({
-                        backendUrl,
                         page,
                         pageVersion: pageVersions[pageIdx] ?? 0,
                         thumbnail: true,

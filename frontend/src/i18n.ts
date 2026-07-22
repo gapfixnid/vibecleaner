@@ -178,6 +178,8 @@ export type TranslationKey =
   | "backend.restartFailed"
   | "backend.retry"
   | "backend.retrying"
+  | "backend.sessionLostTitle"
+  | "backend.sessionLostDesc"
   | "settings.modelsLoadFailed"
   | "settings.providerGoogle"
   | "settings.providerOllama"
@@ -492,6 +494,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "backend.restartFailed": "Failed to invoke the backend restart command.",
     "backend.retry": "Retry",
     "backend.retrying": "Retrying...",
+    "backend.sessionLostTitle": "Unsaved work was lost",
+    "backend.sessionLostDesc": "The processing backend restarted, so unsaved pages and edits from the previous session could not be recovered.",
     "settings.modelsLoadFailed": "Failed to load the model list.",
     "settings.providerGoogle": "Google Translate (Free Web · Default)",
     "settings.providerOllama": "Ollama (Local LLM)",
@@ -805,6 +809,8 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "backend.restartFailed": "백엔드 재시작 명령을 호출하지 못했습니다.",
     "backend.retry": "다시 시도",
     "backend.retrying": "다시 시도 중...",
+    "backend.sessionLostTitle": "저장하지 않은 작업이 사라졌습니다",
+    "backend.sessionLostDesc": "처리 백엔드가 다시 시작되어 이전 세션의 저장하지 않은 페이지와 편집 내용을 복구할 수 없습니다.",
     "settings.modelsLoadFailed": "모델 목록을 불러오지 못했습니다.",
     "settings.providerGoogle": "Google 번역 (무료 웹 · 기본값)",
     "settings.providerOllama": "Ollama (로컬 LLM)",

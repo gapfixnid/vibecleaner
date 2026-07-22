@@ -4,11 +4,13 @@ from types import SimpleNamespace
 
 from PySide6.QtWidgets import QApplication
 
+TEST_TOKEN = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"
+
 class BackendQtRuntimeTests(unittest.TestCase):
     def test_create_app_initializes_qapplication_for_layout_metrics(self):
         from backend.main import create_app
 
-        create_app()
+        create_app(TEST_TOKEN)
 
         self.assertIsNotNone(QApplication.instance())
 

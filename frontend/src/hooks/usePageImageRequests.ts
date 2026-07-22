@@ -1,5 +1,4 @@
 import { useCallback, useEffect } from "react";
-import * as api from "../services/api";
 import type { PageInfo } from "../types";
 import { buildPageImageUrl as buildPageImageRequestUrl } from "../lib/pageImageUrl";
 
@@ -10,19 +9,16 @@ interface UsePageImageRequestsDeps {
 }
 
 export function usePageImageRequests({ pages, currentIndex, pageVersions }: UsePageImageRequestsDeps) {
-  const backendUrl = api.getBackendUrl();
-
   const buildPageImageUrl = useCallback(
     (page: PageInfo, preview = true, imageType: "auto" | "original" | "inpainted" = "auto") => {
       return buildPageImageRequestUrl({
-        backendUrl,
         page,
         pageVersion: pageVersions[page.index] || 0,
         preview,
         imageType,
       });
     },
-    [backendUrl, pageVersions]
+    [pageVersions]
   );
 
   useEffect(() => {
@@ -44,7 +40,6 @@ export function usePageImageRequests({ pages, currentIndex, pageVersions }: UseP
   }, [buildPageImageUrl, currentIndex, pages]);
 
   return {
-    backendUrl,
     buildPageImageUrl,
   };
 }

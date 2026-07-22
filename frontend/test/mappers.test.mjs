@@ -152,6 +152,7 @@ assert.deepEqual(plain(toBubbleInfo(bubbleDto)), {
   layout_margin: { top: 5, right: 6, bottom: 7, left: 8 },
   layout_confidence: 0.73,
   layout_reasoning: "writing_mode=vertical; alignment=center",
+  text_box: { x: 12, y: 22, width: 90, height: 60 },
   lines: [{ text: "안녕", x: 1, y: 2, width: 30, height: 12 }],
 });
 

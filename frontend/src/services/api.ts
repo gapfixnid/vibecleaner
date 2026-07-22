@@ -15,14 +15,6 @@ import type {
 } from "../types";
 import { toBubbleInfo, toBubbleUpdateDto } from "./mappers";
 
-let BACKEND_URL = "http://127.0.0.1:8000";
-
-export const setBackendUrl = (url: string) => {
-  BACKEND_URL = url;
-};
-
-export const getBackendUrl = () => BACKEND_URL;
-
 export const getSettings = async (): Promise<Settings> => {
   const settings = await api.getSettings();
   return settings as Settings;

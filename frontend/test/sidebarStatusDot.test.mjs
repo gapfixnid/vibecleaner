@@ -11,16 +11,16 @@ const sidebarSource = fs.readFileSync(sidebarPath, "utf8");
 
 assert.equal(
   sidebarSource.includes("page-status-dot"),
-  false,
-  "Sidebar thumbnails should not render status dots",
+  true,
+  "Sidebar thumbnails should render the current page status",
 );
 assert.equal(
-  sidebarSource.includes("derivePageStatus"),
-  false,
-  "Sidebar should not derive thumbnail status after dot removal",
+  sidebarSource.includes("aria-label={pageStateLabel}"),
+  true,
+  "Sidebar status must expose its label to assistive technology",
 );
 assert.equal(
-  sidebarSource.includes("pageStatusLabel"),
-  false,
-  "Sidebar should not create thumbnail status labels after dot removal",
+  sidebarSource.includes("title={pageStateLabel}"),
+  true,
+  "Sidebar status must expose a tooltip label",
 );

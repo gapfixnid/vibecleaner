@@ -1,8 +1,10 @@
 from backend.main import create_app
 
+TEST_TOKEN = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"
+
 
 def test_app_exposes_container_and_settings_route():
-    app = create_app()
+    app = create_app(TEST_TOKEN)
 
     assert hasattr(app.state, "container")
     route_paths = {route.path for route in app.routes if hasattr(route, "path")}

@@ -5,6 +5,8 @@ from backend.core.providers import ProviderRegistry
 from backend.engines.provider_catalog import register_builtin_providers
 from backend.main import create_app
 
+TEST_TOKEN = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"
+
 
 def _builtin_registry():
     registry = ProviderRegistry()
@@ -53,7 +55,7 @@ def test_catalog_api_returns_metadata_without_adapters_or_secret_values():
 
 
 def test_application_exposes_provider_catalog_route_and_registry():
-    app = create_app()
+    app = create_app(TEST_TOKEN)
     route_paths = {route.path for route in app.routes if hasattr(route, "path")}
     for route in app.routes:
         original_router = getattr(route, "original_router", None)

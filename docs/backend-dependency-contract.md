@@ -27,6 +27,45 @@ The React frontend currently calls backend APIs through Tauri commands. Running
 Vite directly in a browser is useful for static UI work only; it does not start
 the backend and it does not provide the Tauri command bridge.
 
+## Desktop Local-IPC Contract
+
+`BackendManager` is the single owner of the Python child process, session
+token, shared HTTP client, lifecycle phase, and monotonically increasing
+generation. Each launch uses a random loopback port and a random 32-byte
+Base64URL session token. The Python entry point removes the token from its
+environment, keeps only decoded bytes, and requires it in
+`X-VibeCleaner-Token` on every endpoint except `/health`.
+
+Readiness is an identity check, not merely a successful TCP connection. Tauri
+sends a random 32-byte challenge to `/health` and accepts the process only when
+the response has protocol version `1` and a valid HMAC-SHA256 proof for the
+canonical message `vibecleaner-health-v1:<challenge>`. The shared client does
+not use system proxies or redirects and validates its generation after every
+response.
+
+The child watcher reports `BACKEND_EXITED` only when all of these remain true:
+
+- the watched generation is current;
+- the watched PID is still the manager's child; and
+- the current phase is `starting` or `running`.
+
+Shutdown and restart first move to `stopping` and take the child from the
+manager, so an intentional exit cannot be mistaken for a crash. A restart
+increments the generation before entering `restarting`; therefore
+`running(g=1) -> restarting(g=1)` is invalid while
+`running(g=1) -> restarting(g=2)` is accepted.
+
+Browser code never receives the backend port or token. Images use the
+`vibecleaner-image` custom protocol, whose Rust handler accepts only `GET
+/api/pages/{page_id}/image`, validates its path and query allowlists, and
+forwards only response headers needed to render and cache an image. Other API
+traffic stays behind Tauri commands.
+
+When a newer generation reaches `running`, React atomically stops job polling,
+clears pages, bubbles, selections, image versions, dirty state, loading state,
+and the active project path before reloading settings and pages. If the prior
+generation held in-memory work, the user is warned that unsaved work was lost.
+
 `backend/main.py` owns FastAPI app creation. `backend/core/container.py` is the
 composition root that wires concrete runtime dependencies.
 

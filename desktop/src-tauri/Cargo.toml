@@ -25,4 +25,11 @@ tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 rfd = "0.15"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["time", "sync", "rt-multi-thread", "macros"] }
+base64 = "0.22"
+getrandom = "0.3"
+hmac = "0.12"
+sha2 = "0.10"
+percent-encoding = "2.3"
+url = "2.5"
+http = "1"
