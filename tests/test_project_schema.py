@@ -137,3 +137,21 @@ def test_missing_page_id_is_generated_without_an_original_id_extension():
 
     assert len(normalized["pages"][0]["page_id"]) == 32
     assert ORIGINAL_PAGE_ID_EXTENSION not in normalized["pages"][0]
+
+
+def test_repaired_page_ids_are_deterministic_and_normalization_is_idempotent():
+    damaged = {
+        "version": "2.0",
+        "pages": [
+            {"page_id": r"..\outside"},
+            {"page_id": "duplicate"},
+            {"page_id": "duplicate"},
+            {},
+        ],
+    }
+
+    first = normalize_project_metadata(damaged)
+    second = normalize_project_metadata(damaged)
+
+    assert first == second
+    assert normalize_project_metadata(first) == first

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
+import json
 import re
-from typing import Any, Callable, Mapping
 import uuid
+from copy import deepcopy
+from typing import Any, Callable, Mapping
 
 from ...core.version import __version__ as APP_VERSION
 
@@ -16,6 +17,7 @@ CURRENT_PROJECT_VERSION = "2.0"  # Compatibility alias for existing readers.
 LEGACY_PROJECT_SCHEMA_VERSION = 1
 SAFE_PAGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 ORIGINAL_PAGE_ID_EXTENSION = "vibecleaner_original_page_id"
+VIBECLEANER_PAGE_NAMESPACE = uuid.UUID("9597eb26-7d76-5de8-8628-e3a8d2a9820a")
 
 
 class ProjectSchemaError(ValueError):
@@ -107,7 +109,7 @@ def _normalize_page_ids(metadata: dict[str, Any]) -> None:
 
     seen: set[str] = set()
     normalized_pages: list[Any] = []
-    for raw_page in pages:
+    for page_index, raw_page in enumerate(pages):
         if not isinstance(raw_page, Mapping):
             normalized_pages.append(raw_page)
             continue
@@ -122,9 +124,21 @@ def _normalize_page_ids(metadata: dict[str, Any]) -> None:
         if not is_safe:
             if "page_id" in page:
                 page[ORIGINAL_PAGE_ID_EXTENSION] = deepcopy(original_id)
-            replacement = uuid.uuid4().hex
+            canonical_original_id = json.dumps(
+                original_id,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            seed = f"{page_index}:{canonical_original_id}"
+            replacement = uuid.uuid5(VIBECLEANER_PAGE_NAMESPACE, seed).hex
+            collision_index = 0
             while replacement in seen:
-                replacement = uuid.uuid4().hex
+                collision_index += 1
+                replacement = uuid.uuid5(
+                    VIBECLEANER_PAGE_NAMESPACE,
+                    f"{seed}:{collision_index}",
+                ).hex
             page["page_id"] = replacement
 
         seen.add(page["page_id"])

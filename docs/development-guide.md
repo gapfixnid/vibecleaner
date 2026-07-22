@@ -48,7 +48,7 @@ npm install
 npm --prefix frontend install
 python -m venv venv
 .\venv\Scripts\python.exe -m pip install -U pip
-.\venv\Scripts\python.exe -m pip install -r requirements-runtime.txt
+.\venv\Scripts\python.exe -m pip install -r requirements-test.txt
 ```
 
 Pre-download the models required by the currently saved settings if desired:

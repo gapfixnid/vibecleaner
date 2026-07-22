@@ -1,0 +1,10 @@
+# Test and CI environment. Keep runtime dependencies aligned with the sidecar.
+-r requirements-runtime.txt
+
+pytest>=8.0.0
+PyYAML>=6.0
+
+# Older Starlette uses HTTPX; Starlette 1.3+ TestClient requires HTTPX2. Supporting
+# both keeps this unpinned FastAPI/Starlette test environment reproducible.
+httpx>=0.27.0,<1.0.0
+httpx2>=2.0.0,<3.0.0

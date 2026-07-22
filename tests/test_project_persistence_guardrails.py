@@ -154,6 +154,10 @@ def test_malicious_project_page_id_is_rekeyed_before_runtime_and_round_trip(tmp_
     assert len(loaded_page.page_id) == 32
     assert loaded_page.project_extensions[ORIGINAL_PAGE_ID_EXTENSION] == r"..\outside"
 
+    reopened = SimpleNamespace(project_state=ProjectState(), cache_tasks=DeferredCacheTasks())
+    project_route.load_project(file_path=str(source), container=reopened)
+    assert reopened.project_state.pages[0].page_id == loaded_page.page_id
+
     project_route.save_project(file_path=str(destination), selected_indices="[0]", container=container)
     with zipfile.ZipFile(destination, "r") as archive:
         saved_page = json.loads(archive.read("project.json"))["pages"][0]

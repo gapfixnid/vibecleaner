@@ -48,7 +48,7 @@ npm install
 npm --prefix frontend install
 python -m venv venv
 .\venv\Scripts\python.exe -m pip install -U pip
-.\venv\Scripts\python.exe -m pip install -r requirements-runtime.txt
+.\venv\Scripts\python.exe -m pip install -r requirements-test.txt
 ```
 
 현재 저장된 설정에 필요한 모델을 미리 내려받으려면 다음 명령을 실행합니다.
