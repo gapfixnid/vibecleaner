@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type React from "react";
 import type { BubbleInfo } from "../../types";
+import { bubbleGeometryChanged, canStartBubbleDrag } from "../../lib/bubbleDrag";
 
 type BubbleDragType = "move" | "resize";
 
@@ -20,6 +21,7 @@ interface UseBubbleDragOptions {
   imageDimensions: { w: number; h: number };
   scale: number;
   bubbles: BubbleInfo[];
+  selectedBubbleId: number | null;
   onSelectBubble: (id: number | null) => void;
   onPreviewBubbles: (updated: BubbleInfo[]) => void;
   onUpdateBubbles: (updated: BubbleInfo[]) => void;
@@ -30,6 +32,7 @@ export function useBubbleDrag({
   imageDimensions,
   scale,
   bubbles,
+  selectedBubbleId,
   onSelectBubble,
   onPreviewBubbles,
   onUpdateBubbles,
@@ -42,7 +45,13 @@ export function useBubbleDrag({
     const committed = latestDragBubblesRef.current;
     latestDragBubblesRef.current = null;
     setDraggingBubble(null);
-    if (committed) {
+    const changedBubble = committed?.find((bubble) => bubble.id === draggingBubble.id);
+    if (committed && changedBubble && bubbleGeometryChanged(changedBubble, {
+      x: draggingBubble.initialX,
+      y: draggingBubble.initialY,
+      width: draggingBubble.initialW,
+      height: draggingBubble.initialH,
+    })) {
       onUpdateBubbles(committed);
     }
   }, [draggingBubble, onUpdateBubbles]);
@@ -63,10 +72,12 @@ export function useBubbleDrag({
       if (!draggingBubble) return false;
       if (!imageRef.current) return true;
 
+      const pointerDeltaX = e.clientX - draggingBubble.startX;
+      const pointerDeltaY = e.clientY - draggingBubble.startY;
       const imgWidth = imageDimensions.w || imageRef.current.naturalWidth;
       const imgHeight = imageDimensions.h || imageRef.current.naturalHeight;
-      const deltaX = (e.clientX - draggingBubble.startX) / scale;
-      const deltaY = (e.clientY - draggingBubble.startY) / scale;
+      const deltaX = pointerDeltaX / scale;
+      const deltaY = pointerDeltaY / scale;
 
       const updated = bubbles.map((b) => {
         if (b.id !== draggingBubble.id) return b;
@@ -97,6 +108,9 @@ export function useBubbleDrag({
       e.stopPropagation();
       onSelectBubble(bubble.id);
       latestDragBubblesRef.current = null;
+      if (!canStartBubbleDrag(selectedBubbleId, bubble.id, type)) {
+        return;
+      }
       setDraggingBubble({
         id: bubble.id,
         type,
@@ -108,7 +122,7 @@ export function useBubbleDrag({
         initialH: bubble.height,
       });
     },
-    [onSelectBubble],
+    [onSelectBubble, selectedBubbleId],
   );
 
   return {

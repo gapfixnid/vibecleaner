@@ -152,6 +152,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     imageDimensions,
     scale,
     bubbles,
+    selectedBubbleId,
     onSelectBubble,
     onPreviewBubbles,
     onUpdateBubbles,
