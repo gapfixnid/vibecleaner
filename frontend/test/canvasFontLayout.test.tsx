@@ -4,6 +4,10 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { CanvasBubbleTextLayers } from "../src/components/canvas/CanvasBubbleTextLayers";
+import {
+  bubbleVisualSignature,
+  nextSelectionRenderState,
+} from "../src/lib/textLayerVisual";
 import type { BubbleInfo } from "../src/types";
 
 test("canvas renders glyphs with the layout-computed font size", () => {
@@ -54,4 +58,51 @@ test("canvas renders glyphs with the layout-computed font size", () => {
 
   assert.match(markup, /font-size="18"/);
   assert.doesNotMatch(markup, /font-size="28"/);
+});
+
+test("selection alone preserves the canonical tile visual signature", () => {
+  const bubble = {
+    id: 1,
+    text: "source",
+    translated: "translated",
+    x: 10,
+    y: 20,
+    width: 100,
+    height: 60,
+    font_family: "Arial",
+    font_size: 18,
+    bold: false,
+    italic: false,
+    color: "#000000",
+    alignment: "center" as const,
+    writing_mode: "horizontal",
+    text_direction: "ltr",
+    justification: "none",
+    layout_padding: {},
+    layout_margin: {},
+  } as BubbleInfo;
+
+  assert.equal(bubbleVisualSignature(bubble), bubbleVisualSignature({ ...bubble }));
+  assert.notEqual(
+    bubbleVisualSignature(bubble),
+    bubbleVisualSignature({ ...bubble, x: bubble.x + 1 }),
+  );
+  assert.notEqual(
+    bubbleVisualSignature(bubble),
+    bubbleVisualSignature({ ...bubble, translated: "edited" }),
+  );
+
+  const initial = { bubbleId: 1, baselineSignature: bubbleVisualSignature(bubble), editing: false };
+  assert.equal(
+    nextSelectionRenderState(initial, 1, bubbleVisualSignature({ ...bubble })),
+    initial,
+  );
+  assert.equal(
+    nextSelectionRenderState(initial, 1, bubbleVisualSignature({ ...bubble, x: 11 })).editing,
+    true,
+  );
+  assert.deepEqual(
+    nextSelectionRenderState({ ...initial, editing: true }, 2, "next"),
+    { bubbleId: 2, baselineSignature: "next", editing: false },
+  );
 });

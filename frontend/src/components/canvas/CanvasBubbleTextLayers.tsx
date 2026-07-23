@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { BubbleInfo, TextLayerRefDto } from "../../types";
 import { buildTextLayerUrl } from "../../lib/textLayerUrl";
+import {
+  bubbleVisualSignature,
+  nextSelectionRenderState,
+  type SelectionRenderState,
+} from "../../lib/textLayerVisual";
 
 interface Props {
   bubbles: BubbleInfo[];
@@ -108,6 +113,21 @@ export const CanvasBubbleTextLayers = React.memo(({ bubbles, selectedBubbleId, w
     () => bubbles.find((bubble) => bubble.id === selectedBubbleId) ?? null,
     [bubbles, selectedBubbleId],
   );
+  const selectedSignature = selected ? bubbleVisualSignature(selected) : null;
+  const [selectionRender, setSelectionRender] = useState<SelectionRenderState>({
+    bubbleId: selectedBubbleId,
+    baselineSignature: selectedSignature,
+    editing: false,
+  });
+  const nextSelectionRender = nextSelectionRenderState(
+    selectionRender,
+    selectedBubbleId,
+    selectedSignature,
+  );
+  if (nextSelectionRender !== selectionRender) {
+    setSelectionRender(nextSelectionRender);
+  }
+  const selectedEditing = nextSelectionRender.editing;
   const selectedFontKey = useMemo(() => {
     if (!selected) return null;
     const fonts = selected.lines.flatMap((line) => line.runs?.map((run) => (
@@ -121,7 +141,7 @@ export const CanvasBubbleTextLayers = React.memo(({ bubbles, selectedBubbleId, w
 
   useEffect(() => {
     let cancelled = false;
-    if (!selected || !selectedFontKey) return;
+    if (!selected || !selectedFontKey || !selectedEditing) return;
     const fonts = new Set<string>();
     selected.lines.forEach((line) => line.runs?.forEach((run) => {
       if (run.font_family) fonts.add(`${run.font_pixel_size}px "${run.font_family}"`);
@@ -132,7 +152,7 @@ export const CanvasBubbleTextLayers = React.memo(({ bubbles, selectedBubbleId, w
       if (!cancelled) setOverlayReadyKey(selectedFontKey);
     }));
     return () => { cancelled = true; };
-  }, [selected, selectedFontKey]);
+  }, [selected, selectedEditing, selectedFontKey]);
 
   return (
     <svg
@@ -146,11 +166,12 @@ export const CanvasBubbleTextLayers = React.memo(({ bubbles, selectedBubbleId, w
         if (!bubble.translated) return null;
         const tile = displayed[bubble.id];
         const isSelected = bubble.id === selectedBubbleId;
+        const useEditorOverlay = isSelected && selectedEditing;
         const failed = bubble.text_layer
           ? failedKeys.has(`${bubble.id}:${bubble.text_layer.cache_key}`)
           : true;
-        const showDom = failed || bubble.render_status.status === "fallback" || !tile || isSelected;
-        const domReady = !isSelected || overlayReadyKey === selectedFontKey;
+        const showDom = failed || bubble.render_status.status === "fallback" || !tile || useEditorOverlay;
+        const domReady = !useEditorOverlay || overlayReadyKey === selectedFontKey;
         return (
           <g key={bubble.id}>
             {tile && (
