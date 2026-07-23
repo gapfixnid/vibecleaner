@@ -34,7 +34,18 @@ export interface PagesResponse {
 }
 
 export interface BubblesResponse {
+  page_id: string;
+  project_generation: number;
+  content_revision: number;
+  visual_revision: number;
+  text_layer_namespace: string;
   bubbles: BubbleInfo[];
+}
+
+export interface BubbleMutationResult extends Omit<BubblesResponse, "bubbles"> {
+  status: "ok";
+  changed_bubbles: BubbleInfo[];
+  deleted_bubble_ids: number[];
 }
 
 export interface CurrentIndexResult {

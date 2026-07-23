@@ -212,6 +212,12 @@ class MangaPage:
     page_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     status: str = "idle"
     problems: List[str] = field(default_factory=list)
+    # Runtime-only render concurrency and derived-asset state. These values are
+    # deliberately excluded from the project schema.
+    visual_revision: int = 0
+    image_visual_revision: int = 0
+    text_layer_refs: Dict[int, Any] = field(default_factory=dict, repr=False)
+    bubble_render_status: Dict[int, Any] = field(default_factory=dict, repr=False)
     project_extensions: Dict[str, Any] = field(default_factory=dict, repr=False)
 
     def to_project_dict(self) -> dict[str, Any]:

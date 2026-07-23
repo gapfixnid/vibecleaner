@@ -19,6 +19,37 @@ export interface TextLineDto {
   y: number;
   width: number;
   height: number;
+  origin_x?: number;
+  baseline_y?: number;
+  advance_width?: number;
+  ink_left?: number;
+  ink_top?: number;
+  ink_width?: number;
+  ink_height?: number;
+  runs?: TextGlyphRunDto[];
+}
+
+export interface TextGlyphRunDto {
+  text: string;
+  origin_x: number;
+  font_family: string;
+  font_pixel_size: number;
+  is_rtl: boolean;
+}
+
+export interface TextLayerRefDto {
+  cache_key: string;
+  pixel_digest: string;
+  crop_x: number;
+  crop_y: number;
+  width: number;
+  height: number;
+  mime_type: "image/png";
+}
+
+export interface BubbleRenderStatusDto {
+  status: "ready" | "pending" | "fallback";
+  error_code?: string | null;
 }
 
 export interface TextLayoutDto {
@@ -58,6 +89,10 @@ export interface BubbleDto {
   problems: string[];
   edited?: boolean;
   text_class?: string;
+  text_layer?: TextLayerRefDto | null;
+  render_status?: BubbleRenderStatusDto;
+  stroke_color?: string;
+  stroke_width?: number;
 }
 
 export interface BubblePatchDto {

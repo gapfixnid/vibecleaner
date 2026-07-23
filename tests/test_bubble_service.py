@@ -162,7 +162,9 @@ class BubbleServiceTests(unittest.TestCase):
         with patch.object(bubble_service, "load_cv_image") as load_image:
             response = bubble_service.get_bubbles_response(self.state, "page_a", FakeRenderService(None))
 
-        self.assertEqual(response, {"bubbles": []})
+        self.assertEqual(response["bubbles"], [])
+        self.assertEqual(response["page_id"], "page_a")
+        self.assertEqual(response["visual_revision"], 0)
         load_image.assert_not_called()
 
 if __name__ == "__main__":

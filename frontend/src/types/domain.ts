@@ -6,6 +6,14 @@ export interface LineLayout {
   y: number;
   width: number;
   height: number;
+  origin_x?: number;
+  baseline_y?: number;
+  advance_width?: number;
+  ink_left?: number;
+  ink_top?: number;
+  ink_width?: number;
+  ink_height?: number;
+  runs?: import("./bubble").TextGlyphRunDto[];
 }
 
 export interface BubbleInfo {
@@ -43,6 +51,14 @@ export interface BubbleInfo {
   layout_reasoning: string;
   lines: LineLayout[];
   text_box?: { x: number; y: number; width: number; height: number } | null;
+  text_layer: import("./bubble").TextLayerRefDto | null;
+  render_status: import("./bubble").BubbleRenderStatusDto;
+  stroke_color: string;
+  stroke_width: number;
+  text_layer_namespace: string;
+  page_width: number;
+  page_height: number;
+  page_id: string;
 }
 
 export interface BubbleUpdate {

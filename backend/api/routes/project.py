@@ -76,7 +76,10 @@ def new_project(container: AppContainer = Depends(get_container)):
         state.pages = []
         state.current_page_idx = -1
         state.project_extensions = {}
-        state.touch()
+        state.replace_project()
+    text_layers = getattr(container, "text_layer_service", None)
+    if text_layers is not None:
+        text_layers.clear_runtime_caches()
     return {"page_count": 0, "current_index": -1}
 
 
@@ -435,9 +438,12 @@ def load_project(file_path: str = Form(...), container: AppContainer = Depends(g
             state.pages = loaded_pages
             state.current_page_idx = restored_current
             state.project_extensions = project_extensions
-            state.touch()
+            state.replace_project()
             page_count = len(state.pages)
             current_index = state.current_page_idx
+        text_layers = getattr(container, "text_layer_service", None)
+        if text_layers is not None:
+            text_layers.clear_runtime_caches()
         _start_project_cache_warmup(container.cache_tasks, state, page_count, current_index)
         return {
             "page_count": page_count,

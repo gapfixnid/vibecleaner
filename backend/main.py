@@ -18,9 +18,7 @@ from fastapi.responses import JSONResponse
 if __package__ in (None, ""):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Text layout uses QFontMetricsF in request handlers, so the backend process
-# needs an offscreen QApplication before routes start serving bubble data.
-from backend.infrastructure.runtime import qt  # noqa: F401
+from backend.infrastructure.runtime.qt import QtRuntime
 
 from backend.core.version import APP_NAME, __version__ as APP_VERSION
 from backend.core.container import build_container, start_pipeline_warmup
@@ -83,8 +81,9 @@ async def _page_image_load_handler(request: Request, exc: PageImageLoadError):
     return JSONResponse({"detail": "Failed to load page image"}, status_code=500)
 
 
-def create_app(session_token: str) -> FastAPI:
+def create_app(session_token: str, qt_runtime: QtRuntime | None = None) -> FastAPI:
     token_bytes = canonical_token(session_token)
+    runtime = qt_runtime or QtRuntime.initialize_on_main_thread()
     app = FastAPI(
         title=f"{APP_NAME} backend",
         version=APP_VERSION,
@@ -94,7 +93,8 @@ def create_app(session_token: str) -> FastAPI:
         openapi_url=None,
     )
     app.state.session_token_bytes = token_bytes
-    app.state.container = build_container()
+    app.state.qt_runtime = runtime
+    app.state.container = build_container(qt_runtime=runtime)
     app.add_exception_handler(PageNotFoundError, _page_not_found_handler)
     app.add_exception_handler(PageImageLoadError, _page_image_load_handler)
     app.add_middleware(SessionAuthMiddleware)
@@ -111,11 +111,15 @@ if __name__ == "__main__":
     if session_token is None:
         logger.critical("Missing local backend session token")
         raise SystemExit(2)
+    qt_runtime = QtRuntime.initialize_on_main_thread()
     try:
-        app = create_app(session_token)
+        app = create_app(session_token, qt_runtime)
     except ValueError as exc:
         logger.critical("Invalid local backend session token: %s", exc)
         raise SystemExit(2) from exc
-    start_pipeline_warmup(app.state.container)
-    logger.info("Starting FastAPI server on port %d", args.port)
-    uvicorn.run(app, host="127.0.0.1", port=args.port)
+    try:
+        start_pipeline_warmup(app.state.container)
+        logger.info("Starting FastAPI server on port %d", args.port)
+        uvicorn.run(app, host="127.0.0.1", port=args.port)
+    finally:
+        qt_runtime.shutdown_on_main_thread()

@@ -6,13 +6,16 @@ from ..dependencies import get_container
 from ...core.container import AppContainer
 from ...infrastructure.job_messages import msg
 from ..use_cases.bubbles import (
+    BubbleMutationRequest,
     BubbleUpdateSchema,
+    VisualMutationPrecondition,
     get_bubbles_response,
     re_ocr_bubble_response,
     start_translate_bubble,
     update_bubbles_response,
 )
 from ..use_cases.page_images import get_page_image_response
+from ..use_cases.page_text_layers import get_text_layer_response, retry_text_layers_response
 from ..use_cases.page_crud import (
     delete_page_batch_response,
     delete_page_response,
@@ -34,6 +37,12 @@ router = APIRouter()
 class TranslateBatchRequest(BaseModel):
     page_indices: Optional[List[int]] = None
     page_ids: Optional[List[str]] = None
+
+
+class TextLayerRetryRequest(BaseModel):
+    expected_project_generation: int
+    expected_visual_revision: int
+    bubble_ids: List[int]
 
 @router.get("/api/pages")
 def get_pages(container: AppContainer = Depends(get_container)):
@@ -99,29 +108,86 @@ def get_page_image(
 
 @router.get("/api/pages/{page_id}/bubbles")
 def get_bubbles(page_id: str, container: AppContainer = Depends(get_container)):
-    return get_bubbles_response(container.project_state, page_id, container.render_service)
+    return get_bubbles_response(
+        container.project_state,
+        page_id,
+        container.render_service,
+        container.text_layer_service,
+    )
+
+
+@router.get("/api/text-layers/{namespace}/{page_id}/{bubble_id}/{cache_key}.png")
+def get_text_layer(
+    namespace: str,
+    page_id: str,
+    bubble_id: int,
+    cache_key: str,
+    container: AppContainer = Depends(get_container),
+):
+    if bubble_id < 1 or bubble_id > 2**31 - 1:
+        raise HTTPException(status_code=400, detail={"code": "INVALID_BUBBLE_ID"})
+    if len(namespace) != 32 or any(ch not in "0123456789abcdef" for ch in namespace):
+        raise HTTPException(status_code=400, detail={"code": "INVALID_TEXT_LAYER_NAMESPACE"})
+    if len(cache_key) != 24 or any(ch not in "0123456789abcdef" for ch in cache_key):
+        raise HTTPException(status_code=400, detail={"code": "INVALID_TEXT_LAYER_KEY"})
+    return get_text_layer_response(container, namespace, page_id, bubble_id, cache_key)
+
+
+@router.post("/api/pages/{page_id}/text-layers/retry")
+def retry_text_layers(
+    page_id: str,
+    request: TextLayerRetryRequest,
+    container: AppContainer = Depends(get_container),
+):
+    return retry_text_layers_response(container, page_id, request)
 
 @router.post("/api/pages/{page_id}/bubbles")
 def update_bubbles(
     page_id: str,
-    bubbles: List[BubbleUpdateSchema],
+    request: BubbleMutationRequest,
     container: AppContainer = Depends(get_container),
 ):
-    return update_bubbles_response(container.project_state, page_id, bubbles)
+    return update_bubbles_response(
+        container.project_state,
+        page_id,
+        request,
+        container.render_service,
+        container.text_layer_service,
+    )
 
 @router.post("/api/pages/{page_id}/bubbles/{bubble_id}/ocr")
-def re_ocr_bubble(page_id: str, bubble_id: int, container: AppContainer = Depends(get_container)):
-    return re_ocr_bubble_response(container.project_state, page_id, bubble_id, container.detection_service, container.config)
+def re_ocr_bubble(
+    page_id: str,
+    bubble_id: int,
+    precondition: VisualMutationPrecondition,
+    container: AppContainer = Depends(get_container),
+):
+    return re_ocr_bubble_response(
+        container.project_state,
+        page_id,
+        bubble_id,
+        precondition,
+        container.detection_service,
+        container.config,
+        container.text_layer_service,
+    )
 
 @router.post("/api/pages/{page_id}/bubbles/{bubble_id}/translate")
-def translate_single_bubble(page_id: str, bubble_id: int, container: AppContainer = Depends(get_container)):
+def translate_single_bubble(
+    page_id: str,
+    bubble_id: int,
+    precondition: VisualMutationPrecondition,
+    container: AppContainer = Depends(get_container),
+):
     return start_translate_bubble(
         container.project_state,
         page_id,
         bubble_id,
+        precondition,
         container.translation_service,
         container.config,
         container.job_manager,
+        container.text_layer_service,
     )
 
 @router.post("/api/pages/{page_id}/bubbles/{bubble_id}/inpaint")

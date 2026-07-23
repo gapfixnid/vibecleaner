@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from ..engines.translation.service import TranslationService
     from ..infrastructure.cache.tasks import CacheTaskQueue
     from ..infrastructure.jobs import JobManager
+    from ..infrastructure.runtime.qt import QtRuntime
+    from ..engines.rendering.text_layer import TextLayerService
+    from ..infrastructure.image.text_layer_cache import TextLayerCache
 
 
 @dataclass
@@ -39,9 +42,12 @@ class AppContainer:
     pipeline_runner: PipelineRunner
     pipeline_planner: PipelinePlanner
     provider_registry: ProviderRegistry
+    qt_runtime: QtRuntime
+    text_layer_service: TextLayerService
+    text_layer_cache: TextLayerCache
 
 
-def build_container(config: AppConfig | None = None) -> AppContainer:
+def build_container(config: AppConfig | None = None, qt_runtime: QtRuntime | None = None) -> AppContainer:
     from ..infrastructure.storage import get_settings_file_path
     from ..pipeline.page_translation_stages import build_page_translation_runner
     from ..infrastructure.cache.tasks import CacheTaskQueue
@@ -58,6 +64,9 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
     from .state.review import refresh_page_status
     from ..engines.translation.service import TranslationService
     from ..engines.provider_catalog import register_builtin_providers
+    from ..infrastructure.runtime.qt import get_qt_runtime
+    from ..engines.rendering.text_layer import TextLayerService
+    from ..infrastructure.image.text_layer_cache import TextLayerCache
 
     runtime_config = config or AppConfig(settings_path=get_settings_file_path())
     if config is None:
@@ -66,8 +75,16 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
     translation_service = TranslationService(config=runtime_config)
     detection_service = DetectionService(config=runtime_config)
     inpainting_service = InpaintingService(config=runtime_config)
-    render_service = RenderService(config=runtime_config)
-    export_service = ExportService(render_service)
+    runtime = qt_runtime or get_qt_runtime()
+    render_service = RenderService(config=runtime_config, executor=runtime.executor)
+    text_layer_cache = TextLayerCache()
+    text_layer_service = TextLayerService(
+        render_service,
+        runtime.executor,
+        text_layer_cache,
+        runtime.cache_namespace,
+    )
+    export_service = ExportService(render_service, text_layer_service)
     provider_registry = ProviderRegistry()
     register_builtin_providers(
         provider_registry,
@@ -107,6 +124,7 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
         bubble_analysis_service=BubbleAnalysisService(),
         layout_planner_service=LayoutPlannerService(),
         render_service=render_service,
+        text_layer_service=text_layer_service,
         ensure_page_image=ensure_page_image,
         invalidate_page_caches=invalidate_page_caches,
         encode_preview_jpeg_bytes=encode_preview_jpeg_bytes,
@@ -134,6 +152,9 @@ def build_container(config: AppConfig | None = None) -> AppContainer:
         pipeline_runner=pipeline_runner,
         pipeline_planner=PipelinePlanner(),
         provider_registry=provider_registry,
+        qt_runtime=runtime,
+        text_layer_service=text_layer_service,
+        text_layer_cache=text_layer_cache,
     )
 
 

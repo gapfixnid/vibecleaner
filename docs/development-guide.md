@@ -4,6 +4,10 @@
 
 This document is for contributors who want to run or package vibecleaner from source. See the [user guide](../README.en.md) for normal app usage.
 
+## Canonical text rendering
+
+Bubble text is rendered once by the backend Qt runtime and reused by both the canvas and export. The runtime/thread, immutable URL, cache, revision, and fallback contracts are recorded in [ADR 0002](adr/0002-use-canonical-bubble-text-layers.md). Keep all render-time Qt objects inside the dedicated worker; only `QGuiApplication` and bundled-font registration belong to the main thread.
+
 ## Technology overview
 
 - Desktop shell: Tauri 2 / Rust

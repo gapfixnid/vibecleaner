@@ -3,8 +3,10 @@ import logging
 from functools import lru_cache
 
 import cv2
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from PySide6.QtGui import QFontMetricsF
+from PySide6.QtCore import QPoint
+from PySide6.QtGui import QColorSpace, QImage, QPainter
 from typing import Optional, Any, Callable
 from ...core.models import MangaPage
 from .service import RenderService
@@ -28,8 +30,9 @@ def resolve_font_path(font_family: str | None) -> str | None:
 
 
 class ExportService:
-    def __init__(self, render_service: Optional[RenderService] = None) -> None:
+    def __init__(self, render_service: Optional[RenderService] = None, text_layer_service=None) -> None:
         self.render_service: RenderService = render_service or RenderService()
+        self.text_layer_service = text_layer_service
 
     def render_page(
         self,
@@ -38,7 +41,66 @@ class ExportService:
         font_family: str | None = None,
         font_resolver: FontResolver | None = None,
     ) -> Optional[Image.Image]:
-        """Render a single page's export image using Pillow."""
+        """Compose the exact cached Qt text tiles onto the inpainted page."""
+        if self.text_layer_service is not None:
+            return self._render_page_from_tiles(page)
+        # Compatibility path for isolated unit tests that construct the export
+        # service without the application composition root.
+        return self._render_page_legacy(page, font_path, font_family, font_resolver)
+
+    def _render_page_from_tiles(self, page: MangaPage) -> Image.Image | None:
+        if page.inpainted_image is None:
+            return None
+        tiles = []
+        failures = []
+        for bubble in page.bubbles:
+            if not (bubble.translated or "").strip():
+                continue
+            try:
+                tiles.append(self.text_layer_service.create_tile(
+                    page.page_id,
+                    bubble,
+                    page.cv_image,
+                    image_revision=page.image_visual_revision,
+                ))
+            except Exception:
+                logger.exception("Canonical export tile failed. bubble_id=%s", bubble.id)
+                failures.append(bubble.id)
+        if failures:
+            raise RuntimeError(f"TEXT_LAYER_EXPORT_FAILED:{','.join(map(str, failures))}")
+
+        def composite(_worker):
+            bgr = np.ascontiguousarray(page.inpainted_image)
+            rgba = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGBA)
+            height, width = rgba.shape[:2]
+            canvas = QImage(rgba.data, width, height, width * 4, QImage.Format.Format_RGBA8888).copy()
+            canvas.setDevicePixelRatio(1.0)
+            canvas.setColorSpace(QColorSpace(QColorSpace.NamedColorSpace.SRgb))
+            painter = QPainter(canvas)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+            for tile in tiles:
+                tile_image = QImage.fromData(tile.png_bytes, "PNG")
+                if tile_image.isNull():
+                    painter.end()
+                    raise RuntimeError(f"TEXT_LAYER_EXPORT_FAILED:{tile.bubble_id}")
+                painter.drawImage(QPoint(tile.crop_x, tile.crop_y), tile_image)
+            painter.end()
+            converted = canvas.convertToFormat(QImage.Format.Format_RGBA8888)
+            view = np.frombuffer(converted.bits(), dtype=np.uint8, count=converted.sizeInBytes())
+            rows = view.reshape(height, converted.bytesPerLine())
+            output = rows[:, :width * 4].reshape(height, width, 4).copy()
+            return output
+
+        rgba = self.text_layer_service.executor.run(composite)
+        return Image.fromarray(rgba, mode="RGBA")
+
+    def _render_page_legacy(
+        self,
+        page: MangaPage,
+        font_path: str | None,
+        font_family: str | None,
+        font_resolver: FontResolver | None,
+    ) -> Optional[Image.Image]:
         if font_path is None and font_family is not None:
             font_path = resolve_font_path(font_family)
         if font_resolver is None:
@@ -77,9 +139,6 @@ class ExportService:
             font_size = font_pixel_size(font)
             if font_size <= 0:
                 font_size = 12
-            font.setPixelSize(font_size)
-            font.setBold(b.bold)
-            font.setItalic(b.italic)
 
             if bubble_font_path:
                 pil_font = self._load_font(bubble_font_path, font_size)
@@ -92,8 +151,7 @@ class ExportService:
                 logger.warning("Fallback font used for bubble export. bubble_id=%s requested=None", b.id)
                 pil_font = ttfont
 
-            metrics = QFontMetricsF(font)
-            fallback_line_h = int(metrics.height()) + 2
+            fallback_line_h = int(font_size * 1.2) + 2
             for i, line_layout in enumerate(layout.line_layouts):
                 line = line_layout.text
                 bbox = draw.textbbox((0, 0), line, font=pil_font)

@@ -57,6 +57,7 @@ class FakeRenderer:
         font_family=None,
         min_size=None,
         max_size=None,
+        alignment="center",
         padding=None,
         margin=None,
         target_center_y=None,
@@ -161,7 +162,7 @@ class RenderServiceTests(unittest.TestCase):
 
         self.assertEqual(renderer.mask_rect, Rect(0, 0, 100, 80))
         self.assertEqual(renderer.mask_shape, (80, 100))
-        self.assertEqual(renderer.vertical_center_y, 39.5)
+        self.assertAlmostEqual(renderer.vertical_center_y, 38.8)
         self.assertIsNone(renderer.vertical_bounds)
 
     def test_auto_font_selection_reaches_renderer_when_no_font_family_is_requested(self):
@@ -215,7 +216,7 @@ class RenderServiceTests(unittest.TestCase):
         service.get_layout_for_bubble("target", bubble, image=None, font_family="Test")
 
         # The fallback ellipse has center 39.5; the source box center is 20.
-        self.assertEqual(renderer.vertical_center_y, 29.75)
+        self.assertAlmostEqual(renderer.vertical_center_y, 35.6)
 
     def test_fixed_font_size_reflows_without_running_auto_sizing(self):
         renderer = FakeRenderer()

@@ -14,9 +14,27 @@ from ...core.state.review import refresh_page_status
 from .page_crud import resolve_page, resolve_page_index
 
 
-def _ensure_project_revision(state, start_revision: int) -> None:
-    if state.revision != start_revision:
+def _ensure_page_guard(state, page_id: str, page_object, project_generation: int, visual_revision: int):
+    if state.project_generation != project_generation:
         raise RuntimeError("Project changed while the operation was running. Please retry.")
+    page = state.pages[resolve_page_index(state, page_id)]
+    if page is not page_object:
+        raise RuntimeError("Page was replaced while the operation was running. Please retry.")
+    if page.visual_revision != visual_revision:
+        raise RuntimeError("Page changed while the operation was running. Please retry.")
+    return page
+
+
+def _commit_inpaint_visual_change(state, page, inpainted_image, preview_bytes) -> None:
+    page.inpainted_image = inpainted_image
+    page.image_visual_revision += 1
+    page.visual_revision += 1
+    page.text_layer_refs.clear()
+    page.bubble_render_status.clear()
+    refresh_page_status(page)
+    invalidate_page_caches(page, thumbnails=True, layouts=False, responses=True)
+    page._preview_inpainted_bytes = preview_bytes
+    state.touch()
 
 
 def start_inpaint_bubble(state, page_id: str, bubble_id: int, inpainting_service, job_manager, config=None):
@@ -56,7 +74,9 @@ def _inpaint_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, i
         bubble = next((b for b in page.bubbles if b.id == bubble_id), None)
         if not bubble:
             raise RuntimeError(f"Bubble {bubble_id} not found")
-        start_revision = state.revision
+        page_object = page
+        project_generation = state.project_generation
+        visual_revision = page.visual_revision
         image = page.inpainted_image.copy() if page.inpainted_image is not None else page.cv_image.copy()
         bubble_snapshot = bubble.clone()
 
@@ -86,20 +106,14 @@ def _inpaint_single_bubble_job(state, job: dict, page_id: str, bubble_id: int, i
     job_manager.ensure_not_cancelled(job)
 
     with state.lock:
-        _ensure_project_revision(state, start_revision)
+        page = _ensure_page_guard(state, page_id, page_object, project_generation, visual_revision)
         job_manager.ensure_not_cancelled(job)
-        page_idx = resolve_page_index(state, page_id)
-        page = state.pages[page_idx]
-        page.inpainted_image = inpainted_image
         current_bubble = next((item for item in page.bubbles if item.id == bubble_snapshot.id), None)
         if current_bubble is not None and bubble_snapshot.source_polygons:
             current_bubble.source_polygons = bubble_snapshot.source_polygons
             current_bubble.text_box = bubble_snapshot.text_box
-        refresh_page_status(page)
-        invalidate_page_caches(page, thumbnails=True, layouts=False, responses=True)
-        page._preview_inpainted_bytes = preview_bytes
-        state.touch()
-        return {"status": "ok"}
+        _commit_inpaint_visual_change(state, page, inpainted_image, preview_bytes)
+        return {"status": "ok", "visual_revision": page.visual_revision}
 
 
 def _inpaint_job(state, job: dict, page_id: str, inpainting_service, job_manager, config=None):
@@ -108,7 +122,9 @@ def _inpaint_job(state, job: dict, page_id: str, inpainting_service, job_manager
         page_idx = resolve_page_index(state, page_id)
         page = state.pages[page_idx]
         ensure_page_image(page)
-        start_revision = state.revision
+        page_object = page
+        project_generation = state.project_generation
+        visual_revision = page.visual_revision
         image = page.cv_image.copy()
         bubbles_snapshot = [bubble.clone() for bubble in page.bubbles]
         recover_missing_source_polygons(
@@ -136,19 +152,13 @@ def _inpaint_job(state, job: dict, page_id: str, inpainting_service, job_manager
     job_manager.ensure_not_cancelled(job)
 
     with state.lock:
-        _ensure_project_revision(state, start_revision)
+        page = _ensure_page_guard(state, page_id, page_object, project_generation, visual_revision)
         job_manager.ensure_not_cancelled(job)
-        page_idx = resolve_page_index(state, page_id)
-        page = state.pages[page_idx]
-        page.inpainted_image = inpainted_image
         recovered_by_id = {bubble.id: bubble for bubble in bubbles_snapshot if bubble.source_polygons}
         for current_bubble in page.bubbles:
             recovered = recovered_by_id.get(current_bubble.id)
             if recovered is not None:
                 current_bubble.source_polygons = recovered.source_polygons
                 current_bubble.text_box = recovered.text_box
-        refresh_page_status(page)
-        invalidate_page_caches(page, thumbnails=True, layouts=False, responses=True)
-        page._preview_inpainted_bytes = preview_bytes
-        state.touch()
-        return {"status": "ok"}
+        _commit_inpaint_visual_change(state, page, inpainted_image, preview_bytes)
+        return {"status": "ok", "visual_revision": page.visual_revision}

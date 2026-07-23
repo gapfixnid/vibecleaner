@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, type MutableRefObject } from 
 import * as api from "../services/api";
 import type { BubbleInfo, BubbleUpdate, PageInfo } from "../types";
 import type { RunTask, WaitForJob, ShowError } from "./useProcessingTask";
+import { ApiError } from "../types/api";
 
 interface UseBubblesDeps {
   /** Ref to the active page index, owned by usePages/App. */
@@ -54,6 +55,10 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
   const [selectedBubbleId, setSelectedBubbleId] = useState<number | null>(null);
   const bubbleRequestSeq = useRef(0);
   const bubblesRef = useRef<BubbleInfo[]>([]);
+  const projectGenerationRef = useRef(0);
+  const contentRevisionRef = useRef(0);
+  const visualRevisionRef = useRef(0);
+  const recoveryAttemptRef = useRef(new Set<string>());
 
   useEffect(() => {
     bubblesRef.current = bubbles;
@@ -73,6 +78,9 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
       try {
         const data = await api.getBubbles(pageId);
         if (requestId === bubbleRequestSeq.current && pageIdx === currentIndexRef.current) {
+          projectGenerationRef.current = data.project_generation;
+          contentRevisionRef.current = data.content_revision;
+          visualRevisionRef.current = data.visual_revision;
           setBubbles(data.bubbles);
         }
       } catch (e) {
@@ -88,11 +96,38 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
     [currentIndexRef, getPageId, showError, t]
   );
 
+  useEffect(() => {
+    const pageId = getPageId();
+    const fallbackIds = bubbles
+      .filter((bubble) => bubble.translated && bubble.render_status.status === "fallback")
+      .map((bubble) => bubble.id);
+    if (!pageId || fallbackIds.length === 0) return;
+    const attemptKey = `${pageId}:${visualRevisionRef.current}`;
+    if (recoveryAttemptRef.current.has(attemptKey)) return;
+    recoveryAttemptRef.current.add(attemptKey);
+    let cancelled = false;
+    void api.retryTextLayers(
+      pageId,
+      fallbackIds,
+      projectGenerationRef.current,
+      visualRevisionRef.current,
+    ).then((result) => {
+      if (!cancelled && result.visual_revision > visualRevisionRef.current) {
+        void fetchBubblesForPage(currentIndexRef.current);
+      }
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [bubbles, currentIndexRef, fetchBubblesForPage, getPageId]);
+
   /** Called by usePages when a page becomes active: clear then load. */
   const handlePageActivated = useCallback(
     (idx: number) => {
       bubbleRequestSeq.current += 1;
       setSelectedBubbleId(null);
+      projectGenerationRef.current = 0;
+      contentRevisionRef.current = 0;
+      visualRevisionRef.current = 0;
+      recoveryAttemptRef.current.clear();
       setBubbles([]);
       window.setTimeout(() => {
         fetchBubblesForPage(idx);
@@ -105,6 +140,10 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
     bubbleRequestSeq.current += 1;
     setBubbles([]);
     setSelectedBubbleId(null);
+    projectGenerationRef.current = 0;
+    contentRevisionRef.current = 0;
+    visualRevisionRef.current = 0;
+    recoveryAttemptRef.current.clear();
   }, []);
 
   const syncBubblesToBackend = useCallback(
@@ -112,12 +151,53 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
       const pageId = getPageId();
       if (!pageId) return;
       const source = bubblesList ?? bubblesRef.current;
-      await api.updateBubbles(pageId, source.map(toBubbleUpdate));
+      const submit = () => api.updateBubbles(
+        pageId,
+        source.map(toBubbleUpdate),
+        projectGenerationRef.current,
+        visualRevisionRef.current,
+      );
+      let result;
+      try {
+        result = await submit();
+      } catch (error) {
+        const details = error instanceof ApiError ? JSON.stringify(error.details ?? "") : "";
+        if (!details.includes("PROJECT_REPLACED")
+          && !details.includes("PAGE_REPLACED")
+          && !details.includes("VISUAL_REVISION_CONFLICT")) {
+          throw error;
+        }
+        await fetchBubblesForPage(currentIndexRef.current);
+        result = await submit();
+      }
+      if (result.project_generation !== projectGenerationRef.current) {
+        await fetchBubblesForPage(currentIndexRef.current);
+        return;
+      }
+      if (result.visual_revision === visualRevisionRef.current + 1) {
+        const changed = new Map(result.changed_bubbles.map((bubble) => [bubble.id, bubble]));
+        const deleted = new Set(result.deleted_bubble_ids);
+        setBubbles((current) => current
+          .filter((bubble) => !deleted.has(bubble.id))
+          .map((bubble) => {
+            const replacement = changed.get(bubble.id);
+            return replacement ? {
+              ...replacement,
+              page_id: bubble.page_id,
+              page_width: bubble.page_width,
+              page_height: bubble.page_height,
+            } : bubble;
+          }));
+        visualRevisionRef.current = result.visual_revision;
+        contentRevisionRef.current = result.content_revision;
+      } else if (result.visual_revision > visualRevisionRef.current) {
+        await fetchBubblesForPage(currentIndexRef.current);
+      }
       // `silent` skips dirty-marking for read-only flows (e.g. export, which
       // only persists pending edits to render — not a user-initiated change).
       if (!opts?.silent) markDirty();
     },
-    [getPageId, markDirty]
+    [getPageId, markDirty, fetchBubblesForPage, currentIndexRef]
   );
 
   const handlePreviewBubbles = useCallback((updatedList: BubbleInfo[]) => {

@@ -50,9 +50,16 @@ def _resolve_page_index(state: Any, page_id: str) -> int:
     raise PageNotFoundError(page_id)
 
 
-def _ensure_project_revision(state: Any, start_revision: int) -> None:
-    if state.revision != start_revision:
-        raise RuntimeError("Project changed while the operation was running. Please retry.")
+def _ensure_page_guard(state: Any, context: PipelineContext) -> Any:
+    if state.project_generation != context.artifacts["project_generation"]:
+        raise RuntimeError("Project was replaced while the operation was running. Please retry.")
+    page_idx = _resolve_page_index(state, context.page_id)
+    page = state.pages[page_idx]
+    if page is not context.artifacts["snapshot_page"]:
+        raise RuntimeError("Page was replaced while the operation was running. Please retry.")
+    if page.visual_revision != context.artifacts["visual_revision"]:
+        raise RuntimeError("Page changed while the operation was running. Please retry.")
+    return page
 
 
 class PageDetectionStage:
@@ -75,7 +82,6 @@ class PageDetectionStage:
             page_idx = _resolve_page_index(state, context.page_id)
             page = state.pages[page_idx]
             self.ensure_page_image(page)
-            start_revision = state.revision
             image = page.cv_image.copy()
             inpainted_image = page.inpainted_image.copy() if page.inpainted_image is not None else None
             local_bubbles = [bubble.clone() for bubble in page.bubbles]
@@ -91,7 +97,10 @@ class PageDetectionStage:
         context.artifacts.update(
             {
                 "page_idx": page_idx,
-                "start_revision": start_revision,
+                "project_generation": state.project_generation,
+                "visual_revision": page.visual_revision,
+                "snapshot_page": page,
+                "image_visual_revision": page.image_visual_revision,
                 "image": image,
                 "inpainted_image": inpainted_image,
                 "local_bubbles": local_bubbles,
@@ -418,8 +427,9 @@ class PageInpaintingStage:
 class PageLayoutStage:
     name = "layout"
 
-    def __init__(self, render_service: Any) -> None:
+    def __init__(self, render_service: Any, text_layer_service: Any | None = None) -> None:
         self.render_service = render_service
+        self.text_layer_service = text_layer_service
 
     def run(self, context: PipelineContext) -> PipelineContext:
         job = context.artifacts["job"]
@@ -427,14 +437,38 @@ class PageLayoutStage:
         image = context.artifacts["image"]
         local_bubbles = context.artifacts["local_bubbles"]
         layout_cache = {}
+        text_layer_refs = {}
+        render_statuses = {}
         for bubble in local_bubbles:
             job_manager.ensure_not_cancelled(job)
-            layout_cache[bubble_layout_cache_key(bubble)] = compute_bubble_layout(
-                bubble,
-                image,
-                self.render_service,
-            )
+            if self.text_layer_service is not None and (bubble.translated or "").strip():
+                try:
+                    tile = self.text_layer_service.create_tile(
+                        context.page_id,
+                        bubble,
+                        image,
+                        image_revision=context.artifacts.get("image_visual_revision", 0),
+                    )
+                    layout_cache[bubble_layout_cache_key(bubble)] = tile.layout
+                    text_layer_refs[bubble.id] = {
+                        "layout_fingerprint": tile.layout_fingerprint,
+                        "render_fingerprint": tile.render_fingerprint,
+                        "cache_key": tile.cache_key,
+                        "pixel_digest": tile.pixel_digest,
+                        "crop_x": tile.crop_x,
+                        "crop_y": tile.crop_y,
+                        "width": tile.width,
+                        "height": tile.height,
+                    }
+                    render_statuses[bubble.id] = {"status": "ready", "error_code": None}
+                    continue
+                except Exception as exc:
+                    logger.warning("Translation tile fallback. bubble_id=%s error=%s", bubble.id, exc)
+                    render_statuses[bubble.id] = {"status": "fallback", "error_code": str(exc)}
+            layout_cache[bubble_layout_cache_key(bubble)] = compute_bubble_layout(bubble, image, self.render_service)
         context.artifacts["bubble_layout_cache"] = layout_cache
+        context.artifacts["text_layer_refs"] = text_layer_refs
+        context.artifacts["bubble_render_status"] = render_statuses
         context.artifacts["layout_result"] = local_bubbles
         return context
 
@@ -465,7 +499,6 @@ class PageRenderingStage:
         local_bubbles = context.artifacts["local_bubbles"]
         bubble_counter = context.artifacts["bubble_counter"]
         bubble_layout_cache = context.artifacts.get("bubble_layout_cache", {})
-        start_revision = context.artifacts["start_revision"]
 
         if show_progress:
             job_manager.update(job, progress=80, message=msg_from_context("page_translation.rendering", context))
@@ -474,18 +507,19 @@ class PageRenderingStage:
         job_manager.ensure_not_cancelled(job)
 
         with state.lock:
-            _ensure_project_revision(state, start_revision)
-            page_idx = _resolve_page_index(state, page_id)
-            page = state.pages[page_idx]
+            page = _ensure_page_guard(state, context)
             page.bubbles = local_bubbles
             page.bubble_counter = bubble_counter
             page.inpainted_image = inpainted_image
             self.refresh_page_status(page)
             self.invalidate_page_caches(page, thumbnails=True, responses=True)
             page._bubble_layout_cache = dict(bubble_layout_cache)
+            page.text_layer_refs = dict(context.artifacts.get("text_layer_refs", {}))
+            page.bubble_render_status = dict(context.artifacts.get("bubble_render_status", {}))
             page._thumbnail_original_bytes = self.encode_thumbnail_bytes(page.cv_image)
             if inpainted_preview_bytes is not None:
                 page._preview_inpainted_bytes = inpainted_preview_bytes
+            page.visual_revision += 1
             state.touch()
 
         context.artifacts["render_result"] = page
@@ -502,6 +536,7 @@ def build_page_translation_runner(
     bubble_analysis_service: Any,
     layout_planner_service: Any,
     render_service: Any,
+    text_layer_service: Any | None = None,
     ensure_page_image: Any,
     invalidate_page_caches: Any,
     encode_preview_jpeg_bytes: Any,
@@ -535,7 +570,7 @@ def build_page_translation_runner(
         quality_router=quality_router,
         provider_manifest=(provider_manifests or {}).get("inpainting"),
     ))
-    registry.register(PageLayoutStage(render_service))
+    registry.register(PageLayoutStage(render_service, text_layer_service))
     registry.register(
         PageRenderingStage(
             encode_preview_jpeg_bytes=encode_preview_jpeg_bytes,

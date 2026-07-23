@@ -428,6 +428,21 @@ async fn get_page_for_session(
                 });
                 let problems = b.get("problems").cloned().unwrap_or(serde_json::json!([]));
                 let edited = b.get("edited").and_then(|v| v.as_bool()).unwrap_or(false);
+                let text_layer = b
+                    .get("text_layer")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                let render_status = b.get("render_status").cloned().unwrap_or_else(|| {
+                    serde_json::json!({"status": "fallback", "error_code": "TEXT_LAYER_MISSING"})
+                });
+                let stroke_color = b
+                    .get("stroke_color")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("#ffffff");
+                let stroke_width = b
+                    .get("stroke_width")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(1.0);
 
                 serde_json::json!({
                     "id": format!("bubble_{}", id),
@@ -464,7 +479,11 @@ async fn get_page_for_session(
                     },
                     "text_class": text_class,
                     "problems": problems,
-                    "edited": edited
+                    "edited": edited,
+                    "text_layer": text_layer,
+                    "render_status": render_status,
+                    "stroke_color": stroke_color,
+                    "stroke_width": stroke_width
                 })
             })
             .collect()
@@ -511,7 +530,11 @@ async fn get_page_for_session(
         "status": status,
         "has_inpaint": has_inpaint,
         "bubbles": bubbles_dto,
-        "problems": problems
+        "problems": problems,
+        "project_generation": bubbles_res.get("project_generation").cloned().unwrap_or(serde_json::json!(0)),
+        "content_revision": bubbles_res.get("content_revision").cloned().unwrap_or(serde_json::json!(0)),
+        "visual_revision": bubbles_res.get("visual_revision").cloned().unwrap_or(serde_json::json!(0)),
+        "text_layer_namespace": bubbles_res.get("text_layer_namespace").cloned().unwrap_or(serde_json::json!(""))
     }))
 }
 
@@ -878,7 +901,12 @@ async fn update_bubble(
 
     bubbles_arr[bubble_index] = current_bubble;
 
-    let _: serde_json::Value = forward_post(&session, &bubbles_path, &bubbles_arr).await?;
+    let payload = serde_json::json!({
+        "expected_project_generation": bubbles_res.get("project_generation").and_then(|v| v.as_u64()).unwrap_or(0),
+        "expected_visual_revision": bubbles_res.get("visual_revision").and_then(|v| v.as_u64()).unwrap_or(0),
+        "bubbles": bubbles_arr,
+    });
+    let _: serde_json::Value = forward_post(&session, &bubbles_path, &payload).await?;
 
     let page_dto = get_page_for_session(&session, page_id).await?;
     let bubbles_arr = page_dto
@@ -900,10 +928,72 @@ async fn update_bubbles(
     manager: tauri::State<'_, BackendManager>,
     page_id: String,
     bubbles: serde_json::Value,
+    expected_project_generation: u64,
+    expected_visual_revision: u64,
 ) -> CommandResult<serde_json::Value> {
     let session = manager.session_snapshot()?;
     let path = page_api_path(&page_id, "/bubbles")?;
-    forward_post(&session, &path, &bubbles).await
+    let payload = serde_json::json!({
+        "expected_project_generation": expected_project_generation,
+        "expected_visual_revision": expected_visual_revision,
+        "bubbles": bubbles,
+    });
+    let mut result: serde_json::Value = forward_post(&session, &path, &payload).await?;
+    let changed_ids: std::collections::HashSet<i64> = result
+        .get("changed_bubbles")
+        .and_then(|value| value.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|bubble| bubble.get("id").and_then(|id| id.as_i64()))
+        .collect();
+    let page = get_page_for_session(&session, page_id).await?;
+    let mapped = page
+        .get("bubbles")
+        .and_then(|value| value.as_array())
+        .into_iter()
+        .flatten()
+        .filter(|bubble| {
+            bubble
+                .get("id")
+                .and_then(|id| id.as_str())
+                .and_then(|id| id.strip_prefix("bubble_"))
+                .and_then(|id| id.parse::<i64>().ok())
+                .is_some_and(|id| changed_ids.contains(&id))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    result["changed_bubbles"] = serde_json::Value::Array(mapped);
+    session.ensure_current()?;
+    Ok(result)
+}
+
+#[tauri::command]
+async fn retry_text_layers(
+    manager: tauri::State<'_, BackendManager>,
+    page_id: String,
+    bubble_ids: Vec<i64>,
+    expected_project_generation: u64,
+    expected_visual_revision: u64,
+) -> CommandResult<serde_json::Value> {
+    if bubble_ids.iter().any(|id| *id < 1 || *id > i32::MAX as i64) {
+        return Err(BridgeError::new(
+            "INVALID_BUBBLE_ID",
+            "Invalid bubble ID.",
+            false,
+        ));
+    }
+    let session = manager.session_snapshot()?;
+    let path = page_api_path(&page_id, "/text-layers/retry")?;
+    forward_post(
+        &session,
+        &path,
+        &serde_json::json!({
+            "expected_project_generation": expected_project_generation,
+            "expected_visual_revision": expected_visual_revision,
+            "bubble_ids": bubble_ids,
+        }),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -944,7 +1034,11 @@ async fn reocr_bubble(
     let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
     let url = page_api_path(&page_id, &format!("/bubbles/{id_num}/ocr"))?;
-    let _: serde_json::Value = forward_post(&session, &url, &serde_json::json!({})).await?;
+    let page_before = get_page_for_session(&session, page_id.clone()).await?;
+    let _: serde_json::Value = forward_post(&session, &url, &serde_json::json!({
+        "expected_project_generation": page_before.get("project_generation").and_then(|v| v.as_u64()).unwrap_or(0),
+        "expected_visual_revision": page_before.get("visual_revision").and_then(|v| v.as_u64()).unwrap_or(0),
+    })).await?;
 
     layout_bubble_for_session(&session, page_id, bubble_id).await
 }
@@ -958,7 +1052,11 @@ async fn retranslate_bubble(
     let session = manager.session_snapshot()?;
     let id_num: i64 = bubble_id.replace("bubble_", "").parse().unwrap_or(0);
     let url = page_api_path(&page_id, &format!("/bubbles/{id_num}/translate"))?;
-    let job_status: serde_json::Value = forward_empty_post(&session, &url).await?;
+    let page_before = get_page_for_session(&session, page_id.clone()).await?;
+    let job_status: serde_json::Value = forward_post(&session, &url, &serde_json::json!({
+        "expected_project_generation": page_before.get("project_generation").and_then(|v| v.as_u64()).unwrap_or(0),
+        "expected_visual_revision": page_before.get("visual_revision").and_then(|v| v.as_u64()).unwrap_or(0),
+    })).await?;
 
     let job_id = job_status
         .get("job_id")
@@ -1238,6 +1336,7 @@ pub fn run() {
             get_job,
             cancel_job,
             update_bubbles,
+            retry_text_layers,
             update_bubble,
             layout_bubble,
             reocr_bubble,

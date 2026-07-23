@@ -3,8 +3,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional as OptNone, Tuple
 
 import numpy as np
-from PySide6.QtGui import QFont, QFontMetricsF
-from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QFont, QFontMetricsF, QGuiApplication
 from PySide6.QtCore import QRectF, Qt
 from .typesetting import dp_wrap_text, fit_font_size, unicode_break_tokens
 from ...infrastructure.fonts import resolver as font_resolver
@@ -314,7 +313,7 @@ class TextRenderer:
             font_family = resolved_font.name
             logger.debug(f"Font resolved: {font_family} (chain: {' → '.join(chain)})")
         else:
-            app = QApplication.instance()
+            app = QGuiApplication.instance()
             if app is None or not app.font().family():
                 font_family = "Segoe UI"
         max_size = float(self.max_font_size if max_size is None else max_size)
@@ -466,7 +465,7 @@ class TextRenderer:
             font_family = resolved_font.name
             logger.debug(f"Font resolved (rect): {font_family} (chain: {' → '.join(chain)})")
         else:
-            app = QApplication.instance()
+            app = QGuiApplication.instance()
             if app is None or not app.font().family():
                 font_family = "Segoe UI"
 
@@ -585,7 +584,7 @@ class TextRenderer:
             font_family = resolved_font.name
             logger.debug(f"Font resolved (fixed): {font_family} (chain: {' → '.join(chain)})")
         else:
-            app = QApplication.instance()
+            app = QGuiApplication.instance()
             if app is None or not app.font().family():
                 font_family = "Segoe UI"
 
@@ -618,6 +617,7 @@ class TextRenderer:
                         allow_char_break=allow_char_break,
                         dynamic_max=requested_size,
                         min_size=0.0,
+                        alignment=alignment,
                         target_center_y=target_center_y,
                     )
                     if layout is not None:
@@ -737,6 +737,7 @@ class TextRenderer:
         font_family: str | None = None,
         min_size: float | None = None,
         max_size: float | None = None,
+        alignment: str = "center",
         padding: dict[str, float] | None = None,
         margin: dict[str, float] | None = None,
         target_center_y: float | None = None,
@@ -786,6 +787,7 @@ class TextRenderer:
                 allow_char_break=False,
                 dynamic_max=dynamic_max,
                 min_size=min_size,
+                alignment=alignment,
                 target_center_y=target_center_y,
             )
             if best_layout is not None:
@@ -801,6 +803,7 @@ class TextRenderer:
                 allow_char_break=True,
                 dynamic_max=dynamic_max,
                 min_size=min_size,
+                alignment=alignment,
                 target_center_y=target_center_y,
             )
             if best_layout is not None:
@@ -849,6 +852,7 @@ class TextRenderer:
         allow_char_break: bool,
         dynamic_max: float,
         min_size: float,
+        alignment: str = "center",
         target_center_y: float | None = None,
     ) -> TextLayoutResult | None:
         best_layout = None
@@ -879,10 +883,31 @@ class TextRenderer:
 
                 bad_breaks = self._bad_line_break_count(layout.lines, text)
                 excess_lines = max(0, len(layout.lines) - preferred_max_lines)
+                mask_xs = np.where(mask)[1]
+                desired_axis = rect.x() + (
+                    float(np.mean(mask_xs)) if mask_xs.size else rect.width() / 2.0
+                )
+                if alignment == "left":
+                    edges = [line.x for line in layout.line_layouts]
+                    raw_axis_error = float(np.std(edges)) if len(edges) > 1 else 0.0
+                    edge_error = raw_axis_error
+                elif alignment == "right":
+                    edges = [line.x + line.width for line in layout.line_layouts]
+                    raw_axis_error = float(np.std(edges)) if len(edges) > 1 else 0.0
+                    edge_error = raw_axis_error
+                else:
+                    centers = [line.x + line.width / 2.0 for line in layout.line_layouts]
+                    raw_axis_error = float(np.mean([abs(center - desired_axis) for center in centers]))
+                    edge_error = 0.0
+                axis_violation = max(0.0, raw_axis_error - rect.width() * 0.01)
+                edge_violation = max(0.0, edge_error - 1.5)
                 key = (
                     bad_breaks,
                     excess_lines,
+                    axis_violation,
+                    edge_violation,
                     -font_pixel_size(layout.font),
+                    raw_axis_error,
                     layout.score,
                     abs(line_height_ratio - 1.12),
                 )

@@ -35,7 +35,27 @@ export function toPagesResponse(project: ProjectDto): PagesResponse {
   };
 }
 
-export function toBubbleInfo(bubble: BubbleDto): BubbleInfo {
+export function toBubbleInfo(
+  bubble: BubbleDto,
+  context: { namespace?: string; pageWidth?: number; pageHeight?: number; pageId?: string } = {},
+): BubbleInfo {
+  const pageWidth = context.pageWidth ?? 0;
+  const pageHeight = context.pageHeight ?? 0;
+  const candidateLayer = bubble.text_layer ?? null;
+  const textLayer = candidateLayer
+    && Number.isInteger(candidateLayer.crop_x)
+    && Number.isInteger(candidateLayer.crop_y)
+    && Number.isInteger(candidateLayer.width)
+    && Number.isInteger(candidateLayer.height)
+    && candidateLayer.crop_x >= 0
+    && candidateLayer.crop_y >= 0
+    && candidateLayer.width > 0
+    && candidateLayer.height > 0
+    && candidateLayer.width * candidateLayer.height <= 64_000_000
+    && (pageWidth <= 0 || candidateLayer.crop_x + candidateLayer.width <= pageWidth)
+    && (pageHeight <= 0 || candidateLayer.crop_y + candidateLayer.height <= pageHeight)
+      ? candidateLayer
+      : null;
   return {
     id: parseInt(bubble.id.replace("bubble_", "")) || 0,
     x: bubble.bubbleBox.x,
@@ -82,7 +102,25 @@ export function toBubbleInfo(bubble: BubbleDto): BubbleInfo {
       y: line.y,
       width: line.width,
       height: line.height,
+      origin_x: line.origin_x,
+      baseline_y: line.baseline_y,
+      advance_width: line.advance_width,
+      ink_left: line.ink_left,
+      ink_top: line.ink_top,
+      ink_width: line.ink_width,
+      ink_height: line.ink_height,
+      runs: line.runs,
     })),
+    text_layer: textLayer,
+    render_status: textLayer
+      ? (bubble.render_status ?? { status: "ready", error_code: null })
+      : { status: "fallback", error_code: bubble.render_status?.error_code ?? "INVALID_TEXT_LAYER_GEOMETRY" },
+    stroke_color: bubble.stroke_color ?? "#ffffff",
+    stroke_width: bubble.stroke_width ?? 1,
+    text_layer_namespace: context.namespace ?? "",
+    page_width: pageWidth,
+    page_height: pageHeight,
+    page_id: context.pageId ?? "",
   };
 }
 

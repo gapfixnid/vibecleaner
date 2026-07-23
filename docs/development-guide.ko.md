@@ -4,6 +4,10 @@
 
 이 문서는 소스 코드로 앱을 실행하거나 패키징하려는 개발자를 위한 문서입니다. 일반적인 앱 사용법은 [README](../README.md)를 확인하세요.
 
+## 기준 텍스트 렌더링
+
+말풍선 텍스트는 backend Qt runtime에서 한 번 렌더링하며 canvas와 export가 같은 결과를 재사용합니다. runtime/thread, immutable URL, cache, revision, fallback 계약은 [ADR 0002](adr/0002-use-canonical-bubble-text-layers.md)에 기록했습니다. 렌더링용 Qt 객체는 전용 worker 안에서만 사용하고, `QGuiApplication`과 bundled font 등록만 main thread에서 관리합니다.
+
 ## 기술 구성
 
 - Windows 데스크톱 셸: Tauri 2 / Rust

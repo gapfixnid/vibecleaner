@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import type { RefObject } from "react";
 import type { BubbleInfo } from "../../types";
 import { CanvasBubbleBoxOverlay } from "./CanvasBubbleBoxOverlay";
-import { CanvasBubbleTextOverlay } from "./CanvasBubbleTextOverlay";
+import { CanvasBubbleTextLayers } from "./CanvasBubbleTextLayers";
 import { CanvasDetectionOverlay } from "./CanvasDetectionOverlay";
 
 interface CanvasImageStageProps {
@@ -105,7 +105,12 @@ export const CanvasImageStage = React.forwardRef<HTMLDivElement, CanvasImageStag
             )}
 
             {!isOriginalVisible && !isWaitingForImageReload && (
-              <CanvasBubbleTextOverlay bubbles={bubbles} selectedBubbleId={selectedBubbleId} />
+              <CanvasBubbleTextLayers
+                bubbles={bubbles}
+                selectedBubbleId={selectedBubbleId}
+                width={imageDimensions.w || bubbles[0]?.page_width || 1}
+                height={imageDimensions.h || bubbles[0]?.page_height || 1}
+              />
             )}
 
             {!isOriginalVisible && !isWaitingForImageReload && showDetectionOverlay && (

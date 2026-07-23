@@ -18,6 +18,17 @@ export interface ImportResultDto extends CurrentIndexResultDto {
   pages: PagesDto["pages"];
 }
 
+export interface BubbleMutationResultDto {
+  status: "ok";
+  page_id: string;
+  project_generation: number;
+  content_revision: number;
+  visual_revision: number;
+  text_layer_namespace: string;
+  changed_bubbles: BubbleDto[];
+  deleted_bubble_ids: number[];
+}
+
 export interface LoadProjectResultDto {
   status?: string;
   page_count?: number;
@@ -122,7 +133,18 @@ export interface vibeCleanerApi {
   translateBatch(pageIndices?: number[], pageIds?: string[]): Promise<JobStatusDto>;
   getJob(jobId: string): Promise<JobStatusDto>;
   cancelJob(jobId: string): Promise<JobStatusDto>;
-  updateBubbles(pageId: string, bubbles: BubbleUpdateDto[]): Promise<ActionResultDto>;
+  updateBubbles(
+    pageId: string,
+    bubbles: BubbleUpdateDto[],
+    expectedProjectGeneration: number,
+    expectedVisualRevision: number,
+  ): Promise<BubbleMutationResultDto>;
+  retryTextLayers(
+    pageId: string,
+    bubbleIds: number[],
+    expectedProjectGeneration: number,
+    expectedVisualRevision: number,
+  ): Promise<BubbleMutationResultDto>;
   updateBubble(pageId: string, bubbleId: string, patch: BubblePatchDto): Promise<BubbleDto>;
   layoutBubble(pageId: string, bubbleId: string): Promise<BubbleDto>;
   reocrBubble(pageId: string, bubbleId: string): Promise<BubbleDto>;

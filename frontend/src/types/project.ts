@@ -56,6 +56,10 @@ export interface PageDto {
   problems: string[];
   bubble_count?: number;
   translated_count?: number;
+  project_generation?: number;
+  content_revision?: number;
+  visual_revision?: number;
+  text_layer_namespace?: string;
 }
 
 export interface ProjectDto {

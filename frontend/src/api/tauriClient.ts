@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ApiError } from "../types/api";
 import type {
   ActionResultDto,
+  BubbleMutationResultDto,
   BubbleUpdateDto,
   CurrentIndexResultDto,
   ExportOptionsDto,
@@ -114,12 +115,36 @@ export const tauriClient: vibeCleanerApi = {
     return callTauri<JobStatusDto>("cancel_job", { jobId });
   },
 
-  async updateBubbles(pageId: string, bubbles: BubbleUpdateDto[]): Promise<ActionResultDto> {
-    return callTauri<ActionResultDto>("update_bubbles", { pageId, bubbles });
+  async updateBubbles(
+    pageId: string,
+    bubbles: BubbleUpdateDto[],
+    expectedProjectGeneration: number,
+    expectedVisualRevision: number,
+  ): Promise<BubbleMutationResultDto> {
+    return callTauri<BubbleMutationResultDto>("update_bubbles", {
+      pageId,
+      bubbles,
+      expectedProjectGeneration,
+      expectedVisualRevision,
+    });
   },
 
   async updateBubble(pageId: string, bubbleId: string, patch: BubblePatchDto): Promise<BubbleDto> {
     return callTauri<BubbleDto>("update_bubble", { pageId, bubbleId, patch });
+  },
+
+  async retryTextLayers(
+    pageId: string,
+    bubbleIds: number[],
+    expectedProjectGeneration: number,
+    expectedVisualRevision: number,
+  ): Promise<BubbleMutationResultDto> {
+    return callTauri<BubbleMutationResultDto>("retry_text_layers", {
+      pageId,
+      bubbleIds,
+      expectedProjectGeneration,
+      expectedVisualRevision,
+    });
   },
 
   async layoutBubble(pageId: string, bubbleId: string): Promise<BubbleDto> {

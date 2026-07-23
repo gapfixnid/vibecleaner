@@ -13,6 +13,7 @@ import type {
   LoadProjectResult,
   ProviderCatalogDto,
   ImportResultDto,
+  BubbleMutationResult,
 } from "../types";
 import { toBubbleInfo, toBubbleUpdateDto } from "./mappers";
 
@@ -44,7 +45,20 @@ export const getPages = async (): Promise<PagesResponse> => {
 
 export const getBubbles = async (pageId: string): Promise<BubblesResponse> => {
   const page = await api.getPage(pageId);
-  return { bubbles: page.bubbles.map(toBubbleInfo) };
+  const namespace = page.text_layer_namespace ?? "";
+  return {
+    page_id: pageId,
+    project_generation: page.project_generation ?? 0,
+    content_revision: page.content_revision ?? 0,
+    visual_revision: page.visual_revision ?? 0,
+    text_layer_namespace: namespace,
+    bubbles: page.bubbles.map((bubble) => toBubbleInfo(bubble, {
+      namespace,
+      pageWidth: page.width,
+      pageHeight: page.height,
+      pageId,
+    })),
+  };
 };
 
 export const selectPage = async (idx: number, pageId?: string): Promise<ActionResult> => {
@@ -131,10 +145,38 @@ export const exportPage = async (pageId: string, formData: FormData): Promise<Ex
   return { status: "success", saved_path: res.saved_path || savePath };
 };
 
-export const updateBubbles = async (pageId: string, bubbles: BubbleUpdate[]): Promise<ActionResult> => {
-  const res = await api.updateBubbles(pageId, bubbles.map(toBubbleUpdateDto));
-  return { status: "success", ...res };
+export const updateBubbles = async (
+  pageId: string,
+  bubbles: BubbleUpdate[],
+  expectedProjectGeneration: number,
+  expectedVisualRevision: number,
+): Promise<BubbleMutationResult> => {
+  const res = await api.updateBubbles(
+    pageId,
+    bubbles.map(toBubbleUpdateDto),
+    expectedProjectGeneration,
+    expectedVisualRevision,
+  );
+  return {
+    ...res,
+    changed_bubbles: res.changed_bubbles.map((bubble) => toBubbleInfo(bubble, {
+      namespace: res.text_layer_namespace,
+      pageId,
+    })),
+  };
 };
+
+export const retryTextLayers = async (
+  pageId: string,
+  bubbleIds: number[],
+  expectedProjectGeneration: number,
+  expectedVisualRevision: number,
+) => api.retryTextLayers(
+  pageId,
+  bubbleIds,
+  expectedProjectGeneration,
+  expectedVisualRevision,
+);
 
 export const reOcrBubble = async (pageId: string, bubbleId: number): Promise<ActionResult> => {
   await api.reocrBubble(pageId, `bubble_${bubbleId}`);

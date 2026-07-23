@@ -162,7 +162,40 @@ assert.deepEqual(plain(toBubbleInfo(bubbleDto)), {
   layout_reasoning: "writing_mode=vertical; alignment=center",
   text_box: { x: 12, y: 22, width: 90, height: 60 },
   lines: [{ text: "안녕", x: 1, y: 2, width: 30, height: 12 }],
+  text_layer: null,
+  render_status: { status: "fallback", error_code: "INVALID_TEXT_LAYER_GEOMETRY" },
+  stroke_color: "#ffffff",
+  stroke_width: 1,
+  text_layer_namespace: "",
+  page_width: 0,
+  page_height: 0,
+  page_id: "",
 });
+
+const validLayer = {
+  cache_key: "0123456789abcdef01234567",
+  pixel_digest: "a".repeat(64),
+  crop_x: 10,
+  crop_y: 20,
+  width: 40,
+  height: 30,
+  mime_type: "image/png",
+};
+const mappedLayerBubble = toBubbleInfo({
+  ...bubbleDto,
+  text_layer: validLayer,
+  render_status: { status: "ready", error_code: null },
+}, { namespace: "f".repeat(32), pageId: "page_a", pageWidth: 100, pageHeight: 100 });
+assert.deepEqual(plain(mappedLayerBubble.text_layer), validLayer);
+assert.equal(mappedLayerBubble.page_id, "page_a");
+
+const rejectedLayerBubble = toBubbleInfo({
+  ...bubbleDto,
+  text_layer: { ...validLayer, crop_x: 80, width: 40 },
+  render_status: { status: "ready", error_code: null },
+}, { namespace: "f".repeat(32), pageId: "page_a", pageWidth: 100, pageHeight: 100 });
+assert.equal(rejectedLayerBubble.text_layer, null);
+assert.equal(rejectedLayerBubble.render_status.status, "fallback");
 
 const updateDto = toBubbleUpdateDto({
   id: 42,
