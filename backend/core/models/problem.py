@@ -52,15 +52,25 @@ def normalize_bubble_problem(value: Any) -> BubbleProblem:
         )
 
     detail = str(value)
-    lowered = detail.strip().lower()
-    if lowered in {"layout overflow", "text overflow"}:
-        return BubbleProblem(BubbleProblemCode.TEXT_OVERFLOW)
-    if "ocr" in lowered:
-        return BubbleProblem(BubbleProblemCode.OCR_UNCERTAIN)
-    if "translation" in lowered:
-        return BubbleProblem(
+    normalized = detail.strip()
+    known_legacy = {
+        "layout overflow": BubbleProblemCode.TEXT_OVERFLOW,
+        "text overflow": BubbleProblemCode.TEXT_OVERFLOW,
+        "TEXT_OVERFLOW": BubbleProblemCode.TEXT_OVERFLOW,
+        "OCR_UNCERTAIN": BubbleProblemCode.OCR_UNCERTAIN,
+        "MASK_UNCERTAIN": BubbleProblemCode.MASK_UNCERTAIN,
+        "BUBBLE_ASSOCIATION_UNCERTAIN": (
+            BubbleProblemCode.BUBBLE_ASSOCIATION_UNCERTAIN
+        ),
+        "TRANSLATION_EXPANDED": (
             BubbleProblemCode.TRANSLATION_EXPANDED
-        )
+        ),
+    }
+    code = known_legacy.get(normalized)
+    if code is None:
+        code = known_legacy.get(normalized.lower())
+    if code is not None:
+        return BubbleProblem(code)
     return BubbleProblem(
         BubbleProblemCode.LEGACY_REVIEW_NOTE,
         detail,
@@ -73,6 +83,15 @@ DERIVED_PROBLEM_CODES = {
     BubbleProblemCode.OCR_UNCERTAIN,
     BubbleProblemCode.TRANSLATION_EXPANDED,
     BubbleProblemCode.TEXT_OVERFLOW,
+}
+
+
+# These signals can only be replaced by redetection/re-OCR/body-mask analysis.
+# Layout-only refreshes must retain them after loading a project.
+PERSISTED_INPUT_SIGNAL_CODES = {
+    BubbleProblemCode.BUBBLE_ASSOCIATION_UNCERTAIN,
+    BubbleProblemCode.MASK_UNCERTAIN,
+    BubbleProblemCode.OCR_UNCERTAIN,
 }
 
 

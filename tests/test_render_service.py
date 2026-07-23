@@ -1,11 +1,15 @@
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 from backend.core.models import Rect
 
 from backend.core.models import TextBubble
 from backend.engines.rendering.service import RenderService
+from backend.infrastructure.image.masks import (
+    BubbleClipMaskResult,
+)
 
 def _rect_from_qrectf(rect) -> Rect:
     """The service hands the renderer Qt geometry; record it as a core Rect."""
@@ -235,6 +239,72 @@ class RenderServiceTests(unittest.TestCase):
         self.assertIsNone(renderer.fixed_mask)
         self.assertEqual(layout.font.pixelSize(), 24)
         self.assertIsNone(renderer.font_rect)
+
+    def test_ellipse_fallback_sets_and_text_free_clears_mask_warning(
+        self,
+    ):
+        service = RenderService(renderer=FakeRenderer())
+        bubble = TextBubble(
+            id=1,
+            box=Rect(10, 10, 100, 80),
+            text_box=Rect(30, 30, 40, 20),
+            text_class="text_bubble",
+        )
+
+        body = service._build_bubble_body_mask(bubble, None)
+        self.assertEqual(body.source, "ellipse")
+        self.assertIn(
+            "MASK_UNCERTAIN", bubble._derived_problem_codes
+        )
+
+        bubble.text_class = "text_free"
+        self.assertIsNone(
+            service._build_bubble_body_mask(bubble, None)
+        )
+        self.assertNotIn(
+            "MASK_UNCERTAIN", bubble._derived_problem_codes
+        )
+
+    def test_expanded_component_keeps_separate_layout_bounds(self):
+        service = RenderService()
+        bubble = TextBubble(
+            id=2,
+            box=Rect(30, 30, 100, 80),
+            text_box=Rect(55, 50, 40, 25),
+            text_class="text_bubble",
+        )
+        image = np.full((180, 220, 3), 255, np.uint8)
+
+        def fake_mask(mask_shape, *_args, **_kwargs):
+            height, width = mask_shape
+            mask = np.zeros((height, width), np.uint8)
+            mask[
+                height // 8 : height * 7 // 8,
+                width // 8 : width * 7 // 8,
+            ] = 255
+            return BubbleClipMaskResult(
+                mask,
+                "detector_component",
+                0.02,
+            )
+
+        with patch(
+            "backend.engines.rendering.service.build_bubble_clip_mask",
+            side_effect=fake_mask,
+        ):
+            body = service._build_bubble_body_mask(
+                bubble, image
+            )
+
+        self.assertEqual(body.source, "expanded_component")
+        self.assertLess(body.bounds[0], bubble.box.x)
+        self.assertGreater(body.bounds[2], bubble.box.right)
+        self.assertEqual(
+            bubble.box, Rect(30, 30, 100, 80)
+        )
+        self.assertNotIn(
+            "MASK_UNCERTAIN", bubble._derived_problem_codes
+        )
 
 if __name__ == "__main__":
     unittest.main()

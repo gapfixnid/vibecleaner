@@ -19,6 +19,15 @@ contributes its largest physically placeable font candidate. At most eight
 candidates per bubble are rasterized, each glyph run is drawn once, and the
 selected line alpha is reused by tile paint without a second glyph draw.
 Selection retains at least 94% of the largest raster-safe evaluated font size.
+Rectangle auto-layout evaluates both word-preserving and character-break
+passes instead of accepting the first fit. Fixed-size and rectangle candidates
+apply bold and italic before wrapping and advance measurement.
+
+If no candidate can be rasterized within the resource limits, the selector
+returns a serializable overflow layout instead of failing the page job. Tile
+generation then enters per-bubble fallback while the translated domain state
+and canonical public geometry remain available. Public fallback lines use the
+same shaped origins, baselines, ink bounds, and runs as a successful tile.
 
 The public canonical-layout cache is keyed by layout inputs and uses
 singleflight before entering the Qt executor. Tile singleflight owns the whole
@@ -27,6 +36,9 @@ C-contiguous, read-only memory. The 192 MiB process render-cache budget assigns
 96 MiB to tile PNGs, 40 MiB to canonical alpha/layouts, 40 MiB to worker-private
 shaping/glyph data, and 16 MiB to body masks. Each candidate surface is limited
 to 64 MP and one bubble's transient alpha to 96 MiB.
+Candidate safety scoring and final paint share the same integer SourceOver
+alpha composition helper, and retained safe/overflow candidates both count
+toward the transient limit.
 
 ## Resource identity
 
@@ -52,4 +64,12 @@ different IDs may never merge in either later IoU pass. OCR retries operate on
 copies and are accepted by confidence and Unicode grapheme validity, not by
 string length alone. Translation providers share one mandatory JSON contract;
 translation-memory v2 keys include provider, model, generation settings,
-effective prompt, and the digest of the image context actually used.
+endpoint identity, effective prompt, and the digest of the exact encoded image
+context actually used. A rejected vision request consults the text-only cache
+before performing a text-only network retry.
+
+Bubble body-mask discovery searches up to 12% beyond detector geometry without
+changing the selectable bubble box. Layout fingerprints include the adopted
+mask bounds and source. Detector-component recovery clears `MASK_UNCERTAIN`;
+ellipse fallback adds it. Persisted association, mask, and OCR warnings are
+restored as runtime signals so a layout-only refresh cannot erase them.

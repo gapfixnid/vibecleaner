@@ -1,6 +1,7 @@
 # engines/translation/providers.py
 import base64
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import logging
 import re
 import time
@@ -18,6 +19,7 @@ from .helpers import (
     set_texts_from_json,
 )
 from .prompt import build_translation_system_prompt
+from .outcome import VisionUnsupportedError
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,8 @@ class OpenAICompatibleTranslator(BaseTranslator):
         self.installed_models: list[str] = []
         self.system_prompt_override = None
         self.last_error: str | None = None
+        self.last_effective_context = None
+        self._prepared_vision: tuple[int, str, str] | None = None
 
     @property
     def completions_url(self) -> str:
@@ -125,6 +129,7 @@ class OpenAICompatibleTranslator(BaseTranslator):
     ) -> list[TextBlock]:
         if not blocks:
             return blocks
+        self.last_effective_context = None
         if self.is_online is None:
             self.check_connection()
 
@@ -138,6 +143,7 @@ class OpenAICompatibleTranslator(BaseTranslator):
         payload = self._build_payload(
             blocks, source_lang, target_lang, image, active_model
         )
+        self._prepared_vision = None
 
         max_retries = max(0, int(self.max_retries))
         for attempt in range(max_retries + 1):
@@ -171,7 +177,7 @@ class OpenAICompatibleTranslator(BaseTranslator):
                             "Model rejected image input; retrying without image (vision disabled for this session)."
                         )
                         self.supports_vision = False
-                        payload = self._build_payload(blocks, source_lang, target_lang, image, active_model)
+                        raise VisionUnsupportedError(active_model)
                     continue
 
                 translated_text = self._extract_message_content(response)
@@ -219,6 +225,8 @@ class OpenAICompatibleTranslator(BaseTranslator):
                     attempt + 1,
                 )
                 break
+            except VisionUnsupportedError:
+                raise
             except Exception as exc:
                 self.last_error = str(exc)
                 logger.exception(
@@ -248,6 +256,12 @@ class OpenAICompatibleTranslator(BaseTranslator):
                 ]
             active_model = matching[0] if matching else self.installed_models[0]
         return active_model
+
+    def effective_model(self) -> str:
+        return self._resolve_model()
+
+    def cache_endpoint_identity(self) -> str:
+        return self.completions_url
 
     def _build_payload(
         self,
@@ -289,6 +303,11 @@ class OpenAICompatibleTranslator(BaseTranslator):
 
     def _image_to_data_url(self, image: np.ndarray) -> str | None:
         try:
+            if (
+                self._prepared_vision is not None
+                and self._prepared_vision[0] == id(image)
+            ):
+                return self._prepared_vision[2]
             height, width = image.shape[:2]
             max_dim = 1024
             if max(height, width) > max_dim:
@@ -302,6 +321,30 @@ class OpenAICompatibleTranslator(BaseTranslator):
                 "Failed to encode image context for translation. model=%s", self.model
             )
             return None
+
+    def prepare_vision_image(
+        self, image: np.ndarray
+    ) -> tuple[str, str]:
+        height, width = image.shape[:2]
+        encoded_image = image
+        max_dim = 1024
+        if max(height, width) > max_dim:
+            scale = max_dim / max(height, width)
+            encoded_image = cv2.resize(
+                image,
+                (int(width * scale), int(height * scale)),
+            )
+        ok, buffer = cv2.imencode(".jpg", encoded_image)
+        if not ok:
+            raise RuntimeError("TRANSLATION_IMAGE_ENCODE_FAILED")
+        encoded = buffer.tobytes()
+        digest = hashlib.sha256(encoded).hexdigest()
+        data_url = (
+            "data:image/jpeg;base64,"
+            + base64.b64encode(encoded).decode("utf-8")
+        )
+        self._prepared_vision = (id(image), digest, data_url)
+        return digest, data_url
 
     def _extract_message_content(self, response: requests.Response) -> str:
         data = response.json(strict=False)

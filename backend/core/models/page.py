@@ -6,7 +6,11 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .geometry import Box, Rect
-from .problem import BubbleProblem, normalize_bubble_problem
+from .problem import (
+    BubbleProblem,
+    PERSISTED_INPUT_SIGNAL_CODES,
+    normalize_bubble_problem,
+)
 
 
 @dataclass
@@ -59,6 +63,11 @@ class TextBubble:
             normalize_bubble_problem(problem)
             for problem in self.problems
         ]
+        self._derived_problem_codes.update(
+            problem.code.value
+            for problem in self.problems
+            if problem.code in PERSISTED_INPUT_SIGNAL_CODES
+        )
 
     @staticmethod
     def _rect_to_project_list(rect: Optional[Rect]) -> Optional[list[float]]:

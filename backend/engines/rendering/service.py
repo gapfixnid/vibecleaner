@@ -9,9 +9,21 @@ from ...core.config import config_value
 from ...core.models import Rect, TextBubble
 from .renderer import TextRenderer, TextLayoutResult
 from ...infrastructure.runtime.qt import QtRenderExecutor, QtWorkerState, get_qt_runtime
-from ...infrastructure.image.masks import build_bubble_clip_mask
+from ...infrastructure.image.masks import (
+    BubbleClipMaskResult,
+    build_bubble_clip_mask,
+)
+from ...core.models.problem import BubbleProblemCode
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class BubbleBodyMask:
+    mask: np.ndarray
+    bounds: tuple[int, int, int, int]
+    source: str
+    boundary_contact_ratio: float | None = None
 
 
 @dataclass(frozen=True)
@@ -40,6 +52,7 @@ class PublicTextLayoutResult:
     reached_min_font: bool = False
     line_height_ratio: float = 1.0
     area_usage: float = 0.0
+    diagnostics: dict[str, Any] | None = None
 
 
 def _to_qrectf(rect: Rect) -> QRectF:
@@ -209,6 +222,7 @@ class RenderService:
             reached_min_font=bool(getattr(layout, "reached_min_font", False)),
             line_height_ratio=float(getattr(layout, "line_height_ratio", 1.0)),
             area_usage=float(getattr(layout, "area_usage", 0.0)),
+            diagnostics=None,
         )
 
     def _target_center_y(
@@ -216,12 +230,19 @@ class RenderService:
         text: str,
         bubble: TextBubble,
         mask: np.ndarray | None,
+        *,
+        mask_origin_y: float | None = None,
     ) -> float | None:
         if mask is None:
             return None
         mask_ys = np.where(np.asarray(mask) > 0)[0]
         mask_center = (
-            bubble.box.y + float(np.mean(mask_ys))
+            (
+                bubble.box.y
+                if mask_origin_y is None
+                else mask_origin_y
+            )
+            + float(np.mean(mask_ys))
             if mask_ys.size
             else bubble.box.y + bubble.box.height / 2.0
         )
@@ -244,7 +265,18 @@ class RenderService:
         return _to_qrectf(rect)
 
     def _build_bubble_layout_mask(self, bubble: TextBubble, image: np.ndarray | None) -> np.ndarray | None:
+        body = self._build_bubble_body_mask(bubble, image)
+        return body.mask if body is not None else None
+
+    def _build_bubble_body_mask(
+        self,
+        bubble: TextBubble,
+        image: np.ndarray | None,
+    ) -> BubbleBodyMask | None:
         if bubble.text_class == "text_free":
+            bubble._derived_problem_codes.discard(
+                BubbleProblemCode.MASK_UNCERTAIN.value
+            )
             return None
 
         rect = bubble.box
@@ -255,42 +287,87 @@ class RenderService:
 
         inset = max(1, min(5, int(round(min(width, height) * 0.03))))
         fallback_mask = self.renderer.make_ellipse_mask(width, height, inset=inset)
-        if image is None or bubble.text_box is None:
-            return fallback_mask
-
-        bounds = (
+        original_bounds = (
             int(round(rect.x)),
             int(round(rect.y)),
             int(round(rect.right)),
             int(round(rect.bottom)),
         )
+
+        def ellipse_fallback() -> BubbleBodyMask:
+            bubble._derived_problem_codes.add(
+                BubbleProblemCode.MASK_UNCERTAIN.value
+            )
+            return BubbleBodyMask(
+                fallback_mask,
+                original_bounds,
+                "ellipse",
+            )
+
+        if image is None or bubble.text_box is None:
+            return ellipse_fallback()
+
+        image_height, image_width = image.shape[:2]
+        expand_x = max(2, int(round(width * 0.12)))
+        expand_y = max(2, int(round(height * 0.12)))
+        search_bounds = (
+            max(0, original_bounds[0] - expand_x),
+            max(0, original_bounds[1] - expand_y),
+            min(image_width, original_bounds[2] + expand_x),
+            min(image_height, original_bounds[3] + expand_y),
+        )
         coords = [int(round(v)) for v in bubble.source_xyxy()]
         seed_bbox = (coords[0], coords[1], coords[2], coords[3]) if len(coords) == 4 else None
-        try:
-            mask = build_bubble_clip_mask(
-                (height, width),
-                bounds,
-                bounds,
-                inset=inset,
-                image=image,
-                seed_bbox=seed_bbox,
+        for bounds, source_name in (
+            (search_bounds, "expanded_component"),
+            (original_bounds, "detector_component"),
+        ):
+            search_width = max(1, bounds[2] - bounds[0])
+            search_height = max(1, bounds[3] - bounds[1])
+            try:
+                result = build_bubble_clip_mask(
+                    (search_height, search_width),
+                    bounds,
+                    bounds,
+                    inset=inset,
+                    image=image,
+                    seed_bbox=seed_bbox,
+                    return_metadata=True,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to build bubble layout mask. bubble_id=%s source=%s",
+                    getattr(bubble, "id", None),
+                    source_name,
+                )
+                continue
+            if not isinstance(result, BubbleClipMaskResult):
+                continue
+            if result.source != "detector_component":
+                continue
+            mask = np.asarray(result.mask, dtype=np.uint8)
+            if not bool(mask.any()) or not self._is_useful_shape_mask(mask):
+                continue
+            refined = self._refine_shape_mask(mask, bubble, bounds)
+            if not bool(np.asarray(refined).any()):
+                continue
+            bubble._derived_problem_codes.discard(
+                BubbleProblemCode.MASK_UNCERTAIN.value
             )
-        except Exception:
-            logger.exception(
-                "Failed to build bubble layout mask; falling back to ellipse mask. bubble_id=%s",
-                getattr(bubble, "id", None),
+            return BubbleBodyMask(
+                refined,
+                bounds,
+                source_name,
+                result.boundary_contact_ratio,
             )
-            return fallback_mask
+        return ellipse_fallback()
 
-        if mask is None or not bool(np.asarray(mask).any()):
-            return fallback_mask
-
-        mask = np.asarray(mask, dtype=np.uint8)
-        if not self._is_useful_shape_mask(mask):
-            return fallback_mask
-        return self._refine_shape_mask(mask, bubble)
-
-    def _refine_shape_mask(self, raw_mask: np.ndarray, bubble: TextBubble) -> np.ndarray:
+    def _refine_shape_mask(
+        self,
+        raw_mask: np.ndarray,
+        bubble: TextBubble,
+        bounds: tuple[int, int, int, int] | None = None,
+    ) -> np.ndarray:
         """Keep the component that best represents the usable bubble body."""
         import cv2
 
@@ -309,11 +386,13 @@ class RenderService:
             return raw_mask
 
         text_box = bubble.text_box
+        origin_x = bounds[0] if bounds is not None else bubble.box.x
+        origin_y = bounds[1] if bounds is not None else bubble.box.y
         if text_box is not None:
-            tx1 = max(0, int(math.floor(text_box.x - bubble.box.x)))
-            ty1 = max(0, int(math.floor(text_box.y - bubble.box.y)))
-            tx2 = min(width, int(math.ceil(text_box.right - bubble.box.x)))
-            ty2 = min(height, int(math.ceil(text_box.bottom - bubble.box.y)))
+            tx1 = max(0, int(math.floor(text_box.x - origin_x)))
+            ty1 = max(0, int(math.floor(text_box.y - origin_y)))
+            tx2 = min(width, int(math.ceil(text_box.right - origin_x)))
+            ty2 = min(height, int(math.ceil(text_box.bottom - origin_y)))
         else:
             tx1, ty1, tx2, ty2 = width // 4, height // 4, width * 3 // 4, height * 3 // 4
         text_region = np.zeros_like(raw, dtype=bool)

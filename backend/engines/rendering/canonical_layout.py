@@ -4,7 +4,7 @@ import hashlib
 import json
 import math
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 import cv2
@@ -16,11 +16,12 @@ from ...core.models import TextBubble
 from ...infrastructure.fonts import resolver as font_resolver
 from ...infrastructure.image.canonical_layout_cache import CanonicalLayoutCache
 from ...infrastructure.runtime.qt import QtRenderExecutor, QtWorkerState
+from .alpha import compose_final_alpha
 from .renderer import TextLayoutResult, TextLineLayout, _set_font_pixel_size, font_pixel_size
 from .service import FontDescriptor, PublicTextLayoutResult, RenderService, _to_qrectf
 
 
-LAYOUT_CONTRACT = "qt-glyph-layout-v2"
+LAYOUT_CONTRACT = "qt-glyph-layout-v3"
 MAX_RASTER_CANDIDATES = 8
 MAX_SURFACE_PIXELS = 64_000_000
 MAX_TRANSIENT_BYTES = 96 * 1024 * 1024
@@ -40,6 +41,14 @@ class CanonicalPublicLine:
     y: float
     width: float
     height: float
+    origin_x: float | None = None
+    baseline_y: float | None = None
+    advance_width: float | None = None
+    ink_left: int | None = None
+    ink_top: int | None = None
+    ink_width: int | None = None
+    ink_height: int | None = None
+    runs: tuple[CanonicalRun, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -134,6 +143,8 @@ class BubbleLayoutRequest:
     image: np.ndarray | None
     font_family: str | None
     mask: np.ndarray | None
+    mask_bounds: tuple[int, int, int, int] | None
+    mask_source: str | None
     layout_rect: QRectF
     target_center_y: float | None
     automatic_min_size: float
@@ -184,9 +195,16 @@ class CanonicalLayoutSelector:
         font_family: str | None = None,
         *,
         mask: np.ndarray | None = None,
+        mask_bounds: tuple[int, int, int, int] | None = None,
+        mask_source: str | None = None,
     ) -> str:
         if mask is None:
-            mask = self.render_service._build_bubble_layout_mask(bubble, image)
+            body = self.render_service._build_bubble_body_mask(
+                bubble, image
+            )
+            mask = body.mask if body is not None else None
+            mask_bounds = body.bounds if body is not None else None
+            mask_source = body.source if body is not None else None
         image_digest = (
             hashlib.sha256(np.ascontiguousarray(image).data).hexdigest()
             if image is not None
@@ -209,7 +227,9 @@ class CanonicalLayoutSelector:
                 if mask_array is not None
                 else None,
                 "body_mask_digest": mask_digest,
-                "body_mask_contract": "bubble-clip-v2",
+                "body_mask_bounds": mask_bounds,
+                "body_mask_source": mask_source,
+                "body_mask_contract": "bubble-clip-v3",
                 "bubble_id": bubble.id,
                 "box": bubble.box.to_xywh(),
                 "text_box": bubble.text_box.to_xywh() if bubble.text_box else None,
@@ -243,12 +263,32 @@ class CanonicalLayoutSelector:
         *,
         input_key: str | None = None,
     ) -> BubbleLayoutRequest:
-        mask = self.render_service._build_bubble_layout_mask(bubble, image)
+        body = self.render_service._build_bubble_body_mask(
+            bubble, image
+        )
+        mask = body.mask if body is not None else None
+        mask_bounds = body.bounds if body is not None else None
+        mask_source = body.source if body is not None else None
         input_key = input_key or self.build_input_key(
-            text, bubble, image, font_family, mask=mask
+            text,
+            bubble,
+            image,
+            font_family,
+            mask=mask,
+            mask_bounds=mask_bounds,
+            mask_source=mask_source,
         )
         layout_rect = self.render_service._text_layout_rect(bubble)
-        target = self.render_service._target_center_y(text, bubble, mask)
+        target = self.render_service._target_center_y(
+            text,
+            bubble,
+            mask,
+            mask_origin_y=(
+                float(mask_bounds[1])
+                if mask_bounds is not None
+                else None
+            ),
+        )
         if image is not None and image.ndim >= 2:
             page_height, page_width = image.shape[:2]
         else:
@@ -261,6 +301,8 @@ class CanonicalLayoutSelector:
             image=image,
             font_family=font_family,
             mask=mask,
+            mask_bounds=mask_bounds,
+            mask_source=mask_source,
             layout_rect=layout_rect,
             target_center_y=target,
             automatic_min_size=self.render_service._automatic_min_font_size(image),
@@ -283,6 +325,8 @@ class CanonicalLayoutSelector:
         self, worker: QtWorkerState, request: BubbleLayoutRequest
     ) -> CanonicalLayoutArtifact:
         candidates = self._collect_candidates(request)
+        if not candidates:
+            candidates = [self._fallback_candidate(request)]
         candidates = sorted(
             candidates,
             key=lambda item: (
@@ -300,7 +344,13 @@ class CanonicalLayoutSelector:
         relaxed_max: int | None = None
 
         for candidate in candidates:
-            retained_bytes = best.byte_size if best is not None else 0
+            retained = {
+                id(item.fill_alpha): item
+                for item in (best, overflow_best)
+                if item is not None
+                and not item.diagnostics.resource_violation
+            }
+            retained_bytes = sum(item.byte_size for item in retained.values())
             rasterized = self._rasterize_candidate(
                 worker,
                 request,
@@ -342,10 +392,21 @@ class CanonicalLayoutSelector:
 
         if best is None:
             if overflow_best is None:
-                raise RuntimeError(
-                    "CANONICAL_LAYOUT_RESOURCE_EXHAUSTED"
+                fallback = next(
+                    (
+                        item
+                        for item in candidates
+                        if item.mask_pass == "overflow_fallback"
+                    ),
+                    None,
                 )
-            best = overflow_best
+                if fallback is None:
+                    fallback = self._fallback_candidate(request)
+                    candidates.append(fallback)
+                best = self._resource_failure(fallback)
+                raster_diagnostics.append(best.diagnostics)
+            else:
+                best = overflow_best
             fmax = best.candidate.effective_font_size
 
         return self._freeze_artifact(
@@ -363,6 +424,13 @@ class CanonicalLayoutSelector:
             return request.font_family
         resolved, _chain = font_resolver.resolve(request.text, target_lang="Korean")
         return resolved.name
+
+    @staticmethod
+    def _mask_rect(request: BubbleLayoutRequest) -> QRectF:
+        if request.mask_bounds is None:
+            return _to_qrectf(request.bubble.box)
+        x1, y1, x2, y2 = request.mask_bounds
+        return QRectF(x1, y1, x2 - x1, y2 - y1)
 
     @staticmethod
     def _to_spec(
@@ -405,7 +473,11 @@ class CanonicalLayoutSelector:
         alignment = bubble.alignment or "center"
 
         if requested > 0:
-            rect = _to_qrectf(bubble.box) if request.mask is not None else request.layout_rect
+            rect = (
+                self._mask_rect(request)
+                if request.mask is not None
+                else request.layout_rect
+            )
             layout = self.renderer.layout_text_at_fixed_size(
                 request.text,
                 rect,
@@ -416,9 +488,9 @@ class CanonicalLayoutSelector:
                 padding=padding,
                 margin=margin,
                 target_center_y=request.target_center_y,
+                bold=bold,
+                italic=italic,
             )
-            layout.font.setBold(bold)
-            layout.font.setItalic(italic)
             return [
                 self._to_spec(
                     layout,
@@ -431,30 +503,101 @@ class CanonicalLayoutSelector:
             ]
 
         if request.mask is None:
-            layout = self.renderer.find_optimal_layout_in_rect(
-                request.text,
+            content_rect = self.renderer.content_rect(
                 request.layout_rect,
-                font_family=family,
-                min_size=request.automatic_min_size,
-                max_size=self.render_service._max_font_size(),
-                alignment=alignment,
                 padding=padding,
                 margin=margin,
             )
-            layout.font.setBold(bold)
-            layout.font.setItalic(italic)
+            minimum = self.renderer._automatic_min_font_size(
+                request.automatic_min_size,
+                self.render_service._max_font_size(),
+            )
+            dynamic_max = max(
+                minimum,
+                min(
+                    self.render_service._max_font_size(),
+                    content_rect.height() * 0.70,
+                    content_rect.width() * 0.70,
+                ),
+            )
+            sizes = self.renderer._candidate_font_sizes(
+                minimum, dynamic_max
+            )
+            chosen: list[RoughLayoutCandidate] = []
+            for allow_break in (False, True):
+                pass_candidates: list[RoughLayoutCandidate] = []
+                for size in sizes:
+                    layout = self.renderer._best_rect_layout_for_candidates(
+                        request.text,
+                        content_rect,
+                        family,
+                        [size],
+                        alignment,
+                        minimum,
+                        allow_break,
+                        bold=bold,
+                        italic=italic,
+                    )
+                    if layout is None:
+                        continue
+                    pass_candidates.append(
+                        self._to_spec(
+                            layout,
+                            mask_pass="rect",
+                            allow_char_break=allow_break,
+                            bold=bold,
+                            italic=italic,
+                            rough_key=(
+                                bool(layout.is_overflow),
+                                -font_pixel_size(layout.font),
+                                self.renderer._bad_line_break_count(
+                                    layout.lines, request.text
+                                ),
+                                layout.score,
+                            ),
+                        )
+                    )
+                if pass_candidates:
+                    largest = min(
+                        pass_candidates,
+                        key=lambda item: (
+                            -item.effective_font_size,
+                            item.rough_key,
+                        ),
+                    )
+                    typography = min(
+                        pass_candidates,
+                        key=lambda item: item.rough_key,
+                    )
+                    chosen.append(largest)
+                    if typography != largest:
+                        chosen.append(typography)
+            if chosen:
+                return chosen
+            fallback = self.renderer.layout_text_at_fixed_size(
+                request.text,
+                request.layout_rect,
+                minimum,
+                font_family=family,
+                alignment=alignment,
+                padding=padding,
+                margin=margin,
+                bold=bold,
+                italic=italic,
+            )
+            fallback.is_overflow = True
             return [
                 self._to_spec(
-                    layout,
-                    mask_pass="rect",
+                    fallback,
+                    mask_pass="overflow_fallback",
                     allow_char_break=True,
                     bold=bold,
                     italic=italic,
-                    rough_key=(bool(layout.is_overflow), -font_pixel_size(layout.font)),
+                    rough_key=(True, -font_pixel_size(fallback.font)),
                 )
             ]
 
-        rect = _to_qrectf(bubble.box)
+        rect = self._mask_rect(request)
         min_size = max(
             self.renderer.AUTO_READABILITY_MIN_FONT_SIZE,
             request.automatic_min_size,
@@ -547,11 +690,30 @@ class CanonicalLayoutSelector:
         return list(unique.values())
 
     def _fallback_candidate(self, request: BubbleLayoutRequest) -> RoughLayoutCandidate:
-        layout = self.render_service._get_layout_for_bubble_worker(
+        family = self._resolve_family(request)
+        fallback_rect = (
+            self._mask_rect(request)
+            if request.mask is not None
+            else request.layout_rect
+        )
+        fallback_size = max(
+            1,
+            int(
+                request.bubble.font_size
+                or request.automatic_min_size
+            ),
+        )
+        layout = self.renderer.layout_text_at_fixed_size(
             request.text,
-            request.bubble,
-            image=request.image,
-            font_family=request.font_family,
+            fallback_rect,
+            fallback_size,
+            font_family=family,
+            alignment=request.bubble.alignment or "center",
+            padding=dict(request.bubble.layout_padding or {}),
+            margin=dict(request.bubble.layout_margin or {}),
+            target_center_y=request.target_center_y,
+            bold=bool(request.bubble.bold),
+            italic=bool(request.bubble.italic),
         )
         layout.is_overflow = True
         return self._to_spec(
@@ -704,7 +866,9 @@ class CanonicalLayoutSelector:
         width = max(1, int(math.ceil(rough_right)) - surface_x)
         height = max(1, int(math.ceil(rough_bottom)) - surface_y)
         pixels = width * height
-        estimated = pixels * 7
+        # QImage, its converted RGBA buffer, line/fill/final alpha, and the
+        # distance-transform scratch space coexist during rasterization.
+        estimated = pixels * 16
         if (
             pixels > MAX_SURFACE_PIXELS
             or estimated > transient_budget
@@ -753,16 +917,18 @@ class CanonicalLayoutSelector:
             )
 
         stroke_only = _stroke_only(fill_alpha, stroke_width)
-        total_alpha = int(fill_alpha.astype(np.uint64).sum()) + int(
-            stroke_only.astype(np.uint64).sum()
-        )
+        final_alpha = compose_final_alpha(fill_alpha, stroke_only)
+        total_alpha = int(final_alpha.astype(np.uint64).sum())
         outside_sum, outside_visible = self._outside_alpha(
-            request, candidate, fill_alpha, stroke_only, surface_x, surface_y
+            request,
+            candidate,
+            final_alpha,
+            surface_x,
+            surface_y,
         )
         outside_ratio = outside_sum / max(1, total_alpha)
-        combined_alpha = np.maximum(fill_alpha, stroke_only)
-        visible_count = int(np.count_nonzero(combined_alpha > 8))
-        visible_y, visible_x = np.where(combined_alpha > 0)
+        visible_count = int(np.count_nonzero(final_alpha > 8))
+        visible_y, visible_x = np.where(final_alpha > 0)
         page_safe = bool(visible_x.size) and (
             surface_x + int(visible_x.min()) >= 0
             and surface_y + int(visible_y.min()) >= 0
@@ -815,12 +981,10 @@ class CanonicalLayoutSelector:
         self,
         request: BubbleLayoutRequest,
         candidate: RoughLayoutCandidate,
-        fill: np.ndarray,
-        stroke: np.ndarray,
+        alpha: np.ndarray,
         surface_x: int,
         surface_y: int,
     ) -> tuple[int, int]:
-        alpha = np.maximum(fill, stroke)
         if request.mask is None or candidate.mask_pass in {"rect", "fixed", "overflow_fallback"}:
             return 0, 0
         scale = 1.0 if candidate.mask_pass == "mask_strict" else 0.7
@@ -832,8 +996,16 @@ class CanonicalLayoutSelector:
             inset_scale=scale,
         )
         allowed = np.zeros_like(alpha, dtype=bool)
-        bx = int(round(request.bubble.box.x))
-        by = int(round(request.bubble.box.y))
+        bx = (
+            request.mask_bounds[0]
+            if request.mask_bounds is not None
+            else int(round(request.bubble.box.x))
+        )
+        by = (
+            request.mask_bounds[1]
+            if request.mask_bounds is not None
+            else int(round(request.bubble.box.y))
+        )
         x1 = max(0, bx - surface_x)
         y1 = max(0, by - surface_y)
         x2 = min(alpha.shape[1], bx - surface_x + safe.shape[1])
@@ -894,6 +1066,28 @@ class CanonicalLayoutSelector:
         relaxed_max: int | None,
     ) -> CanonicalLayoutArtifact:
         spec = selected.candidate
+        public_lines: tuple[CanonicalPublicLine, ...]
+        if selected.shaped_lines:
+            public_lines = tuple(
+                CanonicalPublicLine(
+                    text=line.text,
+                    x=float(line.ink_left),
+                    y=float(line.ink_top),
+                    width=float(line.ink_width),
+                    height=float(line.ink_height),
+                    origin_x=line.origin_x,
+                    baseline_y=line.baseline_y,
+                    advance_width=line.advance_width,
+                    ink_left=line.ink_left,
+                    ink_top=line.ink_top,
+                    ink_width=line.ink_width,
+                    ink_height=line.ink_height,
+                    runs=line.runs,
+                )
+                for line in selected.shaped_lines
+            )
+        else:
+            public_lines = tuple(spec.slots)
         public_layout = PublicTextLayoutResult(
             font=FontDescriptor(
                 spec.font_family,
@@ -902,8 +1096,16 @@ class CanonicalLayoutSelector:
                 spec.italic,
             ),
             lines=tuple(spec.lines),  # type: ignore[arg-type]
-            render_width=max((slot.width for slot in spec.slots), default=0.0),
-            line_layouts=tuple(spec.slots),  # type: ignore[arg-type]
+            render_width=max(
+                (
+                    line.advance_width
+                    if line.advance_width is not None
+                    else line.width
+                    for line in public_lines
+                ),
+                default=0.0,
+            ),
+            line_layouts=public_lines,  # type: ignore[arg-type]
             score=spec.score,
             is_overflow=spec.is_overflow or not selected.diagnostics.raster_safe,
             reached_min_font=spec.reached_min_font,
@@ -978,11 +1180,21 @@ class CanonicalLayoutSelector:
             "candidate_count": len(candidates),
             "rasterized_candidate_count": len(raster_diagnostics),
             "safe_area_ratio": round(safe_area_ratio, 6),
+            "body_mask_source": request.mask_source,
             "outside_alpha_ratio": selected.diagnostics.outside_alpha_ratio,
             "resource_violation_count": sum(
                 item.resource_violation for item in raster_diagnostics
             ),
+            "error_code": (
+                "CANONICAL_LAYOUT_RESOURCE_EXHAUSTED"
+                if selected.diagnostics.resource_violation
+                else None
+            ),
         }
+        public_layout = replace(
+            public_layout,
+            diagnostics=dict(diagnostics),
+        )
         return CanonicalLayoutArtifact(
             selected=selected,
             public_layout=public_layout,

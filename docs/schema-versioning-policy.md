@@ -42,6 +42,11 @@ inputs rather than silently redefining them:
 This table is a compatibility decision, not proof that the corresponding
 migrations are already implemented.
 
+Project schema 2 review-string migration recognizes only the documented exact
+legacy values. Any other string—including provider or connection errors that
+happen to contain words such as `ocr` or `translation`—becomes its own
+`LEGACY_REVIEW_NOTE` with the original text preserved in `detail`.
+
 ## Format contracts
 
 ### Projects

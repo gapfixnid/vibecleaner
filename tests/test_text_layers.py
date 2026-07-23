@@ -20,6 +20,7 @@ from backend.engines.rendering.service import RenderService
 from backend.engines.rendering.canonical_layout import (
     _expanded_alpha,
 )
+from backend.engines.rendering.alpha import compose_final_alpha
 from backend.engines.rendering.export import ExportService
 from backend.engines.rendering.text_layer import TextLayerService
 from backend.infrastructure.image.text_layer_cache import TextLayerCache
@@ -146,6 +147,119 @@ def test_cached_canonical_alpha_is_owned_contiguous_and_read_only():
     ).astype(np.uint8)
     assert np.array_equal(stroke, expected)
     assert not np.any((fill == 255) & (stroke > 0))
+
+
+def test_empty_candidate_set_returns_serializable_overflow_layout(
+    monkeypatch,
+):
+    _runtime, render, service, _cache = make_service()
+    image = np.full((80, 120, 3), 255, np.uint8)
+    bubble = TextBubble(
+        id=9,
+        box=Rect(10, 10, 18, 12),
+        text="source",
+        translated="a very long translated sentence",
+        text_class="text_free",
+    )
+    selector = service.canonical_selector
+    monkeypatch.setattr(
+        selector, "_collect_candidates", lambda _request: []
+    )
+
+    layout = render.get_layout_for_bubble(
+        bubble.translated, bubble, image
+    )
+
+    assert layout.is_overflow
+    assert layout.line_layouts
+
+
+def test_resource_exhaustion_keeps_overflow_layout_for_dom_fallback(
+    monkeypatch,
+):
+    _runtime, render, service, _cache = make_service()
+    image = np.full((80, 120, 3), 255, np.uint8)
+    bubble = TextBubble(
+        id=10,
+        box=Rect(10, 10, 40, 20),
+        text="source",
+        translated="translated",
+        text_class="text_free",
+    )
+    selector = service.canonical_selector
+    monkeypatch.setattr(
+        selector,
+        "_rasterize_candidate",
+        lambda _worker, _request, candidate, **_kwargs: (
+            selector._resource_failure(candidate)
+        ),
+    )
+
+    layout = render.get_layout_for_bubble(
+        bubble.translated, bubble, image
+    )
+
+    assert layout.is_overflow
+    assert layout.line_layouts
+    assert (
+        layout.diagnostics["error_code"]
+        == "CANONICAL_LAYOUT_RESOURCE_EXHAUSTED"
+    )
+
+
+def test_public_layout_uses_same_shaped_geometry_as_tile_artifact():
+    _runtime, _render, service, _cache = make_service()
+    image = np.full((200, 300, 3), 255, np.uint8)
+    bubble = make_bubble()
+    request = service.canonical_selector.build_request(
+        bubble.translated, bubble, image, bubble.font_family
+    )
+    artifact = service.canonical_selector.get_artifact(request)
+
+    public = artifact.public_layout.line_layouts[0]
+    shaped = artifact.selected.shaped_lines[0]
+    assert public.origin_x == shaped.origin_x
+    assert public.baseline_y == shaped.baseline_y
+    assert public.ink_left == shaped.ink_left
+    assert public.runs == shaped.runs
+
+
+def test_final_alpha_helper_matches_source_over_contract():
+    fill = np.array([[0, 128, 255]], dtype=np.uint8)
+    stroke = np.array([[255, 128, 30]], dtype=np.uint8)
+    expected = (
+        fill.astype(np.uint16)
+        + stroke.astype(np.uint16)
+        * (255 - fill.astype(np.uint16))
+        // 255
+    ).astype(np.uint8)
+    assert np.array_equal(
+        compose_final_alpha(fill, stroke), expected
+    )
+
+
+def test_rect_auto_layout_rasters_both_break_passes_with_style():
+    _runtime, _render, service, _cache = make_service()
+    image = np.full((180, 280, 3), 255, np.uint8)
+    bubble = TextBubble(
+        id=11,
+        box=Rect(20, 20, 180, 80),
+        text="source",
+        translated="styled rectangular automatic layout",
+        font_family="Pretendard Variable",
+        font_size=0,
+        bold=True,
+        italic=True,
+        text_class="text_free",
+    )
+    request = service.canonical_selector.build_request(
+        bubble.translated, bubble, image, bubble.font_family
+    )
+    artifact = service.canonical_selector.get_artifact(request)
+
+    assert artifact.diagnostics["candidate_count"] >= 2
+    assert artifact.selected.candidate.bold
+    assert artifact.selected.candidate.italic
 
 
 def test_executor_reentry_is_rejected_instead_of_deadlocking():

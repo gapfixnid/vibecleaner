@@ -14,6 +14,7 @@ class TranslationRequestContext:
     temperature: float | None
     top_p: float | None
     max_tokens: int | None
+    endpoint_identity: str | None = None
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,12 @@ class TranslationValue:
 class TranslationOutcome:
     values: tuple[TranslationValue, ...]
     effective_context: TranslationRequestContext
+
+
+class VisionUnsupportedError(RuntimeError):
+    def __init__(self, effective_model: str) -> None:
+        super().__init__("TRANSLATION_VISION_UNSUPPORTED")
+        self.effective_model = effective_model
 
 
 def translate_with_legacy_adapter(
@@ -74,6 +81,7 @@ def translate_with_legacy_adapter(
             temperature=requested_context.temperature,
             top_p=requested_context.top_p,
             max_tokens=requested_context.max_tokens,
+            endpoint_identity=requested_context.endpoint_identity,
         )
     return TranslationOutcome(
         values=tuple(

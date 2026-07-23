@@ -1,7 +1,10 @@
 from typing import Optional
 
 import logging
+import math
+from dataclasses import dataclass
 import numpy as np
+from typing import Optional
 
 from .backend import resolve_detection_backend
 from .font.engine import extract_foreground_color
@@ -13,6 +16,13 @@ from ..common.textblock import TextBlock
 from ...infrastructure.model_catalog import DEFAULT_OCR_MODEL
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class NormalizedTextRegion:
+    box: np.ndarray
+    original_index: int
+    confidence: float | None
 
 
 class DetectionPipeline:
@@ -37,8 +47,23 @@ class DetectionPipeline:
         raw_bubble_count = (
             len(bubble_boxes) if bubble_boxes is not None else 0
         )
-        text_boxes = filter_and_fix_bboxes(text_boxes, image.shape)
-        bubble_boxes = filter_and_fix_bboxes(bubble_boxes, image.shape)
+        normalized_text = self._normalize_text_regions(
+            text_boxes,
+            image.shape,
+            text_confidences or {},
+        )
+        normalized_bubbles = self._normalize_bubble_boxes(
+            bubble_boxes,
+            image.shape,
+        )
+        text_boxes = np.asarray(
+            [region.box for region in normalized_text],
+            dtype=int,
+        ).reshape(-1, 4)
+        bubble_boxes = np.asarray(
+            normalized_bubbles,
+            dtype=int,
+        ).reshape(-1, 4)
         bubbles_only_enabled = self._resolve_option(
             "bubbles_only", bubbles_only, False
         )
@@ -54,7 +79,7 @@ class DetectionPipeline:
             text_boxes,
             bubble_boxes,
             text_colors_per_box,
-            text_confidences=text_confidences or {},
+            text_regions=normalized_text,
             bubbles_only=bubbles_only_enabled,
         )
         matched = sum(block.bubble_match_id is not None for block in text_blocks)
@@ -89,6 +114,49 @@ class DetectionPipeline:
             text_direction_override=self._resolve_option("text_direction_override", text_direction_override, "auto"),
         )
         return text_blocks
+
+    @staticmethod
+    def _normalize_text_regions(
+        raw_boxes: np.ndarray,
+        image_shape: tuple[int, ...],
+        confidences: dict[tuple[int, int, int, int], float],
+    ) -> list[NormalizedTextRegion]:
+        regions: list[NormalizedTextRegion] = []
+        source_boxes = raw_boxes if raw_boxes is not None else []
+        for index, raw_box in enumerate(source_boxes):
+            raw_key = tuple(int(value) for value in raw_box)
+            cleaned = filter_and_fix_bboxes(
+                [raw_box], image_shape
+            )
+            if len(cleaned) != 1:
+                continue
+            regions.append(
+                NormalizedTextRegion(
+                    box=np.asarray(cleaned[0], dtype=int),
+                    original_index=index,
+                    confidence=confidences.get(raw_key),
+                )
+            )
+        return regions
+
+    @staticmethod
+    def _normalize_bubble_boxes(
+        raw_boxes: np.ndarray | None,
+        image_shape: tuple[int, ...],
+    ) -> list[np.ndarray]:
+        normalized: list[tuple[tuple[int, ...], int, np.ndarray]] = []
+        source_boxes = raw_boxes if raw_boxes is not None else []
+        for index, raw_box in enumerate(source_boxes):
+            cleaned = filter_and_fix_bboxes(
+                [raw_box], image_shape
+            )
+            if len(cleaned) != 1:
+                continue
+            box = np.asarray(cleaned[0], dtype=int)
+            key = tuple(int(value) for value in box)
+            normalized.append((key, index, box))
+        normalized.sort(key=lambda item: (*item[0], item[1]))
+        return [item[2] for item in normalized]
 
     def _resolve_option(self, name: str, explicit_value, default):
         if explicit_value is not None:
@@ -171,7 +239,7 @@ class DetectionPipeline:
         text_boxes: np.ndarray,
         bubble_boxes: np.ndarray,
         text_colors_per_box: list[tuple],
-        text_confidences: dict[tuple[int, int, int, int], float],
+        text_regions: list[NormalizedTextRegion],
         bubbles_only: bool = False,
     ) -> list[TextBlock]:
         text_blocks = []
@@ -179,7 +247,11 @@ class DetectionPipeline:
 
         for txt_idx, txt_box in enumerate(text_boxes):
             text_color = text_colors_per_box[txt_idx]
-            confidence = text_confidences.get(tuple(int(value) for value in txt_box))
+            confidence = (
+                text_regions[txt_idx].confidence
+                if txt_idx < len(text_regions)
+                else None
+            )
             if len(bubble_boxes) == 0:
                 text_blocks.append(TextBlock(
                     text_bbox=txt_box, text_class="text_free", font_color=text_color,
@@ -187,7 +259,9 @@ class DetectionPipeline:
                 ))
                 continue
 
-            candidates: list[tuple[float, int, np.ndarray]] = []
+            candidates: list[
+                tuple[float, float, int, np.ndarray]
+            ] = []
             text_x1, text_y1, text_x2, text_y2 = map(float, txt_box)
             text_area = max(1.0, (text_x2 - text_x1) * (text_y2 - text_y1))
             text_center_x = (text_x1 + text_x2) / 2.0
@@ -209,6 +283,12 @@ class DetectionPipeline:
                             0.0, min(text_y2, by2) - max(text_y1, by1)
                         )
                         overlap = intersection / text_area
+                        center_inside = (
+                            bx1 <= text_center_x <= bx2
+                            and by1 <= text_center_y <= by2
+                        )
+                        if overlap < 0.5 and not center_inside:
+                            continue
                         diagonal = max(
                             1.0,
                             float(np.hypot(bx2 - bx1, by2 - by1)),
@@ -220,26 +300,44 @@ class DetectionPipeline:
                             )
                         ) / diagonal
                         containment_bonus = (
-                            2.0
+                            1.0
                             if does_rectangle_fit(bubble_box, txt_box)
                             else 0.0
                         )
+                        bubble_area = max(
+                            1.0, (bx2 - bx1) * (by2 - by1)
+                        )
+                        area_ratio = bubble_area / text_area
+                        oversized_penalty = max(
+                            0.0, math.log2(area_ratio) - 4.0
+                        ) * 0.35
                         candidates.append(
                             (
                                 overlap * 3.0
                                 + containment_bonus
+                                + (1.5 if center_inside else 0.0)
                                 - distance,
+                                - oversized_penalty,
                                 bubble_match_id,
                                 bubble_box,
                             )
                         )
 
             if candidates:
-                candidates.sort(key=lambda item: (-item[0], item[1]))
-                best_score, bubble_match_id, bubble_box = candidates[0]
+                scored = [
+                    (
+                        score + penalty,
+                        bubble_match_id,
+                        bubble_box,
+                    )
+                    for score, penalty, bubble_match_id, bubble_box
+                    in candidates
+                ]
+                scored.sort(key=lambda item: (-item[0], item[1]))
+                best_score, bubble_match_id, bubble_box = scored[0]
                 ambiguous = (
-                    len(candidates) > 1
-                    and best_score - candidates[1][0] < 0.25
+                    len(scored) > 1
+                    and best_score - scored[1][0] < 0.25
                 )
                 text_blocks.append(
                     TextBlock(

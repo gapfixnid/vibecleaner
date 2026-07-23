@@ -312,7 +312,14 @@ class PageOcrStage:
                             )
                             recovered_blocks += 1
                         else:
-                            block.problem_codes.add("OCR_UNCERTAIN")
+                            if decision.uncertain:
+                                block.problem_codes.add(
+                                    "OCR_UNCERTAIN"
+                                )
+                            else:
+                                block.problem_codes.discard(
+                                    "OCR_UNCERTAIN"
+                                )
                             rejected_blocks += 1
                     ocr_score = self.quality_router.evaluate_ocr(
                         context.artifacts["blocks"], config.source_language

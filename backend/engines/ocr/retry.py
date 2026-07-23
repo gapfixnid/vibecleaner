@@ -28,12 +28,29 @@ def _language_mismatch(text: str, language: str) -> bool:
     if count < 6:
         return False
     normalized = str(language or "").strip().lower()
-    if normalized not in {"japanese", "日本語", "ja"}:
+    script = {
+        "japanese": "japanese",
+        "日本語": "japanese",
+        "ja": "japanese",
+        "korean": "korean",
+        "한국어": "korean",
+        "ko": "korean",
+        "english": "english",
+        "en": "english",
+    }.get(normalized)
+    if script is None:
         return False
-    ratio = script_ratio(text, "japanese")
+    ratio = script_ratio(text, script)
     if count < 12:
         return ratio < 0.10
     return ratio < 0.25
+
+
+def _warning_needed(original: OcrSnapshot) -> bool:
+    return (
+        original.confidence is None
+        or original.confidence < 0.40
+    )
 
 
 def choose_ocr_retry(
@@ -51,7 +68,10 @@ def choose_ocr_retry(
     )
     if invalid:
         return OcrRetryDecision(
-            False, original, "invalid_candidate", True
+            False,
+            original,
+            "invalid_candidate",
+            _warning_needed(original),
         )
 
     suspicious_original = original_length <= 2
@@ -60,11 +80,17 @@ def choose_ocr_retry(
             12, original_length * 4
         ):
             return OcrRetryDecision(
-                False, original, "suspicious_length_expansion", True
+                False,
+                original,
+                "suspicious_length_expansion",
+                _warning_needed(original),
             )
         if candidate.confidence is None:
             return OcrRetryDecision(
-                False, original, "candidate_confidence_missing", True
+                False,
+                original,
+                "candidate_confidence_missing",
+                _warning_needed(original),
             )
         if original.confidence is None:
             accepted = candidate.confidence >= 0.55
@@ -78,12 +104,15 @@ def choose_ocr_retry(
             "suspicious_recovery"
             if accepted
             else "suspicious_low_confidence",
-            not accepted,
+            not accepted and _warning_needed(original),
         )
 
     if candidate.confidence is None:
         return OcrRetryDecision(
-            False, original, "candidate_confidence_missing", True
+            False,
+            original,
+            "candidate_confidence_missing",
+            _warning_needed(original),
         )
     if original.confidence is None:
         return OcrRetryDecision(
@@ -94,5 +123,5 @@ def choose_ocr_retry(
         accepted,
         candidate if accepted else original,
         "confidence_improved" if accepted else "not_improved",
-        not accepted,
+        not accepted and _warning_needed(original),
     )

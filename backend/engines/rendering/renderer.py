@@ -521,6 +521,9 @@ class TextRenderer:
         alignment: str,
         min_size: float,
         allow_char_break: bool,
+        *,
+        bold: bool = False,
+        italic: bool = False,
     ) -> TextLayoutResult | None:
         best_layout = None
         best_key = None
@@ -529,6 +532,8 @@ class TextRenderer:
         for size in candidate_sizes:
             font = QFont(font_family)
             _set_font_pixel_size(font, size)
+            font.setBold(bold)
+            font.setItalic(italic)
             lines = self.wrap_korean_text(
                 text,
                 rect.width(),
@@ -577,6 +582,8 @@ class TextRenderer:
         padding: dict[str, float] | None = None,
         margin: dict[str, float] | None = None,
         target_center_y: float | None = None,
+        bold: bool = False,
+        italic: bool = False,
     ) -> TextLayoutResult:
         """Lay out text without changing the caller's requested font size."""
         if font_family is None:
@@ -591,6 +598,8 @@ class TextRenderer:
         requested_size = max(1.0, float(font_size))
         font = QFont(font_family)
         _set_font_pixel_size(font, requested_size)
+        font.setBold(bold)
+        font.setItalic(italic)
 
         if mask is not None:
             candidate_masks = [
@@ -619,6 +628,8 @@ class TextRenderer:
                         min_size=0.0,
                         alignment=alignment,
                         target_center_y=target_center_y,
+                        bold=bold,
+                        italic=italic,
                     )
                     if layout is not None:
                         layout.reached_min_font = False
@@ -636,6 +647,8 @@ class TextRenderer:
                 padding=padding,
                 margin=margin,
                 target_center_y=target_center_y,
+                bold=bold,
+                italic=italic,
             )
             fallback.is_overflow = True
             return fallback
@@ -650,6 +663,8 @@ class TextRenderer:
                 alignment,
                 0.0,
                 allow_char_break,
+                bold=bold,
+                italic=italic,
             )
             if layout is not None:
                 layout.reached_min_font = False
@@ -854,6 +869,8 @@ class TextRenderer:
         min_size: float,
         alignment: str = "center",
         target_center_y: float | None = None,
+        bold: bool = False,
+        italic: bool = False,
     ) -> TextLayoutResult | None:
         best_layout = None
         best_key = None
@@ -867,6 +884,8 @@ class TextRenderer:
         for size in candidate_sizes:
             font = QFont(font_family)
             _set_font_pixel_size(font, size)
+            font.setBold(bold)
+            font.setItalic(italic)
             for line_height_ratio in (1.12, 1.06, 1.0, 1.18):
                 layout = self._layout_text_in_mask(
                     text,

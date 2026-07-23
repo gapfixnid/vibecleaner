@@ -21,6 +21,30 @@ def test_detection_pipeline_preserves_model_confidence_on_text_blocks():
     assert blocks[0].confidence == 0.87
 
 
+def test_clamped_text_box_keeps_raw_detector_confidence():
+    image = np.full((40, 40, 3), 255, dtype=np.uint8)
+    blocks = DetectionPipeline().build_text_blocks(
+        image,
+        np.array([[-4, 5, 25, 25]]),
+        np.empty((0, 4), dtype=np.int32),
+        text_confidences={(-4, 5, 25, 25): 0.73},
+    )
+
+    assert blocks[0].confidence == 0.73
+
+
+def test_tiny_overlap_without_center_inside_is_not_associated():
+    image = np.full((100, 100, 3), 255, dtype=np.uint8)
+    blocks = DetectionPipeline().build_text_blocks(
+        image,
+        np.array([[40, 40, 70, 70]]),
+        np.array([[68, 68, 98, 98]]),
+    )
+
+    assert blocks[0].bubble_match_id is None
+    assert blocks[0].text_class == "text_free"
+
+
 def test_bubble_analysis_keeps_raw_model_confidence_separate_from_heuristic_score():
     block = TextBlock(
         text_bbox=np.array([5, 5, 25, 25]),

@@ -4,6 +4,7 @@ import numpy as np
 
 from backend.core.models import Rect, TextBubble
 from backend.core.models.problem import (
+    BubbleProblem,
     BubbleProblemCode,
     normalize_bubble_problem,
 )
@@ -68,6 +69,31 @@ def test_unknown_structured_problem_preserves_original_detail():
     assert problem.detail == "keep me"
 
 
+def test_legacy_translation_failure_message_is_not_reclassified():
+    problem = normalize_bubble_problem(
+        "translation provider connection failed"
+    )
+    assert problem == BubbleProblem(
+        BubbleProblemCode.LEGACY_REVIEW_NOTE,
+        "translation provider connection failed",
+    )
+
+
+def test_loaded_input_warnings_survive_layout_only_reconciliation():
+    bubble = TextBubble(
+        id=1,
+        box=Rect(0, 0, 40, 40),
+        problems=[
+            BubbleProblem(BubbleProblemCode.OCR_UNCERTAIN),
+            BubbleProblem(BubbleProblemCode.MASK_UNCERTAIN),
+        ],
+    )
+    assert bubble._derived_problem_codes == {
+        "OCR_UNCERTAIN",
+        "MASK_UNCERTAIN",
+    }
+
+
 def test_ocr_suspicious_recovery_overrides_normal_improvement_rule():
     decision = choose_ocr_retry(
         OcrSnapshot("", None),
@@ -86,6 +112,16 @@ def test_ocr_retry_without_candidate_confidence_keeps_original():
     )
     assert not decision.accepted
     assert decision.uncertain
+
+
+def test_rejected_retry_does_not_warn_for_high_confidence_original():
+    decision = choose_ocr_retry(
+        OcrSnapshot("정상 원문입니다", 0.90),
+        OcrSnapshot("bad candidate", 0.91),
+        "Korean",
+    )
+    assert not decision.accepted
+    assert not decision.uncertain
 
 
 def test_different_detector_bubble_ids_never_merge_in_analysis_or_postpass():

@@ -248,8 +248,7 @@ class BubbleAnalysisService:
             first = group[0]
             weighted_confidence = 0.0
             confidence_weight = 0.0
-            weighted_color = np.zeros(3, dtype=np.float64)
-            color_weight = 0.0
+            color_samples: list[tuple[np.ndarray, float]] = []
             for item in group:
                 area = max(
                     1.0,
@@ -266,10 +265,15 @@ class BubbleAnalysisService:
                 weighted_confidence += confidence * area
                 confidence_weight += area
                 weight = area * max(confidence, 0.1)
-                weighted_color += np.asarray(
-                    item.font_color[:3], dtype=np.float64
-                ) * weight
-                color_weight += weight
+                color_samples.append(
+                    (
+                        np.asarray(
+                            item.font_color[:3],
+                            dtype=np.float64,
+                        ),
+                        weight,
+                    )
+                )
             for item in group[1:]:
                 first.bubble_box = self._union_box(first.bubble_box, item.bubble_box)
                 first.text_box = self._union_box(first.text_box, item.text_box)
@@ -283,14 +287,39 @@ class BubbleAnalysisService:
                 first.model_confidence = (
                     weighted_confidence / confidence_weight
                 )
-            if color_weight > 0:
+            if color_samples:
                 first.font_color = tuple(
                     int(round(value))
-                    for value in weighted_color / color_weight
+                    for value in self._weighted_median_color(
+                        color_samples
+                    )
                 )
             first.layout_box = first.text_box
             grouped.append(first)
         return grouped
+
+    @staticmethod
+    def _weighted_median_color(
+        samples: list[tuple[np.ndarray, float]],
+    ) -> np.ndarray:
+        result = np.zeros(3, dtype=np.float64)
+        for channel in range(3):
+            ordered = sorted(
+                (
+                    float(color[channel]),
+                    max(0.0, float(weight)),
+                )
+                for color, weight in samples
+            )
+            total = sum(weight for _, weight in ordered)
+            threshold = total / 2.0
+            cumulative = 0.0
+            for value, weight in ordered:
+                cumulative += weight
+                if cumulative >= threshold:
+                    result[channel] = value
+                    break
+        return result
 
     @staticmethod
     def _extract_text_polygons(block) -> List[List[Tuple[int, int]]]:

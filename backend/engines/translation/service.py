@@ -5,6 +5,7 @@ import threading
 import hashlib
 import shutil
 import numpy as np
+from dataclasses import replace
 from typing import List, Optional, Any, Dict, cast
 from ...infrastructure.storage import get_app_data_dir
 from ...core.config import OLLAMA_API_URL
@@ -22,6 +23,7 @@ from .providers import (
 from .base import BaseTranslator
 from .outcome import (
     TranslationRequestContext,
+    VisionUnsupportedError,
     translate_with_legacy_adapter,
 )
 from .prompt import (
@@ -246,18 +248,68 @@ class TranslationService:
 
         # Call active translator for untranslated blocks
         if to_translate:
+            effective_context = requested_context
             with self._provider_gate.slot():
-                with self._translator_lock:
-                    outcome = translate_with_legacy_adapter(
-                        self.translator,
-                        to_translate,
-                        src_lang,
-                        tgt_lang,
-                        cv_image,
+                try:
+                    with self._translator_lock:
+                        outcome = translate_with_legacy_adapter(
+                            self.translator,
+                            to_translate,
+                            src_lang,
+                            tgt_lang,
+                            cv_image,
+                            requested_context,
+                        )
+                except VisionUnsupportedError as exc:
+                    effective_context = replace(
                         requested_context,
+                        model=exc.effective_model,
+                        vision_enabled=False,
+                        image_digest=None,
                     )
-            for value in outcome.values:
-                to_translate[value.index].translation = value.text
+                    uncached: list[Any] = []
+                    with self._cache_lock:
+                        for block in to_translate:
+                            index = block_indexes[id(block)]
+                            text_key = self._cache_key(
+                                blocks,
+                                index,
+                                src_lang,
+                                tgt_lang,
+                                effective_context,
+                            )
+                            cached = (
+                                self._cache.get(text_key)
+                                if self.config.translation_cache_enabled
+                                else None
+                            )
+                            if cached is not None:
+                                block.translation = cached
+                            else:
+                                uncached.append(block)
+                    if uncached:
+                        with self._translator_lock:
+                            outcome = translate_with_legacy_adapter(
+                                self.translator,
+                                uncached,
+                                src_lang,
+                                tgt_lang,
+                                None,
+                                effective_context,
+                            )
+                        for value in outcome.values:
+                            uncached[value.index].translation = (
+                                value.text
+                            )
+                        effective_context = outcome.effective_context
+                    else:
+                        outcome = None
+                else:
+                    effective_context = outcome.effective_context
+                    for value in outcome.values:
+                        to_translate[value.index].translation = (
+                            value.text
+                        )
 
             # Cache the newly translated text blocks and save to Translation Memory file
             with self._cache_lock:
@@ -270,7 +322,7 @@ class TranslationService:
                             index,
                             src_lang,
                             tgt_lang,
-                            outcome.effective_context,
+                            effective_context,
                         )
                         self._cache[effective_key] = translation
                 # Bound the in-memory TM (FIFO) to avoid unbounded growth.
@@ -289,15 +341,40 @@ class TranslationService:
             and getattr(translator, "supports_vision", False)
             and not isinstance(translator, ClaudeTranslatorWrapper)
         )
+        model_resolver = getattr(
+            translator, "effective_model", None
+        )
+        effective_model = (
+            str(model_resolver())
+            if callable(model_resolver)
+            else str(self.model)
+        )
+        endpoint_resolver = getattr(
+            translator, "cache_endpoint_identity", None
+        )
+        endpoint_identity = (
+            str(endpoint_resolver())
+            if callable(endpoint_resolver)
+            else (
+                str(getattr(translator, "api_url"))
+                if getattr(translator, "api_url", None)
+                else None
+            )
+        )
+        image_digest = None
+        if vision_enabled and image is not None:
+            prepare = getattr(
+                translator, "prepare_vision_image", None
+            )
+            if callable(prepare):
+                image_digest = str(prepare(image)[0])
+            else:
+                image_digest = self._vision_image_digest(image)
         return TranslationRequestContext(
             provider=str(self.active_translator_name),
-            model=str(self.model),
+            model=effective_model,
             vision_enabled=vision_enabled,
-            image_digest=(
-                self._vision_image_digest(image)
-                if vision_enabled and image is not None
-                else None
-            ),
+            image_digest=image_digest,
             temperature=self._optional_float(
                 getattr(translator, "temperature", None)
             ),
@@ -307,6 +384,7 @@ class TranslationService:
             max_tokens=self._optional_int(
                 getattr(translator, "max_tokens", None)
             ),
+            endpoint_identity=endpoint_identity,
         )
 
     @staticmethod
@@ -371,6 +449,7 @@ class TranslationService:
             "target_language": normalize_translation_language(tgt_lang) or tgt_lang,
             "provider": context.provider,
             "model": context.model,
+            "endpoint_identity": context.endpoint_identity,
             "prompt_hash": prompt_hash,
             "generation": {
                 "temperature": context.temperature,

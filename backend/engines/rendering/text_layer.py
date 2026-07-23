@@ -18,6 +18,7 @@ from .canonical_layout import (
     CanonicalLayoutSelector,
     canonical_hash,
 )
+from .alpha import compose_final_alpha
 from .service import RenderService
 
 
@@ -215,10 +216,9 @@ class TextLayerService:
         # stroke behind the fill once, using integer source-over arithmetic.
         fill_u16 = fill_alpha.astype(np.uint16)
         stroke_u16 = stroke_only_alpha.astype(np.uint16)
-        out_alpha_u16 = fill_u16 + (
-            stroke_u16 * (255 - fill_u16)
-        ) // 255
-        out_alpha = np.clip(out_alpha_u16, 0, 255).astype(np.uint8)
+        out_alpha = compose_final_alpha(
+            fill_alpha, stroke_only_alpha
+        )
         visible = out_alpha > 0
         if not bool(visible.any()):
             raise RuntimeError("TEXT_LAYER_EMPTY")
@@ -229,7 +229,9 @@ class TextLayerService:
         stroke_behind = (
             stroke_u16.astype(np.uint32) * (255 - fill_u16)
         ) // 255
-        out_a32 = np.maximum(out_alpha_u16.astype(np.uint32), 1)
+        out_a32 = np.maximum(
+            out_alpha.astype(np.uint32), 1
+        )
         for channel, (fill_value, stroke_value) in enumerate(
             zip(
                 (
@@ -246,7 +248,7 @@ class TextLayerService:
         ):
             premultiplied = fill_value * fill_a + stroke_value * stroke_behind
             rgba[:, :, channel] = np.where(
-                out_alpha_u16 > 0,
+                out_alpha > 0,
                 np.clip(
                     (premultiplied + out_a32 // 2) // out_a32,
                     0,

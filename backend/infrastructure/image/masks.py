@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import numpy as np
 
 from .morphology import close_holes, erode, get_structuring_element, MORPH_CROSS
 from .transforms import connected_components
+
+
+@dataclass(frozen=True)
+class BubbleClipMaskResult:
+    mask: np.ndarray
+    source: str
+    boundary_contact_ratio: float | None = None
 
 
 def build_bubble_clip_mask(
@@ -16,7 +24,8 @@ def build_bubble_clip_mask(
     inset: int,
     image: np.ndarray | None = None,
     seed_bbox: tuple[int, int, int, int] | None = None,
-) -> np.ndarray | None:
+    return_metadata: bool = False,
+) -> np.ndarray | BubbleClipMaskResult | None:
     if bubble_xyxy is None or len(bubble_xyxy) < 4:
         return None
 
@@ -153,6 +162,12 @@ def build_bubble_clip_mask(
 
                             final_clip[f_y1:f_y2, f_x1:f_x2] = bubble_mask[b_y1:b_y2, b_x1:b_x2]
 
+                        if return_metadata:
+                            return BubbleClipMaskResult(
+                                final_clip,
+                                "detector_component",
+                                float(touch_ratio),
+                            )
                         return final_clip
         except Exception:
             # Fall back to ellipse on any error
@@ -163,4 +178,15 @@ def build_bubble_clip_mask(
     ellipse_cy = (by1_rel + by2_rel) / 2.0
     rx = max(1.0, (bx2_rel - bx1_rel) / 2.0)
     ry = max(1.0, (by2_rel - by1_rel) / 2.0)
-    return (((cx_grid - ellipse_cx) / rx) ** 2 + ((cy_grid - ellipse_cy) / ry) ** 2) <= 1.0
+    ellipse = (
+        ((cx_grid - ellipse_cx) / rx) ** 2
+        + ((cy_grid - ellipse_cy) / ry) ** 2
+        <= 1.0
+    )
+    if return_metadata:
+        return BubbleClipMaskResult(
+            ellipse,
+            "ellipse",
+            None,
+        )
+    return ellipse
