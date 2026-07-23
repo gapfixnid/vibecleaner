@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Form
 from pydantic import BaseModel
 
@@ -43,6 +43,54 @@ class TextLayerRetryRequest(BaseModel):
     expected_project_generation: int
     expected_visual_revision: int
     bubble_ids: List[int]
+
+
+class _BatchPageJobManager:
+    """Map one page's pipeline progress into the enclosing batch job."""
+
+    def __init__(
+        self,
+        job_manager: Any,
+        *,
+        page_offset: int,
+        total_pages: int,
+        ui_language: str,
+    ) -> None:
+        self._job_manager = job_manager
+        self._page_offset = page_offset
+        self._total_pages = max(1, total_pages)
+        self._ui_language = ui_language
+
+    def update(
+        self,
+        job: dict[str, Any],
+        *,
+        progress: int | None = None,
+        message: str | None = None,
+    ) -> None:
+        mapped_progress = None
+        if progress is not None:
+            local_progress = max(0, min(100, progress))
+            mapped_progress = int(
+                ((self._page_offset * 100) + local_progress) / self._total_pages
+            )
+
+        page_message = msg(
+            "batch_translation.translating_page",
+            self._ui_language,
+            current=self._page_offset + 1,
+            total=self._total_pages,
+        )
+        combined_message = f"{page_message} {message}" if message else page_message
+        self._job_manager.update(
+            job,
+            progress=mapped_progress,
+            message=combined_message,
+        )
+
+    def ensure_not_cancelled(self, job: dict[str, Any]) -> None:
+        self._job_manager.ensure_not_cancelled(job)
+
 
 @router.get("/api/pages")
 def get_pages(container: AppContainer = Depends(get_container)):
@@ -248,23 +296,28 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
 
     for page_id in page_ids:
         page_idx = None
+        page_job_manager = _BatchPageJobManager(
+            container.job_manager,
+            page_offset=attempted_pages,
+            total_pages=total,
+            ui_language=ui_lang,
+        )
         try:
             with container.project_state.lock:
                 page_idx = _resolve_page_index(container.project_state, page_id)
-            container.job_manager.update(
+            page_job_manager.update(
                 job,
-                progress=int((attempted_pages / total) * 100),
-                message=msg("batch_translation.translating_page", ui_lang, current=attempted_pages + 1, total=total),
+                progress=0,
             )
             run_page_translation(
                 job=job,
                 page_id=page_id,
                 state=container.project_state,
                 config=container.config,
-                job_manager=container.job_manager,
+                job_manager=page_job_manager,
                 runner=container.pipeline_runner,
                 planner=container.pipeline_planner,
-                show_progress=False,
+                show_progress=True,
             )
         except Exception as exc:
             if "cancelled" in str(exc).lower():
@@ -282,6 +335,7 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
                 "successful_page_indices": list(successful_page_indices),
                 "failed_pages": list(failed_pages),
             }
+            page_job_manager.update(job, progress=100)
 
         container.job_manager.ensure_not_cancelled(job)
 

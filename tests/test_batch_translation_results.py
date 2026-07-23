@@ -70,6 +70,49 @@ def test_batch_translation_reports_successes_and_page_scoped_failures():
     assert "translated_pages" not in result
 
 
+def test_batch_translation_maps_page_stage_progress_into_batch_progress():
+    container = _container()
+    job = {"cancel_requested": False}
+    calls = []
+
+    def run_page(**kwargs):
+        calls.append(kwargs)
+        kwargs["job_manager"].update(
+            kwargs["job"],
+            progress=15,
+            message="Detecting and reading text",
+        )
+        kwargs["job_manager"].update(
+            kwargs["job"],
+            progress=60,
+            message="Cleaning backgrounds",
+        )
+        return {"translated_count": 1}
+
+    with patch("backend.api.routes.pages.run_page_translation", side_effect=run_page):
+        result = _run_translate_batch_pages(job, ["page-a", "page-b"], container)
+
+    assert result["status"] == "succeeded"
+    assert all(call["show_progress"] is True for call in calls)
+    assert [update["progress"] for update in container.job_manager.updates] == [
+        0,
+        7,
+        30,
+        50,
+        50,
+        57,
+        80,
+        100,
+        100,
+    ]
+    assert container.job_manager.updates[1]["message"] == (
+        "Translating page 1/2... Detecting and reading text"
+    )
+    assert container.job_manager.updates[5]["message"] == (
+        "Translating page 2/2... Detecting and reading text"
+    )
+
+
 def test_job_manager_preserves_succeeded_with_errors_worker_status():
     manager = JobManager()
     started = manager.start(

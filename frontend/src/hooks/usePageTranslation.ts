@@ -99,9 +99,10 @@ export function usePageTranslation({
         await syncBubblesToBackend();
 
         const job = await api.translateBatch(sorted);
-        const result = await waitForJob(job, t("task.translatingPages").replace("{count}", String(total)), {
-          ignoreBackendMessage: true,
-        }) as BatchTranslationResult | undefined;
+        const result = await waitForJob(
+          job,
+          t("task.translatingPages").replace("{count}", String(total)),
+        ) as BatchTranslationResult | undefined;
         const successfulPageIndices = result?.successful_page_indices ?? sorted;
         const failedPages = result?.failed_pages ?? [];
         const reloadIdx = successfulPageIndices.includes(displayIdx)
