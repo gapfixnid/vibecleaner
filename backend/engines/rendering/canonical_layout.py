@@ -422,14 +422,16 @@ class CanonicalLayoutSelector:
                         mask_pass="overflow_fallback",
                     ),
                 )
-            fmax = best.candidate.effective_font_size
+            # An overflow candidate may still provide useful DOM geometry,
+            # but it is not a feasible raster-safe font size.
+            fmax = 0
 
         return self._freeze_artifact(
             request,
             best,
             candidates,
             raster_diagnostics,
-            fmax or best.candidate.effective_font_size,
+            fmax if fmax is not None else 0,
             strict_max,
             relaxed_max,
         )

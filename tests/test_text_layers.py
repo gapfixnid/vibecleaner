@@ -302,6 +302,10 @@ def test_unsafe_layout_is_dom_fallback_not_ready_png(
         layout.diagnostics["selected_pass"]
         == "overflow_fallback"
     )
+    assert (
+        layout.diagnostics["largest_feasible_font_size"]
+        == 0
+    )
     with pytest.raises(
         RuntimeError, match="TEXT_LAYER_LAYOUT_UNSAFE"
     ):
