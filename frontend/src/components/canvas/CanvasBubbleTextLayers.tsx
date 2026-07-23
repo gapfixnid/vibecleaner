@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { BubbleInfo, TextLayerRefDto } from "../../types";
 import { buildTextLayerUrl } from "../../lib/textLayerUrl";
 import {
-  bubbleVisualSignature,
+  bubbleMoveSignature,
   nextSelectionRenderState,
+  selectionRenderStateFor,
   type SelectionRenderState,
 } from "../../lib/textLayerVisual";
 
@@ -19,7 +20,17 @@ interface DisplayedTile {
   url: string;
 }
 
-function BubbleSvgText({ bubble, hidden = false }: { bubble: BubbleInfo; hidden?: boolean }) {
+function BubbleSvgText({
+  bubble,
+  hidden = false,
+  offsetX = 0,
+  offsetY = 0,
+}: {
+  bubble: BubbleInfo;
+  hidden?: boolean;
+  offsetX?: number;
+  offsetY?: number;
+}) {
   return (
     <g opacity={hidden ? 0 : 1} data-bubble-text={bubble.id}>
       {bubble.lines.map((line, lineIndex) => {
@@ -33,8 +44,8 @@ function BubbleSvgText({ bubble, hidden = false }: { bubble: BubbleInfo; hidden?
         return (
           <text
             key={`${bubble.id}-${lineIndex}`}
-            x={line.origin_x ?? line.x}
-            y={line.baseline_y ?? (line.y + line.height * 0.8)}
+            x={(line.origin_x ?? line.x) + offsetX}
+            y={(line.baseline_y ?? (line.y + line.height * 0.8)) + offsetY}
             textAnchor="start"
             fontWeight={bubble.bold ? 700 : 400}
             fontStyle={bubble.italic ? "italic" : "normal"}
@@ -48,7 +59,7 @@ function BubbleSvgText({ bubble, hidden = false }: { bubble: BubbleInfo; hidden?
             {runs.map((run, runIndex) => (
               <tspan
                 key={runIndex}
-                x={run.origin_x}
+                x={run.origin_x + offsetX}
                 fontFamily={run.font_family || bubble.computed_font_family || bubble.font_family}
                 fontSize={run.font_pixel_size || bubble.computed_font_size}
                 direction={run.is_rtl ? "rtl" : "ltr"}
@@ -113,21 +124,43 @@ export const CanvasBubbleTextLayers = React.memo(({ bubbles, selectedBubbleId, w
     () => bubbles.find((bubble) => bubble.id === selectedBubbleId) ?? null,
     [bubbles, selectedBubbleId],
   );
-  const selectedSignature = selected ? bubbleVisualSignature(selected) : null;
   const [selectionRender, setSelectionRender] = useState<SelectionRenderState>({
-    bubbleId: selectedBubbleId,
-    baselineSignature: selectedSignature,
-    editing: false,
+    ...selectionRenderStateFor(selected),
   });
-  const nextSelectionRender = nextSelectionRenderState(
+  let nextSelectionRender = nextSelectionRenderState(
     selectionRender,
-    selectedBubbleId,
-    selectedSignature,
+    selected,
   );
+  let selectedEditing = nextSelectionRender.editing;
+  let selectedPureMove = Boolean(
+    selected
+    && selectedEditing
+    && nextSelectionRender.baselineMoveSignature === bubbleMoveSignature(selected)
+    && (selected.x !== nextSelectionRender.baselineX || selected.y !== nextSelectionRender.baselineY),
+  );
+  const selectedDisplayedTile = selected ? displayed[selected.id] : undefined;
+  const currentMovedTileReady = Boolean(
+    selected
+    && selectedPureMove
+    && selected.text_layer
+    && selected.text_layer.cache_key !== nextSelectionRender.baselineTileKey
+    && selectedDisplayedTile?.ref.cache_key === selected.text_layer.cache_key,
+  );
+  if (selected && currentMovedTileReady) {
+    nextSelectionRender = selectionRenderStateFor(selected);
+    selectedEditing = false;
+    selectedPureMove = false;
+  }
   if (nextSelectionRender !== selectionRender) {
     setSelectionRender(nextSelectionRender);
   }
-  const selectedEditing = nextSelectionRender.editing;
+  const selectedMoveX = selectedPureMove && selected
+    ? selected.x - nextSelectionRender.baselineX
+    : 0;
+  const selectedMoveY = selectedPureMove && selected
+    ? selected.y - nextSelectionRender.baselineY
+    : 0;
+  const selectedUsesEditor = selectedEditing && !selectedPureMove;
   const selectedFontKey = useMemo(() => {
     if (!selected) return null;
     const fonts = selected.lines.flatMap((line) => line.runs?.map((run) => (
@@ -141,7 +174,7 @@ export const CanvasBubbleTextLayers = React.memo(({ bubbles, selectedBubbleId, w
 
   useEffect(() => {
     let cancelled = false;
-    if (!selected || !selectedFontKey || !selectedEditing) return;
+    if (!selected || !selectedFontKey || !selectedUsesEditor) return;
     const fonts = new Set<string>();
     selected.lines.forEach((line) => line.runs?.forEach((run) => {
       if (run.font_family) fonts.add(`${run.font_pixel_size}px "${run.font_family}"`);
@@ -152,7 +185,7 @@ export const CanvasBubbleTextLayers = React.memo(({ bubbles, selectedBubbleId, w
       if (!cancelled) setOverlayReadyKey(selectedFontKey);
     }));
     return () => { cancelled = true; };
-  }, [selected, selectedEditing, selectedFontKey]);
+  }, [selected, selectedFontKey, selectedUsesEditor]);
 
   return (
     <svg
@@ -166,7 +199,14 @@ export const CanvasBubbleTextLayers = React.memo(({ bubbles, selectedBubbleId, w
         if (!bubble.translated) return null;
         const tile = displayed[bubble.id];
         const isSelected = bubble.id === selectedBubbleId;
-        const useEditorOverlay = isSelected && selectedEditing;
+        const useEditorOverlay = isSelected && selectedUsesEditor;
+        const moveBaselineTile = Boolean(
+          isSelected
+          && selectedPureMove
+          && tile
+          && tile.ref.cache_key === nextSelectionRender.baselineTileKey,
+        );
+        const moveFallbackText = isSelected && selectedPureMove && !tile;
         const failed = bubble.text_layer
           ? failedKeys.has(`${bubble.id}:${bubble.text_layer.cache_key}`)
           : true;
@@ -177,14 +217,21 @@ export const CanvasBubbleTextLayers = React.memo(({ bubbles, selectedBubbleId, w
             {tile && (
               <image
                 href={tile.url}
-                x={tile.ref.crop_x}
-                y={tile.ref.crop_y}
+                x={tile.ref.crop_x + (moveBaselineTile ? selectedMoveX : 0)}
+                y={tile.ref.crop_y + (moveBaselineTile ? selectedMoveY : 0)}
                 width={tile.ref.width}
                 height={tile.ref.height}
                 opacity={showDom && domReady ? 0 : 1}
               />
             )}
-            {showDom && <BubbleSvgText bubble={bubble} hidden={isSelected && !domReady} />}
+            {showDom && (
+              <BubbleSvgText
+                bubble={bubble}
+                hidden={useEditorOverlay && !domReady}
+                offsetX={moveFallbackText ? selectedMoveX : 0}
+                offsetY={moveFallbackText ? selectedMoveY : 0}
+              />
+            )}
           </g>
         );
       })}

@@ -5,8 +5,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { CanvasBubbleTextLayers } from "../src/components/canvas/CanvasBubbleTextLayers";
 import {
+  bubbleMoveSignature,
   bubbleVisualSignature,
   nextSelectionRenderState,
+  selectionRenderStateFor,
 } from "../src/lib/textLayerVisual";
 import type { BubbleInfo } from "../src/types";
 
@@ -92,17 +94,22 @@ test("selection alone preserves the canonical tile visual signature", () => {
     bubbleVisualSignature({ ...bubble, translated: "edited" }),
   );
 
-  const initial = { bubbleId: 1, baselineSignature: bubbleVisualSignature(bubble), editing: false };
+  const initial = selectionRenderStateFor(bubble);
   assert.equal(
-    nextSelectionRenderState(initial, 1, bubbleVisualSignature({ ...bubble })),
+    nextSelectionRenderState(initial, { ...bubble }),
     initial,
   );
   assert.equal(
-    nextSelectionRenderState(initial, 1, bubbleVisualSignature({ ...bubble, x: 11 })).editing,
+    nextSelectionRenderState(initial, { ...bubble, x: 11 }).editing,
     true,
   );
+  assert.equal(
+    nextSelectionRenderState({ ...initial, editing: true }, { ...bubble }).editing,
+    false,
+  );
+  assert.equal(bubbleMoveSignature(bubble), bubbleMoveSignature({ ...bubble, x: 11, y: 22 }));
   assert.deepEqual(
-    nextSelectionRenderState({ ...initial, editing: true }, 2, "next"),
-    { bubbleId: 2, baselineSignature: "next", editing: false },
+    nextSelectionRenderState({ ...initial, editing: true }, { ...bubble, id: 2 }),
+    selectionRenderStateFor({ ...bubble, id: 2 }),
   );
 });
