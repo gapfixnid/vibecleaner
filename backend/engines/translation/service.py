@@ -20,6 +20,14 @@ from .providers import (
     BaiduTranslatorWrapper
 )
 from .base import BaseTranslator
+from .outcome import (
+    TranslationRequestContext,
+    translate_with_legacy_adapter,
+)
+from .prompt import (
+    TRANSLATION_PROMPT_CONTRACT,
+    build_translation_system_prompt,
+)
 from ...core.providers.concurrency import ProviderConcurrencyGate
 
 logger = logging.getLogger(__name__)
@@ -219,56 +227,172 @@ class TranslationService:
             return
         # Filter blocks based on translation cache
         to_translate = []
-        block_cache_keys: dict[int, str] = {}
+        block_indexes: dict[int, int] = {}
+        requested_context = self._request_context(cv_image)
         with self._cache_lock:
             for idx, block in enumerate(blocks):
-                cache_key = self._cache_key(blocks, idx, src_lang, tgt_lang)
-                block_cache_keys[id(block)] = cache_key
+                cache_key = self._cache_key(
+                    blocks,
+                    idx,
+                    src_lang,
+                    tgt_lang,
+                    requested_context,
+                )
                 if self.config.translation_cache_enabled and cache_key in self._cache:
                     block.translation = self._cache[cache_key]
                 else:
                     to_translate.append(block)
+                    block_indexes[id(block)] = idx
 
         # Call active translator for untranslated blocks
         if to_translate:
             with self._provider_gate.slot():
                 with self._translator_lock:
-                    self.translator.translate_blocks(to_translate, src_lang, tgt_lang, cv_image)
+                    outcome = translate_with_legacy_adapter(
+                        self.translator,
+                        to_translate,
+                        src_lang,
+                        tgt_lang,
+                        cv_image,
+                        requested_context,
+                    )
+            for value in outcome.values:
+                to_translate[value.index].translation = value.text
 
             # Cache the newly translated text blocks and save to Translation Memory file
             with self._cache_lock:
                 for block in to_translate:
                     translation = cast(str, getattr(block, "translation", ""))
                     if self.config.translation_cache_enabled and translation:
-                        self._cache[block_cache_keys[id(block)]] = translation
+                        index = block_indexes[id(block)]
+                        effective_key = self._cache_key(
+                            blocks,
+                            index,
+                            src_lang,
+                            tgt_lang,
+                            outcome.effective_context,
+                        )
+                        self._cache[effective_key] = translation
                 # Bound the in-memory TM (FIFO) to avoid unbounded growth.
                 if len(self._cache) > self._TM_CACHE_MAX:
                     for old_key in list(self._cache.keys())[: len(self._cache) - self._TM_CACHE_MAX]:
                         self._cache.pop(old_key, None)
                 self._save_tm()
 
-    def _cache_key(self, blocks: List[Any], index: int, src_lang: str, tgt_lang: str) -> str:
-        text = cast(str, blocks[index].text).strip()
-        if self.config.translation_cache_mode != "text_with_context":
-            return text
+    def _request_context(
+        self,
+        image: np.ndarray | None,
+    ) -> TranslationRequestContext:
+        translator = self.translator
+        vision_enabled = bool(
+            image is not None
+            and getattr(translator, "supports_vision", False)
+            and not isinstance(translator, ClaudeTranslatorWrapper)
+        )
+        return TranslationRequestContext(
+            provider=str(self.active_translator_name),
+            model=str(self.model),
+            vision_enabled=vision_enabled,
+            image_digest=(
+                self._vision_image_digest(image)
+                if vision_enabled and image is not None
+                else None
+            ),
+            temperature=self._optional_float(
+                getattr(translator, "temperature", None)
+            ),
+            top_p=self._optional_float(
+                getattr(translator, "top_p", None)
+            ),
+            max_tokens=self._optional_int(
+                getattr(translator, "max_tokens", None)
+            ),
+        )
 
+    @staticmethod
+    def _optional_float(value: Any) -> float | None:
+        return float(value) if value is not None else None
+
+    @staticmethod
+    def _optional_int(value: Any) -> int | None:
+        return int(value) if value is not None else None
+
+    @staticmethod
+    def _vision_image_digest(image: np.ndarray) -> str:
+        import cv2
+
+        height, width = image.shape[:2]
+        encoded_image = image
+        if max(height, width) > 1024:
+            scale = 1024 / max(height, width)
+            encoded_image = cv2.resize(
+                image,
+                (int(width * scale), int(height * scale)),
+            )
+        ok, encoded = cv2.imencode(".jpg", encoded_image)
+        if not ok:
+            raise RuntimeError("TRANSLATION_IMAGE_ENCODE_FAILED")
+        return hashlib.sha256(encoded.tobytes()).hexdigest()
+
+    def _cache_key(
+        self,
+        blocks: List[Any],
+        index: int,
+        src_lang: str,
+        tgt_lang: str,
+        context: TranslationRequestContext | None = None,
+    ) -> str:
+        text = cast(str, blocks[index].text).strip()
         neighbor_parts = []
-        for offset in (-1, 1):
-            neighbor_index = index + offset
-            if 0 <= neighbor_index < len(blocks):
-                neighbor_parts.append(blocks[neighbor_index].text.strip())
-        prompt = self.system_prompt or ""
-        prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12]
+        if self.config.translation_cache_mode == "text_with_context":
+            for offset in (-1, 1):
+                neighbor_index = index + offset
+                if 0 <= neighbor_index < len(blocks):
+                    neighbor_parts.append(
+                        blocks[neighbor_index].text.strip()
+                    )
+        context = context or self._request_context(None)
+        prompt = build_translation_system_prompt(
+            src_lang,
+            tgt_lang,
+            self.system_prompt,
+        )
+        prompt_hash = hashlib.sha256(
+            prompt.encode("utf-8")
+        ).hexdigest()
         raw_key = {
+            "contract": TRANSLATION_PROMPT_CONTRACT,
             "text": text,
-            "neighbors": neighbor_parts,
+            "neighbors": neighbor_parts
+            if self.config.translation_cache_mode
+            == "text_with_context"
+            else None,
             "source_language": normalize_translation_language(src_lang) or src_lang,
             "target_language": normalize_translation_language(tgt_lang) or tgt_lang,
-            "model": str(self.model),
+            "provider": context.provider,
+            "model": context.model,
             "prompt_hash": prompt_hash,
+            "generation": {
+                "temperature": context.temperature,
+                "top_p": context.top_p,
+                "max_tokens": context.max_tokens,
+            },
+            "vision_context": {
+                "enabled": context.vision_enabled,
+                "image_digest": context.image_digest
+                if context.vision_enabled
+                else None,
+            },
         }
         return (
-            "ctx:" + hashlib.sha256(json.dumps(raw_key, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+            "v2:"
+            + hashlib.sha256(
+                json.dumps(
+                    raw_key,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ).encode("utf-8")
+            ).hexdigest()
         )
 
     def delete_cache_entry(self, key: str) -> bool:

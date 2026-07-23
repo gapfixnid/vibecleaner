@@ -2,6 +2,7 @@ import type { BubbleInfo, BubbleUpdate, PageInfo, PagesResponse } from "../types
 import type { BubbleUpdateDto } from "../types/api";
 import type { BubbleDto } from "../types/bubble";
 import type { PageDto, ProjectDto } from "../types/project";
+import type { BubbleProblemCode, BubbleProblemDto } from "../types/problem";
 
 function hasInpaintedPreview(page: PageDto): boolean {
   return page.has_inpaint ?? (
@@ -10,6 +11,21 @@ function hasInpaintedPreview(page: PageDto): boolean {
     page.status === "ready_for_review" ||
     page.status === "has_warnings"
   );
+}
+
+function normalizeBubbleProblem(
+  problem: BubbleProblemDto | string,
+): BubbleProblemDto {
+  if (typeof problem !== "string") return problem;
+  const lowered = problem.toLowerCase();
+  let code: BubbleProblemCode = "LEGACY_REVIEW_NOTE";
+  if (lowered.includes("overflow")) code = "TEXT_OVERFLOW";
+  else if (lowered.includes("ocr")) code = "OCR_UNCERTAIN";
+  else if (lowered.includes("translation")) code = "TRANSLATION_EXPANDED";
+  return {
+    code,
+    detail: code === "LEGACY_REVIEW_NOTE" ? problem : null,
+  };
 }
 
 export function toPageInfo(page: PageDto): PageInfo {
@@ -78,7 +94,7 @@ export function toBubbleInfo(
     alignment: bubble.style.alignment,
     text_class: bubble.text_class || "",
     status: bubble.status,
-    problems: bubble.problems ?? [],
+    problems: (bubble.problems ?? []).map(normalizeBubbleProblem),
     edited: Boolean(bubble.edited),
     layout_overflow: Boolean(bubble.layout.overflow),
     line_height_ratio: bubble.layout.line_height_ratio ?? 1,
@@ -90,6 +106,7 @@ export function toBubbleInfo(
     layout_margin: bubble.layout.margin || {},
     layout_confidence: bubble.layout.confidence || 0,
     layout_reasoning: bubble.layout.reasoning || "",
+    layout_diagnostics: bubble.layout.diagnostics,
     text_box: bubble.textBox ? {
       x: bubble.textBox.x,
       y: bubble.textBox.y,

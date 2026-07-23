@@ -1,4 +1,4 @@
-from ..models import MangaPage, TextBubble
+from ..models import BubbleProblemCode, MangaPage, TextBubble
 
 
 def derive_bubble_status(bubble: TextBubble) -> str:
@@ -7,11 +7,12 @@ def derive_bubble_status(bubble: TextBubble) -> str:
     if bubble.edited:
         return "edited"
     if bubble.problems:
-        if any("translation" in p.lower() for p in bubble.problems):
+        codes = {problem.code for problem in bubble.problems}
+        if BubbleProblemCode.TRANSLATION_EXPANDED in codes:
             return "translation_warning"
-        if any("ocr" in p.lower() for p in bubble.problems):
+        if BubbleProblemCode.OCR_UNCERTAIN in codes:
             return "ocr_warning"
-        if any("overflow" in p.lower() for p in bubble.problems):
+        if BubbleProblemCode.TEXT_OVERFLOW in codes:
             return "layout_overflow"
         return "needs_review"
     if (bubble.translated or "").strip():

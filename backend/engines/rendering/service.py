@@ -60,6 +60,11 @@ class RenderService:
             min_font_size=self._min_font_size(),
             max_font_size=self._max_font_size(),
         )
+        self._canonical_selector: Any | None = None
+
+    def set_canonical_selector(self, selector: Any) -> None:
+        """Install the shared process-local canonical layout selector."""
+        self._canonical_selector = selector
 
     def _min_font_size(self) -> float:
         return float(config_value(self.config, "min_font_size"))
@@ -102,6 +107,14 @@ class RenderService:
         image: np.ndarray | None = None,
         font_family: str | None = None,
     ) -> PublicTextLayoutResult:
+        if self._canonical_selector is not None:
+            request = self._canonical_selector.build_request(
+                text,
+                bubble,
+                image,
+                font_family,
+            )
+            return self._canonical_selector.select(request)
         return self.executor.run(
             lambda worker: self._serialize_layout(
                 self._get_layout_for_bubble_worker(

@@ -23,6 +23,8 @@ if TYPE_CHECKING:
     from ..infrastructure.jobs import JobManager
     from ..infrastructure.runtime.qt import QtRuntime
     from ..engines.rendering.text_layer import TextLayerService
+    from ..engines.rendering.canonical_layout import CanonicalLayoutSelector
+    from ..infrastructure.image.canonical_layout_cache import CanonicalLayoutCache
     from ..infrastructure.image.text_layer_cache import TextLayerCache
 
 
@@ -66,6 +68,8 @@ def build_container(config: AppConfig | None = None, qt_runtime: QtRuntime | Non
     from ..engines.provider_catalog import register_builtin_providers
     from ..infrastructure.runtime.qt import get_qt_runtime
     from ..engines.rendering.text_layer import TextLayerService
+    from ..engines.rendering.canonical_layout import CanonicalLayoutSelector
+    from ..infrastructure.image.canonical_layout_cache import CanonicalLayoutCache
     from ..infrastructure.image.text_layer_cache import TextLayerCache
 
     runtime_config = config or AppConfig(settings_path=get_settings_file_path())
@@ -77,12 +81,19 @@ def build_container(config: AppConfig | None = None, qt_runtime: QtRuntime | Non
     inpainting_service = InpaintingService(config=runtime_config)
     runtime = qt_runtime or get_qt_runtime()
     render_service = RenderService(config=runtime_config, executor=runtime.executor)
+    canonical_layout_cache = CanonicalLayoutCache(runtime.executor)
+    canonical_layout_selector = CanonicalLayoutSelector(
+        render_service,
+        runtime.executor,
+        canonical_layout_cache,
+    )
     text_layer_cache = TextLayerCache()
     text_layer_service = TextLayerService(
         render_service,
         runtime.executor,
         text_layer_cache,
         runtime.cache_namespace,
+        canonical_layout_selector,
     )
     export_service = ExportService(render_service, text_layer_service)
     provider_registry = ProviderRegistry()

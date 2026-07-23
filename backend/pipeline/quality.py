@@ -45,27 +45,69 @@ class AdaptiveQualityRouter:
     def __init__(self, thresholds: QualityThresholds | None = None) -> None:
         self.thresholds = thresholds or QualityThresholds()
 
-    def evaluate_detection(self, regions: list[Any]) -> QualityScore:
+    def evaluate_detection(
+        self,
+        regions: list[Any],
+        signals: dict[str, float] | None = None,
+    ) -> QualityScore:
+        association = dict(signals or {})
+        if not association and regions:
+            association = dict(
+                getattr(
+                    regions[0], "association_diagnostics", {}
+                )
+                or {}
+            )
         confidences = [
             float(value)
             for region in regions
             if (value := getattr(region, "confidence", None)) is not None
         ]
+        association_failed = (
+            float(association.get("invalid_box_ratio", 0.0)) > 0.10
+            or float(
+                association.get("ambiguous_match_ratio", 0.0)
+            )
+            > 0.25
+            or (
+                bool(association.get("bubbles_only", 0.0))
+                and float(
+                    association.get("unmatched_ratio", 0.0)
+                )
+                > 0.20
+            )
+        )
         if not confidences:
             return QualityScore(
                 stage="detection",
-                score=1.0,
-                passed=True,
-                signals={"confidence_available": 0.0, "region_count": float(len(regions))},
+                score=0.0 if association_failed else 1.0,
+                passed=not association_failed,
+                signals={
+                    "confidence_available": 0.0,
+                    "region_count": float(len(regions)),
+                    **association,
+                },
+                recommended_action=(
+                    "upgrade_model"
+                    if association_failed
+                    else "accept"
+                ),
             )
         mean_confidence = sum(confidences) / len(confidences)
         score = max(0.0, min(1.0, mean_confidence))
-        passed = score >= self.thresholds.detection
+        passed = (
+            score >= self.thresholds.detection
+            and not association_failed
+        )
         return QualityScore(
             stage="detection",
             score=round(score, 4),
             passed=passed,
-            signals={"mean_confidence": round(score, 4), "region_count": float(len(regions))},
+            signals={
+                "mean_confidence": round(score, 4),
+                "region_count": float(len(regions)),
+                **association,
+            },
             recommended_action="accept" if passed else "upgrade_model",
         )
 

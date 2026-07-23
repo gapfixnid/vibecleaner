@@ -1,4 +1,5 @@
 import type { Point, Rect } from "./common";
+import type { BubbleProblemDto } from "./problem";
 
 export interface LineLayout {
   text: string;
@@ -36,7 +37,7 @@ export interface BubbleInfo {
   alignment: string;
   text_class: string;
   status: string;
-  problems: string[];
+  problems: BubbleProblemDto[];
   edited: boolean;
   layout_overflow: boolean;
   line_height_ratio: number;
@@ -49,6 +50,7 @@ export interface BubbleInfo {
   layout_confidence: number;
   detection_confidence?: number;
   layout_reasoning: string;
+  layout_diagnostics?: import("./bubble").TextLayoutDto["diagnostics"];
   lines: LineLayout[];
   text_box?: { x: number; y: number; width: number; height: number } | null;
   text_layer: import("./bubble").TextLayerRefDto | null;

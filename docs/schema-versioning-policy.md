@@ -31,8 +31,9 @@ inputs rather than silently redefining them:
 
 | Format | Baseline interpretation | Adoption rule |
 | --- | --- | --- |
-| Zip project `project.json` with `"version": "2.0"` | project schema 2 | Continue accepting the legacy field; new code normalizes it to integer `schema_version: 2` before validation. Preserve the legacy alias while supported readers need it. |
-| Legacy standalone JSON project | project schema 1 | Import through an explicit 1 -> 2 migration; never overwrite the source during import. |
+| Zip project `project.json` with `"version": "2.0"` | project schema 2 | Migrate in memory through schema 3. Bubble review strings become structured `code + detail` records; unknown strings are preserved as separate `LEGACY_REVIEW_NOTE` values. |
+| Current project `project.json` with `"version": "3.0"` | project schema 3 | Bubble review problems are structured records. Writers emit schema 3 only after migration and validation. |
+| Legacy standalone JSON project | project schema 1 | Import through explicit 1 -> 2 -> 3 migrations; never overwrite the source during import. |
 | Settings JSON without a version | settings schema 0 | Run existing value migrations as the 0 -> 1 migration, then persist a version only through an atomic save. |
 | Current `ocr_cache.sqlite3` without schema metadata | cache family `ocr-text`, schema 1 | Adopt it after validating the known table shape; create metadata as part of an idempotent migration. |
 | Legacy `ocr_cache.json` | cache family `ocr-text`, schema 0 | Migrate 0 -> 1 or discard safely if invalid. |

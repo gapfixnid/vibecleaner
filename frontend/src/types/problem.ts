@@ -16,3 +16,16 @@ export interface ProblemDto {
   bubble_id?: string;
   severity: "info" | "warning" | "error";
 }
+
+export type BubbleProblemCode =
+  | "BUBBLE_ASSOCIATION_UNCERTAIN"
+  | "MASK_UNCERTAIN"
+  | "OCR_UNCERTAIN"
+  | "TRANSLATION_EXPANDED"
+  | "TEXT_OVERFLOW"
+  | "LEGACY_REVIEW_NOTE";
+
+export interface BubbleProblemDto {
+  code: BubbleProblemCode;
+  detail?: string | null;
+}

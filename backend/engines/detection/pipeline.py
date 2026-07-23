@@ -7,7 +7,7 @@ from .backend import resolve_detection_backend
 from .font.engine import extract_foreground_color
 from .heuristic_lines import annotate_blocks_with_heuristic_lines
 from .utils.content import filter_and_fix_bboxes
-from ..common.geometry import does_rectangle_fit, do_rectangles_overlap, merge_overlapping_boxes
+from ..common.geometry import does_rectangle_fit, do_rectangles_overlap
 from ...infrastructure.runtime.device import resolve_device
 from ..common.textblock import TextBlock
 from ...infrastructure.model_catalog import DEFAULT_OCR_MODEL
@@ -33,9 +33,15 @@ class DetectionPipeline:
         text_direction_override: str | None = None,
         text_confidences: dict[tuple[int, int, int, int], float] | None = None,
     ) -> list[TextBlock]:
+        raw_text_count = len(text_boxes) if text_boxes is not None else 0
+        raw_bubble_count = (
+            len(bubble_boxes) if bubble_boxes is not None else 0
+        )
         text_boxes = filter_and_fix_bboxes(text_boxes, image.shape)
         bubble_boxes = filter_and_fix_bboxes(bubble_boxes, image.shape)
-        text_boxes = merge_overlapping_boxes(text_boxes)
+        bubbles_only_enabled = self._resolve_option(
+            "bubbles_only", bubbles_only, False
+        )
 
         if bubble_boxes is None:
             bubble_boxes = np.array([])
@@ -49,8 +55,32 @@ class DetectionPipeline:
             bubble_boxes,
             text_colors_per_box,
             text_confidences=text_confidences or {},
-            bubbles_only=self._resolve_option("bubbles_only", bubbles_only, False),
+            bubbles_only=bubbles_only_enabled,
         )
+        matched = sum(block.bubble_match_id is not None for block in text_blocks)
+        ambiguous = sum(
+            block.bubble_match_id is not None and block.ambiguous_match
+            for block in text_blocks
+        )
+        unmatched = sum(block.bubble_match_id is None for block in text_blocks)
+        diagnostics = {
+            "invalid_box_ratio": (
+                max(0, raw_text_count - len(text_boxes))
+                + max(
+                    0,
+                    raw_bubble_count - len(bubble_boxes),
+                )
+            )
+            / max(1, raw_text_count + raw_bubble_count),
+            "ambiguous_match_ratio": ambiguous / max(1, matched),
+            "unmatched_ratio": unmatched / max(1, len(text_blocks)),
+            "matched": matched,
+            "ambiguous": ambiguous,
+            "unmatched": unmatched,
+            "bubbles_only": float(bubbles_only_enabled),
+        }
+        for block in text_blocks:
+            block.association_diagnostics = diagnostics
         self._annotate_lines(
             image,
             text_blocks,
@@ -157,7 +187,12 @@ class DetectionPipeline:
                 ))
                 continue
 
-            for bubble_box in bubble_boxes:
+            candidates: list[tuple[float, int, np.ndarray]] = []
+            text_x1, text_y1, text_x2, text_y2 = map(float, txt_box)
+            text_area = max(1.0, (text_x2 - text_x1) * (text_y2 - text_y1))
+            text_center_x = (text_x1 + text_x2) / 2.0
+            text_center_y = (text_y1 + text_y2) / 2.0
+            for bubble_match_id, bubble_box in enumerate(bubble_boxes):
                 if bubble_box is None:
                     continue
                 if does_rectangle_fit(bubble_box, txt_box) or do_rectangles_overlap(bubble_box, txt_box):
@@ -167,17 +202,62 @@ class DetectionPipeline:
                         is_bubble_bg = self._is_bubble_background(image, bubble_box)
 
                     if is_bubble_bg:
-                        text_blocks.append(
-                            TextBlock(
-                                text_bbox=txt_box,
-                                bubble_bbox=bubble_box,
-                                text_class="text_bubble",
-                                font_color=text_color,
-                                confidence=confidence,
+                        bx1, by1, bx2, by2 = map(float, bubble_box)
+                        intersection = max(
+                            0.0, min(text_x2, bx2) - max(text_x1, bx1)
+                        ) * max(
+                            0.0, min(text_y2, by2) - max(text_y1, by1)
+                        )
+                        overlap = intersection / text_area
+                        diagonal = max(
+                            1.0,
+                            float(np.hypot(bx2 - bx1, by2 - by1)),
+                        )
+                        distance = float(
+                            np.hypot(
+                                text_center_x - (bx1 + bx2) / 2.0,
+                                text_center_y - (by1 + by2) / 2.0,
+                            )
+                        ) / diagonal
+                        containment_bonus = (
+                            2.0
+                            if does_rectangle_fit(bubble_box, txt_box)
+                            else 0.0
+                        )
+                        candidates.append(
+                            (
+                                overlap * 3.0
+                                + containment_bonus
+                                - distance,
+                                bubble_match_id,
+                                bubble_box,
                             )
                         )
-                        text_matched[txt_idx] = True
-                        break
+
+            if candidates:
+                candidates.sort(key=lambda item: (-item[0], item[1]))
+                best_score, bubble_match_id, bubble_box = candidates[0]
+                ambiguous = (
+                    len(candidates) > 1
+                    and best_score - candidates[1][0] < 0.25
+                )
+                text_blocks.append(
+                    TextBlock(
+                        text_bbox=txt_box,
+                        bubble_bbox=bubble_box,
+                        text_class="text_bubble",
+                        font_color=text_color,
+                        confidence=confidence,
+                        bubble_match_id=bubble_match_id,
+                        ambiguous_match=ambiguous,
+                        problem_codes={
+                            "BUBBLE_ASSOCIATION_UNCERTAIN"
+                        }
+                        if ambiguous
+                        else None,
+                    )
+                )
+                text_matched[txt_idx] = True
 
             if not text_matched[txt_idx]:
                 text_blocks.append(TextBlock(

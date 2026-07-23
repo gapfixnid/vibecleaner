@@ -30,7 +30,10 @@ class TextBlock(object):
                  font_color: str | tuple = (),
                  direction: str = "",
                  confidence: float | None = None,
-                 ocr_confidence: float | None = None) -> None:
+                 ocr_confidence: float | None = None,
+                 bubble_match_id: int | None = None,
+                 ambiguous_match: bool = False,
+                 problem_codes: set[str] | None = None) -> None:
         
         self.xyxy = text_bbox
         self.segm_pts = text_segm_points
@@ -56,6 +59,9 @@ class TextBlock(object):
         self.direction = direction
         self.confidence = confidence
         self.ocr_confidence = ocr_confidence
+        self.bubble_match_id = bubble_match_id
+        self.ambiguous_match = ambiguous_match
+        self.problem_codes = set(problem_codes or ())
 
     @property
     def xywh(self):
@@ -106,6 +112,14 @@ class TextBlock(object):
         new_block.font_color = self.font_color
         new_block.confidence = self.confidence
         new_block.ocr_confidence = self.ocr_confidence
+        new_block.direction = self.direction
+        new_block.bubble_match_id = self.bubble_match_id
+        new_block.ambiguous_match = self.ambiguous_match
+        new_block.problem_codes = set(self.problem_codes)
+        if hasattr(self, "association_diagnostics"):
+            new_block.association_diagnostics = copy.deepcopy(
+                self.association_diagnostics
+            )
         
         return new_block
 

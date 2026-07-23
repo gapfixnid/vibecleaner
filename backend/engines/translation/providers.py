@@ -17,6 +17,7 @@ from .helpers import (
     get_raw_text,
     set_texts_from_json,
 )
+from .prompt import build_translation_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -109,33 +110,11 @@ class OpenAICompatibleTranslator(BaseTranslator):
         return False
 
     def get_system_prompt(self, source_lang: str, target_lang: str) -> str:
-        if getattr(self, "system_prompt_override", None):
-            return self.system_prompt_override
-        prompt = f"""You are a professional manga and comic localization translator.
-
-Translate the text from {source_lang} to {target_lang} in the style of a professionally localized manga.
-
-Requirements:
-- Prioritize natural dialogue over literal translation.
-- Preserve meaning, tone, emotion, character personality, and relationships.
-- Rewrite expressions when necessary to sound natural in the target language.
-- Avoid translationese, unnatural phrasing, and direct grammatical carryover from the source language.
-- Use dialogue that sounds like native speakers in comics, webtoons, or animation.
-- Keep lines concise and suitable for speech bubbles.
-- Keep the translation close to the original length whenever possible.
-- Maintain consistent names, terminology, and speaking style across all text blocks on the page.
-- Adapt slang, jokes, idioms, honorifics, and cultural expressions naturally.
-- Translate sound effects and reactions into natural comic expressions when appropriate.
-- Use context and visual information to resolve obvious OCR errors and ambiguous text without inventing missing dialogue.
-
-[Output format — MUST follow exactly]
-- You will receive a JSON object whose values are the text blocks to translate (keys like "block_0", "block_1").
-- Return ONLY the raw JSON object with the SAME keys, replacing each value with its translation.
-- Do NOT translate, add, remove, or reorder keys.
-- Do NOT wrap the output in markdown code fences. Output the pure JSON string only.
-- Do NOT add explanations, notes, or commentary. Do NOT output <think> tags or any reasoning.
-"""
-        return prompt
+        return build_translation_system_prompt(
+            source_lang,
+            target_lang,
+            getattr(self, "system_prompt_override", None) or "",
+        )
 
     def translate_blocks(
         self,
@@ -198,6 +177,15 @@ Requirements:
                 translated_text = self._extract_message_content(response)
                 try:
                     if set_texts_from_json(blocks, translated_text):
+                        self.last_effective_context = {
+                            "model": active_model,
+                            "vision_enabled": any(
+                                item.get("type") == "image_url"
+                                for item in payload["messages"][1][
+                                    "content"
+                                ]
+                            ),
+                        }
                         self.last_error = None
                         return blocks
                 except TranslationParseError:
@@ -205,6 +193,15 @@ Requirements:
                         recovered = self._recover_single_block_translation(translated_text)
                         if recovered:
                             blocks[0].translation = recovered
+                            self.last_effective_context = {
+                                "model": active_model,
+                                "vision_enabled": any(
+                                    item.get("type") == "image_url"
+                                    for item in payload["messages"][1][
+                                        "content"
+                                    ]
+                                ),
+                            }
                             self.last_error = None
                             return blocks
                     raise
@@ -723,9 +720,10 @@ class ClaudeTranslatorWrapper(BaseTranslator):
             "content-type": "application/json",
         }
 
-        system_prompt = (
-            self.system_prompt_override
-            or f"You are a manga translator from {source_lang} to {target_lang}. Translate the values in the JSON. Output ONLY the raw translated JSON. Do not wrap in markdown code blocks."
+        system_prompt = build_translation_system_prompt(
+            source_lang,
+            target_lang,
+            self.system_prompt_override or "",
         )
         raw_text_json = get_raw_text(blocks)
 
@@ -750,6 +748,10 @@ class ClaudeTranslatorWrapper(BaseTranslator):
                 if content_list:
                     translated_text = content_list[0].get("text", "").strip()
                 if set_texts_from_json(blocks, translated_text):
+                    self.last_effective_context = {
+                        "model": self.model,
+                        "vision_enabled": False,
+                    }
                     self.last_error = None
                     return blocks
                 self.last_error = "Response JSON did not match block keys"

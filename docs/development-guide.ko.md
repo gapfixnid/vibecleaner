@@ -8,6 +8,13 @@
 
 말풍선 텍스트는 backend Qt runtime에서 한 번 렌더링하며 canvas와 export가 같은 결과를 재사용합니다. runtime/thread, immutable URL, cache, revision, fallback 계약은 [ADR 0002](adr/0002-use-canonical-bubble-text-layers.md)에 기록했습니다. 렌더링용 Qt 객체는 전용 worker 안에서만 사용하고, `QGuiApplication`과 bundled font 등록만 main thread에서 관리합니다.
 
+자동 배치는 rough 후보를 만든 뒤 Qt worker에서 실제 alpha를 비교해
+최종 후보를 고릅니다. 말풍선당 raster 후보는 최대 8개이며 선택된
+alpha를 canvas tile과 export가 그대로 공유합니다. 검출 연결, OCR
+재시도, 번역 prompt/cache 결과는 원문을 기록하지 않는 집계형
+telemetry로 확인할 수 있습니다. 프로젝트 schema 3부터 말풍선 검수
+경고는 안정적인 code와 선택적 detail로 저장됩니다.
+
 ## 기술 구성
 
 - Windows 데스크톱 셸: Tauri 2 / Rust

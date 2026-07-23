@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .geometry import Box, Rect
+from .problem import BubbleProblem, normalize_bubble_problem
 
 
 @dataclass
@@ -43,9 +44,21 @@ class TextBubble:
     detection_confidence: float = 0.0
     layout_reasoning: str = ""
     status: str = "idle"
-    problems: List[str] = field(default_factory=list)
+    problems: List[BubbleProblem] = field(default_factory=list)
     edited: bool = False
     project_extensions: Dict[str, Any] = field(default_factory=dict, repr=False)
+    _source_bubble_match_id: Optional[int] = field(
+        default=None, repr=False, compare=False
+    )
+    _derived_problem_codes: set[str] = field(
+        default_factory=set, repr=False, compare=False
+    )
+
+    def __post_init__(self) -> None:
+        self.problems = [
+            normalize_bubble_problem(problem)
+            for problem in self.problems
+        ]
 
     @staticmethod
     def _rect_to_project_list(rect: Optional[Rect]) -> Optional[list[float]]:
@@ -94,7 +107,9 @@ class TextBubble:
             "text": self.text,
             "translated": self.translated,
             "status": self.status,
-            "problems": list(self.problems),
+            "problems": [
+                problem.to_dict() for problem in self.problems
+            ],
             "edited": self.edited,
             "style": style,
             "layout_plan": layout_plan,
@@ -162,7 +177,10 @@ class TextBubble:
             layout_reasoning=layout_plan.get("reasoning", data.get("layout_reasoning", "")),
             detection_confidence=float(data.get("detection_confidence", 0.0) or 0.0),
             status=data.get("status", "idle"),
-            problems=list(data.get("problems", [])),
+            problems=[
+                normalize_bubble_problem(problem)
+                for problem in data.get("problems", [])
+            ],
             edited=bool(data.get("edited", False)),
             project_extensions=extensions,
         )
@@ -196,6 +214,8 @@ class TextBubble:
             problems=list(self.problems),
             edited=self.edited,
             project_extensions=deepcopy(self.project_extensions),
+            _source_bubble_match_id=self._source_bubble_match_id,
+            _derived_problem_codes=set(self._derived_problem_codes),
         )
 
 

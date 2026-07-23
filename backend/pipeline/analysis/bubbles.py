@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 import numpy as np
+from .association import can_merge_bubble_sources
 try:
     import cv2
     HAS_CV2 = True
@@ -58,6 +59,9 @@ class BubbleData:
 
     # Link to original block
     original_id: Optional[int] = None
+    source_bubble_match_id: Optional[int] = None
+    ambiguous_match: bool = False
+    problem_codes: set[str] = field(default_factory=set)
 
     @property
     def width(self) -> int:
@@ -192,6 +196,15 @@ class BubbleAnalysisService:
             reading_order=idx,
             direction=getattr(block, 'direction', 'horizontal'),
             original_id=getattr(block, 'id', idx),
+            source_bubble_match_id=getattr(
+                block, "bubble_match_id", None
+            ),
+            ambiguous_match=bool(
+                getattr(block, "ambiguous_match", False)
+            ),
+            problem_codes=set(
+                getattr(block, "problem_codes", set()) or set()
+            ),
         )
 
     def _group_into_bubbles(
@@ -210,7 +223,15 @@ class BubbleAnalysisService:
         groups: List[List[BubbleData]] = []
         for bubble in bubbles:
             matching_group = next(
-                (group for group in groups if self._bubble_iou(group[0], bubble) >= 0.8),
+                (
+                    group
+                    for group in groups
+                    if can_merge_bubble_sources(
+                        group[0].source_bubble_match_id,
+                        bubble.source_bubble_match_id,
+                    )
+                    and self._bubble_iou(group[0], bubble) >= 0.8
+                ),
                 None,
             )
             if matching_group is None:
@@ -225,16 +246,48 @@ class BubbleAnalysisService:
                 continue
             group.sort(key=lambda item: (item.text_box[1], item.text_box[0]))
             first = group[0]
+            weighted_confidence = 0.0
+            confidence_weight = 0.0
+            weighted_color = np.zeros(3, dtype=np.float64)
+            color_weight = 0.0
+            for item in group:
+                area = max(
+                    1.0,
+                    float(
+                        (item.text_box[2] - item.text_box[0])
+                        * (item.text_box[3] - item.text_box[1])
+                    ),
+                )
+                confidence = (
+                    item.model_confidence
+                    if item.model_confidence is not None
+                    else 0.5
+                )
+                weighted_confidence += confidence * area
+                confidence_weight += area
+                weight = area * max(confidence, 0.1)
+                weighted_color += np.asarray(
+                    item.font_color[:3], dtype=np.float64
+                ) * weight
+                color_weight += weight
             for item in group[1:]:
                 first.bubble_box = self._union_box(first.bubble_box, item.bubble_box)
                 first.text_box = self._union_box(first.text_box, item.text_box)
                 first.text_polygons.extend(item.text_polygons)
                 first.text = self._join_text([first.text, item.text], first.direction)
-                first.confidence = max(first.confidence, item.confidence)
-                if item.model_confidence is not None:
-                    first.model_confidence = max(
-                        first.model_confidence or 0.0, item.model_confidence
-                    )
+                first.ambiguous_match = (
+                    first.ambiguous_match or item.ambiguous_match
+                )
+                first.problem_codes.update(item.problem_codes)
+            if confidence_weight > 0:
+                first.model_confidence = (
+                    weighted_confidence / confidence_weight
+                )
+            if color_weight > 0:
+                first.font_color = tuple(
+                    int(round(value))
+                    for value in weighted_color / color_weight
+                )
             first.layout_box = first.text_box
             grouped.append(first)
         return grouped

@@ -26,7 +26,7 @@ def test_existing_v2_project_metadata_gets_an_additive_envelope():
     assert normalized["format"] == PROJECT_FORMAT
     assert normalized["schema_version"] == CURRENT_PROJECT_SCHEMA_VERSION
     assert normalized["app_version"] == "unknown"
-    assert normalized["version"] == metadata["version"]
+    assert normalized["version"] == CURRENT_PROJECT_VERSION
     assert normalized["pages"][0]["original_file_path"] == metadata["pages"][0]["original_file_path"]
     assert len(normalized["pages"][0]["page_id"]) == 32
     assert normalized is not metadata
@@ -54,7 +54,10 @@ def test_versionless_legacy_json_uses_explicit_migration_path():
 
 def test_future_project_version_fails_with_upgrade_guidance():
     with pytest.raises(UnsupportedProjectVersionError, match=r"newer.*Update VibeCleaner"):
-        normalize_project_metadata({"schema_version": 3, "pages": []})
+        normalize_project_metadata({
+            "schema_version": CURRENT_PROJECT_SCHEMA_VERSION + 1,
+            "pages": [],
+        })
 
 
 def test_unknown_old_project_version_is_not_silently_interpreted():

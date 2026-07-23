@@ -123,7 +123,7 @@ const bubbleDto = {
     reasoning: "writing_mode=vertical; alignment=center",
     lines: [{ text: "안녕", x: 1, y: 2, width: 30, height: 12 }],
   },
-  problems: ["check translation"],
+  problems: [{ code: "TRANSLATION_EXPANDED", detail: null }],
   edited: true,
   text_class: "text_bubble",
 };
@@ -148,7 +148,7 @@ assert.deepEqual(plain(toBubbleInfo(bubbleDto)), {
   alignment: "center",
   text_class: "text_bubble",
   status: "needs_review",
-  problems: ["check translation"],
+  problems: [{ code: "TRANSLATION_EXPANDED", detail: null }],
   edited: true,
   layout_overflow: false,
   line_height_ratio: 1.12,

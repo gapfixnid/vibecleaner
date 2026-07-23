@@ -211,6 +211,12 @@ def bubbles_from_analysis(
         text_bubble.detection_confidence = float(
             model_confidence if model_confidence is not None else getattr(bubble_data, "confidence", 0.0)
         )
+        text_bubble._source_bubble_match_id = getattr(
+            bubble_data, "source_bubble_match_id", None
+        )
+        text_bubble._derived_problem_codes.update(
+            getattr(bubble_data, "problem_codes", set()) or set()
+        )
         bubbles.append(text_bubble)
 
     return bubbles
@@ -234,6 +240,8 @@ def merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float = 
         return intersection / union
 
     merged = True
+    from .analysis.association import can_merge_bubble_sources
+
     current = list(bubbles)
     while merged:
         merged = False
@@ -241,7 +249,13 @@ def merge_overlapping_bubbles(bubbles: list[TextBubble], iou_threshold: float = 
         while i < len(current):
             j = i + 1
             while j < len(current):
-                if _iou(current[i], current[j]) >= iou_threshold:
+                if (
+                    can_merge_bubble_sources(
+                        current[i]._source_bubble_match_id,
+                        current[j]._source_bubble_match_id,
+                    )
+                    and _iou(current[i], current[j]) >= iou_threshold
+                ):
                     first = current[i]
                     second = current[j]
                     first.box = first.box.united(second.box)

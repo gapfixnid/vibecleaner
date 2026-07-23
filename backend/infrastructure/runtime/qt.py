@@ -58,6 +58,9 @@ class QtRenderExecutor:
     def thread_id(self) -> int | None:
         return self._thread.ident
 
+    def is_worker_thread(self) -> bool:
+        return threading.get_ident() == self._thread.ident
+
     def submit(self, task: QtRenderTask[T]) -> Future[T]:
         if self._closed:
             raise RuntimeError("Qt render executor is shut down")
@@ -66,7 +69,7 @@ class QtRenderExecutor:
         return future
 
     def run(self, task: QtRenderTask[T]) -> T:
-        if threading.get_ident() == self._thread.ident:
+        if self.is_worker_thread():
             raise RuntimeError("Nested synchronous Qt render task would deadlock")
         return self.submit(task).result()
 

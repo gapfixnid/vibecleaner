@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 
@@ -16,6 +17,9 @@ from backend.api.use_cases.page_text_layers import get_text_layer_response
 from backend.core.models import MangaPage, Rect, TextBubble
 from backend.core.state.project_state import ProjectState
 from backend.engines.rendering.service import RenderService
+from backend.engines.rendering.canonical_layout import (
+    _expanded_alpha,
+)
 from backend.engines.rendering.export import ExportService
 from backend.engines.rendering.text_layer import TextLayerService
 from backend.infrastructure.image.text_layer_cache import TextLayerCache
@@ -86,12 +90,74 @@ def test_color_change_reuses_layout_identity_but_changes_render_identity():
 def test_concurrent_same_tile_requests_share_one_cached_representation():
     _runtime, _render, service, cache = make_service()
     image = np.full((200, 300, 3), 255, np.uint8)
+    paint_count = 0
+    paint_lock = threading.Lock()
+    original_paint = service._paint_artifact
+
+    def counted_paint(*args, **kwargs):
+        nonlocal paint_count
+        with paint_lock:
+            paint_count += 1
+        return original_paint(*args, **kwargs)
+
+    service._paint_artifact = counted_paint
     with ThreadPoolExecutor(max_workers=4) as pool:
         tiles = list(pool.map(lambda _index: service.create_tile("page_a", make_bubble(), image), range(4)))
 
     assert len({tile.cache_key for tile in tiles}) == 1
     assert len({tile.png_bytes for tile in tiles}) == 1
     assert cache.current_bytes == len(tiles[0].png_bytes)
+    assert paint_count == 1
+
+
+def test_cached_canonical_alpha_is_owned_contiguous_and_read_only():
+    _runtime, _render, service, _cache = make_service()
+    image = np.full((200, 300, 3), 255, np.uint8)
+    bubble = make_bubble()
+    request = service.canonical_selector.build_request(
+        bubble.translated,
+        bubble,
+        image,
+        bubble.font_family,
+    )
+    artifact = service.canonical_selector.get_artifact(request)
+
+    for alpha in (
+        artifact.selected.fill_alpha,
+        artifact.selected.stroke_only_alpha,
+    ):
+        assert alpha.flags.c_contiguous
+        assert not alpha.flags.writeable
+        assert alpha.base is None
+
+    fill = artifact.selected.fill_alpha
+    stroke = artifact.selected.stroke_only_alpha
+    expected = np.maximum(
+        _expanded_alpha(
+            fill,
+            max(
+                1.0,
+                artifact.selected.candidate.effective_font_size
+                / 12.0,
+            ),
+        ).astype(np.int16)
+        - fill.astype(np.int16),
+        0,
+    ).astype(np.uint8)
+    assert np.array_equal(stroke, expected)
+    assert not np.any((fill == 255) & (stroke > 0))
+
+
+def test_executor_reentry_is_rejected_instead_of_deadlocking():
+    runtime = get_qt_runtime()
+    try:
+        runtime.executor.run(
+            lambda _worker: runtime.executor.run(lambda _nested: None)
+        )
+    except RuntimeError as exc:
+        assert "deadlock" in str(exc).lower()
+    else:
+        raise AssertionError("nested synchronous render was accepted")
 
 
 def test_historical_cached_tile_remains_immutable_after_current_ref_changes():

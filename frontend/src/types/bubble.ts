@@ -1,4 +1,5 @@
 import type { Rect } from "./common";
+import type { BubbleProblemDto } from "./problem";
 
 export interface TextStyleDto {
   font_family: string;
@@ -64,6 +65,19 @@ export interface TextLayoutDto {
   margin?: Record<string, number>;
   confidence?: number;
   reasoning?: string;
+  diagnostics?: {
+    selected_pass?: "mask_strict" | "mask_relaxed" | "rect" | "fixed" | "overflow_fallback";
+    selected_font_size?: number;
+    largest_feasible_font_size?: number;
+    strict_max_font_size?: number | null;
+    relaxed_max_font_size?: number | null;
+    allow_char_break?: boolean;
+    candidate_count?: number;
+    rasterized_candidate_count?: number;
+    safe_area_ratio?: number;
+    outside_alpha_ratio?: number;
+    resource_violation_count?: number;
+  };
 }
 
 export interface BubbleDto {
@@ -86,7 +100,7 @@ export interface BubbleDto {
     | "warning";
   style: TextStyleDto;
   layout: TextLayoutDto;
-  problems: string[];
+  problems: BubbleProblemDto[];
   edited?: boolean;
   text_class?: string;
   text_layer?: TextLayerRefDto | null;

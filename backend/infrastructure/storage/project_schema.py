@@ -12,8 +12,8 @@ from ...core.version import __version__ as APP_VERSION
 
 
 PROJECT_FORMAT = "vibecleaner-project"
-CURRENT_PROJECT_SCHEMA_VERSION = 2
-CURRENT_PROJECT_VERSION = "2.0"  # Compatibility alias for existing readers.
+CURRENT_PROJECT_SCHEMA_VERSION = 3
+CURRENT_PROJECT_VERSION = "3.0"  # Compatibility alias for existing readers.
 LEGACY_PROJECT_SCHEMA_VERSION = 1
 SAFE_PAGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 ORIGINAL_PAGE_ID_EXTENSION = "vibecleaner_original_page_id"
@@ -77,6 +77,34 @@ def _migrate_1_to_2(metadata: dict[str, Any]) -> dict[str, Any]:
     migrated.setdefault("selected_indices", [])
     migrated.setdefault("pages", [])
     migrated["schema_version"] = 2
+    migrated["version"] = "2.0"
+    return migrated
+
+
+def _migrate_2_to_3(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Convert bubble review strings to lossless structured problems."""
+    from ...core.models.problem import normalize_bubble_problem
+
+    migrated = deepcopy(metadata)
+    pages = migrated.get("pages", [])
+    if isinstance(pages, list):
+        for page in pages:
+            if not isinstance(page, dict):
+                continue
+            bubbles = page.get("bubbles", [])
+            if not isinstance(bubbles, list):
+                continue
+            for bubble in bubbles:
+                if not isinstance(bubble, dict):
+                    continue
+                problems = bubble.get("problems", [])
+                if not isinstance(problems, list):
+                    problems = [problems]
+                bubble["problems"] = [
+                    normalize_bubble_problem(problem).to_dict()
+                    for problem in problems
+                ]
+    migrated["schema_version"] = 3
     migrated["version"] = CURRENT_PROJECT_VERSION
     return migrated
 
@@ -84,6 +112,7 @@ def _migrate_1_to_2(metadata: dict[str, Any]) -> dict[str, Any]:
 Migration = Callable[[dict[str, Any]], dict[str, Any]]
 _MIGRATIONS: dict[int, Migration] = {
     LEGACY_PROJECT_SCHEMA_VERSION: _migrate_1_to_2,
+    2: _migrate_2_to_3,
 }
 
 

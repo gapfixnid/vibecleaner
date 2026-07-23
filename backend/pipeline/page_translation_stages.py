@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import logging
+import math
 from types import SimpleNamespace
 from typing import Any
 
 from ..core.errors import PageNotFoundError
 from ..core.models.image import ImageData
+from ..core.models import (
+    BubbleProblemCode,
+    reconcile_bubble_problems,
+)
+from ..core.text.graphemes import grapheme_count
 from ..infrastructure.job_messages import msg_from_context
 from ..engines.rendering.bubble_layout import bubble_layout_cache_key, compute_bubble_layout
+from ..engines.ocr.retry import OcrSnapshot, choose_ocr_retry
 from .page_analysis import (
     bubbles_from_analysis,
     merge_overlapping_bubbles,
@@ -36,6 +43,25 @@ def _is_better_ocr_text(original: object, candidate: object) -> bool:
     if not original_text:
         return True
     return len(candidate_text) > len(original_text)
+
+
+def _quality_rank(
+    score: Any,
+) -> tuple[int, float, float, float, float, float]:
+    signals = dict(getattr(score, "signals", {}) or {})
+    return (
+        1 if bool(getattr(score, "passed", False)) else 0,
+        -float(signals.get("invalid_box_ratio", 0.0)),
+        -float(signals.get("unmatched_ratio", 0.0)),
+        -float(signals.get("ambiguous_match_ratio", 0.0)),
+        float(
+            signals.get(
+                "mean_confidence",
+                getattr(score, "score", 0.0),
+            )
+        ),
+        float(signals.get("matched", 0.0)),
+    )
 
 
 def _resolve_page_index(state: Any, page_id: str) -> int:
@@ -125,17 +151,37 @@ class PageDetectionStage:
                     not detection_score.passed
                     and selected_model != config.detect_model
                 ):
-                    blocks = self.detection_service.detect_only(
+                    retry_blocks = self.detection_service.detect_only(
                         image, model_name=selected_model
                     )
-                    detection_score = self.quality_router.evaluate_detection(blocks)
+                    retry_score = self.quality_router.evaluate_detection(
+                        retry_blocks
+                    )
+                    retry_selected = (
+                        _quality_rank(retry_score)
+                        > _quality_rank(detection_score)
+                    )
+                    if retry_selected:
+                        blocks = retry_blocks
+                        detection_score = retry_score
                     context.artifacts.setdefault("quality_replans", []).append(
-                        {"stage": "detection", "model": selected_model}
+                        {
+                            "stage": "detection",
+                            "model": selected_model,
+                            "selected": "retry"
+                            if retry_selected
+                            else "initial",
+                        }
                     )
                 context.artifacts["blocks"] = blocks
                 context.artifacts["ocr_pending"] = True
                 context.artifacts.setdefault("quality_scores", {})["detection"] = (
                     detection_score
+                )
+                context.artifacts.setdefault(
+                    "quality_aggregates", {}
+                )["detection_association"] = dict(
+                    detection_score.signals
                 )
             else:
                 context.artifacts["blocks"] = self.detection_service.detect_and_ocr(
@@ -212,15 +258,15 @@ class PageOcrStage:
                     if _is_suspicious_ocr_text(getattr(block, "text", ""))
                 ]
                 if suspicious_blocks:
-                    original_texts = {
-                        id(block): getattr(block, "text", "") for block in suspicious_blocks
-                    }
+                    retry_blocks = [
+                        block.deep_copy() for block in suspicious_blocks
+                    ]
                     retry_padding = max(1, int(getattr(config, "ocr_padding", 8)) * 2)
                     retry_scale = max(1.0, float(getattr(config, "ocr_crop_scale", 1.5)) * 1.25)
                     retry_engine = config.ocr_engine
                     self.detection_service.ocr_only(
                         image,
-                        suspicious_blocks,
+                        retry_blocks,
                         lang=config.source_language,
                         engine=retry_engine,
                         padding=retry_padding,
@@ -232,12 +278,42 @@ class PageOcrStage:
                         use_cache=False,
                     )
                     recovered_blocks = 0
-                    for block in suspicious_blocks:
-                        original = original_texts[id(block)]
-                        if _is_better_ocr_text(original, getattr(block, "text", "")):
+                    rejected_blocks = 0
+                    for block, retry_block in zip(
+                        suspicious_blocks, retry_blocks
+                    ):
+                        decision = choose_ocr_retry(
+                            OcrSnapshot(
+                                str(getattr(block, "text", "") or ""),
+                                getattr(block, "ocr_confidence", None),
+                            ),
+                            OcrSnapshot(
+                                str(
+                                    getattr(
+                                        retry_block, "text", ""
+                                    )
+                                    or ""
+                                ),
+                                getattr(
+                                    retry_block,
+                                    "ocr_confidence",
+                                    None,
+                                ),
+                            ),
+                            config.source_language,
+                        )
+                        if decision.accepted:
+                            block.text = decision.selected.text
+                            block.ocr_confidence = (
+                                decision.selected.confidence
+                            )
+                            block.problem_codes.discard(
+                                "OCR_UNCERTAIN"
+                            )
                             recovered_blocks += 1
                         else:
-                            block.text = original
+                            block.problem_codes.add("OCR_UNCERTAIN")
+                            rejected_blocks += 1
                     ocr_score = self.quality_router.evaluate_ocr(
                         context.artifacts["blocks"], config.source_language
                     )
@@ -245,6 +321,7 @@ class PageOcrStage:
                         "stage": "ocr", "model": retry_engine,
                         "profile": "suspicious_text_recovery", "recovered_blocks": recovered_blocks,
                         "candidate_blocks": len(suspicious_blocks),
+                        "rejected_blocks": rejected_blocks,
                         "passed": ocr_score.passed,
                     })
                 if not ocr_score.passed:
@@ -253,9 +330,13 @@ class PageOcrStage:
                     )
                     retry_padding = max(1, int(getattr(config, "ocr_padding", 8)) * 2)
                     retry_scale = max(1.0, float(getattr(config, "ocr_crop_scale", 1.5)) * 1.25)
-                    context.artifacts["blocks"] = self.detection_service.ocr_only(
+                    original_blocks = context.artifacts["blocks"]
+                    retry_blocks = [
+                        block.deep_copy() for block in original_blocks
+                    ]
+                    self.detection_service.ocr_only(
                         image,
-                        context.artifacts["blocks"],
+                        retry_blocks,
                         lang=config.source_language,
                         engine=retry_engine,
                         padding=retry_padding,
@@ -266,12 +347,49 @@ class PageOcrStage:
                         ),
                         use_cache=False,
                     )
+                    accepted_blocks = 0
+                    for block, retry_block in zip(
+                        original_blocks, retry_blocks
+                    ):
+                        decision = choose_ocr_retry(
+                            OcrSnapshot(
+                                str(getattr(block, "text", "") or ""),
+                                getattr(block, "ocr_confidence", None),
+                            ),
+                            OcrSnapshot(
+                                str(
+                                    getattr(
+                                        retry_block, "text", ""
+                                    )
+                                    or ""
+                                ),
+                                getattr(
+                                    retry_block,
+                                    "ocr_confidence",
+                                    None,
+                                ),
+                            ),
+                            config.source_language,
+                        )
+                        if decision.accepted:
+                            block.text = decision.selected.text
+                            block.ocr_confidence = (
+                                decision.selected.confidence
+                            )
+                            block.problem_codes.discard(
+                                "OCR_UNCERTAIN"
+                            )
+                            accepted_blocks += 1
+                        elif decision.uncertain:
+                            block.problem_codes.add("OCR_UNCERTAIN")
                     ocr_score = self.quality_router.evaluate_ocr(
-                        context.artifacts["blocks"], config.source_language
+                        original_blocks, config.source_language
                     )
                     context.artifacts.setdefault("quality_replans", []).append({
                         "stage": "ocr", "model": retry_engine,
-                        "profile": "enhanced_preprocessing", "passed": ocr_score.passed
+                        "profile": "enhanced_preprocessing",
+                        "accepted_blocks": accepted_blocks,
+                        "passed": ocr_score.passed,
                     })
                 context.artifacts.setdefault("quality_scores", {})["ocr"] = ocr_score
             if show_progress:
@@ -313,6 +431,34 @@ class PageOcrStage:
             if item.get("stage") == "ocr"
         )
         context.artifacts["ocr_provenance"] = ocr_provenance
+        ocr_replans = [
+            item
+            for item in context.artifacts.get(
+                "quality_replans", []
+            )
+            if item.get("stage") == "ocr"
+        ]
+        context.artifacts.setdefault(
+            "quality_aggregates", {}
+        )["ocr_retry"] = {
+            "attempted": sum(
+                int(item.get("candidate_blocks", 0))
+                for item in ocr_replans
+            ),
+            "accepted": sum(
+                int(
+                    item.get(
+                        "recovered_blocks",
+                        item.get("accepted_blocks", 0),
+                    )
+                )
+                for item in ocr_replans
+            ),
+            "rejected": sum(
+                int(item.get("rejected_blocks", 0))
+                for item in ocr_replans
+            ),
+        }
         return context
 
     def _diagnostics(self) -> dict[str, Any]:
@@ -439,8 +585,12 @@ class PageLayoutStage:
         layout_cache = {}
         text_layer_refs = {}
         render_statuses = {}
+        layout_diagnostics: list[dict[str, Any]] = []
+        translation_ratios: list[float] = []
+        expanded_count = 0
         for bubble in local_bubbles:
             job_manager.ensure_not_cancelled(job)
+            layout = None
             if self.text_layer_service is not None and (bubble.translated or "").strip():
                 try:
                     tile = self.text_layer_service.create_tile(
@@ -449,7 +599,13 @@ class PageLayoutStage:
                         image,
                         image_revision=context.artifacts.get("image_visual_revision", 0),
                     )
-                    layout_cache[bubble_layout_cache_key(bubble)] = tile.layout
+                    layout = tile.layout
+                    diagnostics = dict(
+                        tile.layout.get("diagnostics", {}) or {}
+                    )
+                    if diagnostics:
+                        layout_diagnostics.append(diagnostics)
+                    layout_cache[bubble_layout_cache_key(bubble)] = layout
                     text_layer_refs[bubble.id] = {
                         "layout_fingerprint": tile.layout_fingerprint,
                         "render_fingerprint": tile.render_fingerprint,
@@ -461,11 +617,94 @@ class PageLayoutStage:
                         "height": tile.height,
                     }
                     render_statuses[bubble.id] = {"status": "ready", "error_code": None}
-                    continue
                 except Exception as exc:
                     logger.warning("Translation tile fallback. bubble_id=%s error=%s", bubble.id, exc)
                     render_statuses[bubble.id] = {"status": "fallback", "error_code": str(exc)}
-            layout_cache[bubble_layout_cache_key(bubble)] = compute_bubble_layout(bubble, image, self.render_service)
+            if layout is None:
+                layout = compute_bubble_layout(
+                    bubble, image, self.render_service
+                )
+                layout_cache[bubble_layout_cache_key(bubble)] = layout
+
+            derived = {
+                BubbleProblemCode(code)
+                for code in bubble._derived_problem_codes
+                if code in BubbleProblemCode._value2member_map_
+            }
+            overflow = bool(
+                layout.get("overflow")
+                or layout.get("reached_min_font")
+            )
+            if overflow:
+                derived.add(BubbleProblemCode.TEXT_OVERFLOW)
+            source_length = grapheme_count(bubble.text)
+            translated_length = grapheme_count(bubble.translated)
+            expanded = (
+                translated_length
+                > max(24, math.ceil(source_length * 1.8))
+                and overflow
+            )
+            if expanded:
+                derived.add(
+                    BubbleProblemCode.TRANSLATION_EXPANDED
+                )
+                expanded_count += 1
+            if source_length:
+                translation_ratios.append(
+                    translated_length / source_length
+                )
+            bubble.problems = reconcile_bubble_problems(
+                bubble.problems,
+                derived=derived,
+            )
+        selected_passes: dict[str, int] = {}
+        for diagnostics in layout_diagnostics:
+            selected = str(
+                diagnostics.get("selected_pass", "fallback")
+            )
+            selected_passes[selected] = (
+                selected_passes.get(selected, 0) + 1
+            )
+        sorted_ratios = sorted(translation_ratios)
+
+        def percentile(values: list[float], ratio: float) -> float:
+            if not values:
+                return 0.0
+            index = min(
+                len(values) - 1,
+                int(round((len(values) - 1) * ratio)),
+            )
+            return round(values[index], 4)
+
+        context.artifacts.setdefault("quality_aggregates", {}).update(
+            {
+                "layout_selection": {
+                    **selected_passes,
+                    "mean_rasterized_candidates": round(
+                        sum(
+                            float(
+                                item.get(
+                                    "rasterized_candidate_count", 0
+                                )
+                            )
+                            for item in layout_diagnostics
+                        )
+                        / max(1, len(layout_diagnostics)),
+                        4,
+                    ),
+                },
+                "translation_length": {
+                    "count": len(translation_ratios),
+                    "p50_ratio": percentile(
+                        sorted_ratios, 0.50
+                    ),
+                    "p90_ratio": percentile(
+                        sorted_ratios, 0.90
+                    ),
+                    "expanded_count": expanded_count,
+                },
+            }
+        )
         context.artifacts["bubble_layout_cache"] = layout_cache
         context.artifacts["text_layer_refs"] = text_layer_refs
         context.artifacts["bubble_render_status"] = render_statuses

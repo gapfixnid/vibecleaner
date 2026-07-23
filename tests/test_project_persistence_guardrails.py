@@ -11,6 +11,7 @@ from backend.core.models import MangaPage
 from backend.core.state.project_state import ProjectState
 from backend.infrastructure.storage.project_schema import (
     CURRENT_PROJECT_SCHEMA_VERSION,
+    CURRENT_PROJECT_VERSION,
     ORIGINAL_PAGE_ID_EXTENSION,
     PROJECT_FORMAT,
 )
@@ -77,7 +78,7 @@ def test_load_save_round_trip_preserves_additive_extension_fields(tmp_path):
         "format": PROJECT_FORMAT,
         "schema_version": CURRENT_PROJECT_SCHEMA_VERSION,
         "app_version": "future-minor",
-        "version": "2.0",
+        "version": CURRENT_PROJECT_VERSION,
         "current_index": 0,
         "selected_indices": [0],
         "future_project_field": {"keep": True},
@@ -133,7 +134,7 @@ def test_malicious_project_page_id_is_rekeyed_before_runtime_and_round_trip(tmp_
         "format": PROJECT_FORMAT,
         "schema_version": CURRENT_PROJECT_SCHEMA_VERSION,
         "app_version": "external",
-        "version": "2.0",
+        "version": CURRENT_PROJECT_VERSION,
         "current_index": 0,
         "selected_indices": [0],
         "pages": [{

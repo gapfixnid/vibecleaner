@@ -148,7 +148,10 @@ class BubbleServiceTests(unittest.TestCase):
 
         bubble = response["bubbles"][0]
         self.assertEqual(bubble["status"], "layout_overflow")
-        self.assertIn("layout overflow", bubble["problems"])
+        self.assertIn(
+            {"code": "TEXT_OVERFLOW", "detail": None},
+            bubble["problems"],
+        )
         self.assertTrue(bubble["layout_overflow"])
 
     def test_get_bubbles_response_does_not_load_image_when_page_has_no_bubbles(self):

@@ -8,6 +8,14 @@ This document is for contributors who want to run or package vibecleaner from so
 
 Bubble text is rendered once by the backend Qt runtime and reused by both the canvas and export. The runtime/thread, immutable URL, cache, revision, and fallback contracts are recorded in [ADR 0002](adr/0002-use-canonical-bubble-text-layers.md). Keep all render-time Qt objects inside the dedicated worker; only `QGuiApplication` and bundled-font registration belong to the main thread.
 
+Automatic layout produces rough candidates and lets the Qt worker choose the
+final result from actual alpha. At most eight candidates are rasterized per
+bubble, and the selected alpha is shared unchanged by the canvas tile and
+export. Aggregate telemetry covers detection association, OCR retry,
+translation length, and layout selection without recording source text.
+Project schema 3 stores bubble review warnings as stable codes with optional
+details.
+
 ## Technology overview
 
 - Desktop shell: Tauri 2 / Rust

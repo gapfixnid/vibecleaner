@@ -4,7 +4,12 @@ from typing import List
 import numpy as np
 from fastapi import HTTPException
 from pydantic import BaseModel
-from ...core.models import Rect, TextBubble
+from ...core.models import (
+    BubbleProblemCode,
+    Rect,
+    TextBubble,
+    reconcile_bubble_problems,
+)
 from ...infrastructure.image.loading import ensure_page_image, invalidate_page_caches, load_cv_image
 from ...infrastructure.job_messages import msg
 from ...core.state.review import derive_bubble_status, refresh_bubble_status, refresh_page_status
@@ -58,12 +63,22 @@ def _rect_response(rect: Rect | None) -> dict | None:
     }
 
 
-def _layout_overflow_problems(bubble: TextBubble, layout: dict) -> list[str]:
-    problems = list(bubble.problems)
+def _layout_overflow_problems(bubble: TextBubble, layout: dict) -> list:
+    derived = {
+        BubbleProblemCode(code)
+        for code in bubble._derived_problem_codes
+        if code in BubbleProblemCode._value2member_map_
+    }
     if layout.get("overflow") or layout.get("reached_min_font"):
-        if not any("layout overflow" == problem.lower() for problem in problems):
-            problems.append("layout overflow")
-    return problems
+        derived.add(BubbleProblemCode.TEXT_OVERFLOW)
+    return reconcile_bubble_problems(
+        bubble.problems,
+        derived=derived,
+    )
+
+
+def _problem_response(problems: list) -> list[dict]:
+    return [problem.to_dict() for problem in problems]
 
 def _text_layer_ref_response(ref: dict | None) -> dict | None:
     if not ref:
@@ -203,13 +218,16 @@ def get_bubbles_response(state, page_id: str, render_service, text_layer_service
             "layout_overflow": bool(cached_layout.get("overflow") or cached_layout.get("reached_min_font")),
             "line_height_ratio": float(cached_layout.get("line_height_ratio", 1.0)),
             "layout_area_usage": float(cached_layout.get("area_usage", 0.0)),
+            "layout_diagnostics": dict(
+                cached_layout.get("diagnostics", {}) or {}
+            ),
             "bold": bubble.bold,
             "italic": bubble.italic,
             "color": bubble.color,
             "alignment": bubble.alignment,
             "text_class": bubble.text_class,
             "status": status,
-            "problems": problems,
+            "problems": _problem_response(problems),
             "edited": bubble.edited,
             "lines": [
                 {

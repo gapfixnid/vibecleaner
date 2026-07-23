@@ -137,6 +137,11 @@ def run_page_translation(
             "pipeline": "page_translation",
             "ocr_provenance": result.context.artifacts.get("ocr_provenance", {}),
             "runtime_providers": _telemetry_runtime_providers(result.context),
+            "quality_aggregates": dict(
+                result.context.artifacts.get(
+                    "quality_aggregates", {}
+                )
+            ),
         },
     ))
     runner.last_result = result
