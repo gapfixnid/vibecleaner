@@ -3,10 +3,12 @@ from __future__ import annotations
 import hashlib
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from types import SimpleNamespace
 
 import cv2
 import numpy as np
+import pytest
 
 from backend.api.use_cases.bubbles import (
     BubbleMutationRequest,
@@ -260,6 +262,88 @@ def test_rect_auto_layout_rasters_both_break_passes_with_style():
     assert artifact.diagnostics["candidate_count"] >= 2
     assert artifact.selected.candidate.bold
     assert artifact.selected.candidate.italic
+
+
+def test_unsafe_layout_is_dom_fallback_not_ready_png(
+    monkeypatch,
+):
+    _runtime, render, service, _cache = make_service()
+    image = np.full((180, 280, 3), 255, np.uint8)
+    bubble = TextBubble(
+        id=12,
+        box=Rect(20, 20, 180, 80),
+        text="source",
+        translated="unsafe candidate",
+        text_class="text_free",
+    )
+    selector = service.canonical_selector
+    original = selector._rasterize_candidate
+
+    def force_unsafe(*args, **kwargs):
+        rasterized = original(*args, **kwargs)
+        return replace(
+            rasterized,
+            diagnostics=replace(
+                rasterized.diagnostics,
+                raster_safe=False,
+                outside_alpha_ratio=0.5,
+            ),
+        )
+
+    monkeypatch.setattr(
+        selector, "_rasterize_candidate", force_unsafe
+    )
+    layout = render.get_layout_for_bubble(
+        bubble.translated, bubble, image
+    )
+
+    assert layout.is_overflow
+    assert (
+        layout.diagnostics["selected_pass"]
+        == "overflow_fallback"
+    )
+    with pytest.raises(
+        RuntimeError, match="TEXT_LAYER_LAYOUT_UNSAFE"
+    ):
+        service.create_tile("page_a", bubble, image)
+
+
+def test_final_key_uses_explicit_forbidden_break_field():
+    _runtime, _render, service, _cache = make_service()
+    image = np.full((180, 280, 3), 255, np.uint8)
+    bubble = TextBubble(
+        id=13,
+        box=Rect(20, 20, 180, 80),
+        text="source",
+        translated="rect candidate",
+        text_class="text_free",
+    )
+    request = service.canonical_selector.build_request(
+        bubble.translated, bubble, image, None
+    )
+    artifact = service.canonical_selector.get_artifact(request)
+    selected = artifact.selected
+    clean = replace(
+        selected,
+        candidate=replace(
+            selected.candidate,
+            forbidden_break_count=0,
+            rough_key=(False, 0.0, -12, 999.0),
+        ),
+    )
+    forbidden = replace(
+        selected,
+        candidate=replace(
+            selected.candidate,
+            forbidden_break_count=1,
+            rough_key=(False, 0.0, -12, 0.0),
+        ),
+    )
+
+    assert (
+        service.canonical_selector._final_key(clean)
+        < service.canonical_selector._final_key(forbidden)
+    )
 
 
 def test_executor_reentry_is_rejected_instead_of_deadlocking():

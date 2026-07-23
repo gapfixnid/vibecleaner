@@ -306,5 +306,44 @@ class RenderServiceTests(unittest.TestCase):
             "MASK_UNCERTAIN", bubble._derived_problem_codes
         )
 
+    def test_leaking_expanded_component_falls_back_to_detector_bounds(
+        self,
+    ):
+        service = RenderService()
+        bubble = TextBubble(
+            id=3,
+            box=Rect(40, 40, 160, 60),
+            text_box=Rect(90, 55, 50, 20),
+            text_class="text_bubble",
+        )
+        image = np.full((180, 260, 3), 255, np.uint8)
+        calls = 0
+
+        def fake_mask(mask_shape, *_args, **_kwargs):
+            nonlocal calls
+            calls += 1
+            height, width = mask_shape
+            mask = np.zeros((height, width), np.uint8)
+            mask[
+                height // 8 : height * 7 // 8,
+                width // 8 : width * 7 // 8,
+            ] = 255
+            return BubbleClipMaskResult(
+                mask,
+                "detector_component",
+                0.25 if calls == 1 else 0.02,
+            )
+
+        with patch(
+            "backend.engines.rendering.service.build_bubble_clip_mask",
+            side_effect=fake_mask,
+        ):
+            body = service._build_bubble_body_mask(
+                bubble, image
+            )
+
+        self.assertEqual(body.source, "detector_component")
+        self.assertEqual(body.bounds, (40, 40, 200, 100))
+
 if __name__ == "__main__":
     unittest.main()

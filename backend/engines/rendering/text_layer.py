@@ -153,6 +153,8 @@ class TextLayerService:
             input_key=input_key,
         )
         artifact = self.canonical_selector.get_artifact(request)
+        if not artifact.selected.diagnostics.raster_safe:
+            raise RuntimeError("TEXT_LAYER_LAYOUT_UNSAFE")
         text_color = QColor(
             bubble.color if QColor(bubble.color).isValid() else "#000000"
         )

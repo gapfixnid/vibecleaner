@@ -308,13 +308,15 @@ class RenderService:
             return ellipse_fallback()
 
         image_height, image_width = image.shape[:2]
-        expand_x = max(2, int(round(width * 0.12)))
-        expand_y = max(2, int(round(height * 0.12)))
+        short_side = min(width, height)
+        expand = max(
+            6, min(32, int(round(short_side * 0.12)))
+        )
         search_bounds = (
-            max(0, original_bounds[0] - expand_x),
-            max(0, original_bounds[1] - expand_y),
-            min(image_width, original_bounds[2] + expand_x),
-            min(image_height, original_bounds[3] + expand_y),
+            max(0, original_bounds[0] - expand),
+            max(0, original_bounds[1] - expand),
+            min(image_width, original_bounds[2] + expand),
+            min(image_height, original_bounds[3] + expand),
         )
         coords = [int(round(v)) for v in bubble.source_xyxy()]
         seed_bbox = (coords[0], coords[1], coords[2], coords[3]) if len(coords) == 4 else None
@@ -346,6 +348,16 @@ class RenderService:
             if result.source != "detector_component":
                 continue
             mask = np.asarray(result.mask, dtype=np.uint8)
+            if source_name == "expanded_component":
+                component_area = int(np.count_nonzero(mask))
+                detector_area = max(1, width * height)
+                area_ratio = component_area / detector_area
+                if not 0.5 <= area_ratio <= 1.8:
+                    continue
+                if (
+                    result.boundary_contact_ratio or 0.0
+                ) > 0.10:
+                    continue
             if not bool(mask.any()) or not self._is_useful_shape_mask(mask):
                 continue
             refined = self._refine_shape_mask(mask, bubble, bounds)

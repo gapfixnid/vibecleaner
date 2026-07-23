@@ -99,6 +99,9 @@ class RoughLayoutCandidate:
     area_usage: float
     reached_min_font: bool
     is_overflow: bool
+    forbidden_break_count: int
+    orphan_count: int
+    rough_axis_error: float
     rough_key: tuple[Any, ...]
 
 
@@ -406,7 +409,19 @@ class CanonicalLayoutSelector:
                 best = self._resource_failure(fallback)
                 raster_diagnostics.append(best.diagnostics)
             else:
-                best = overflow_best
+                overflow_spec = replace(
+                    overflow_best.candidate,
+                    mask_pass="overflow_fallback",
+                    is_overflow=True,
+                )
+                best = replace(
+                    overflow_best,
+                    candidate=overflow_spec,
+                    diagnostics=replace(
+                        overflow_best.diagnostics,
+                        mask_pass="overflow_fallback",
+                    ),
+                )
             fmax = best.candidate.effective_font_size
 
         return self._freeze_artifact(
@@ -441,6 +456,9 @@ class CanonicalLayoutSelector:
         bold: bool,
         italic: bool,
         rough_key: tuple[Any, ...],
+        forbidden_break_count: int = 0,
+        orphan_count: int | None = None,
+        rough_axis_error: float = 0.0,
     ) -> RoughLayoutCandidate:
         return RoughLayoutCandidate(
             font_family=layout.font.family(),
@@ -459,6 +477,13 @@ class CanonicalLayoutSelector:
             area_usage=float(layout.area_usage),
             reached_min_font=bool(layout.reached_min_font),
             is_overflow=bool(layout.is_overflow),
+            forbidden_break_count=forbidden_break_count,
+            orphan_count=(
+                sum(len(line.strip()) == 1 for line in layout.lines)
+                if orphan_count is None
+                else orphan_count
+            ),
+            rough_axis_error=rough_axis_error,
             rough_key=rough_key,
         )
 
@@ -498,6 +523,11 @@ class CanonicalLayoutSelector:
                     allow_char_break=True,
                     bold=bold,
                     italic=italic,
+                    forbidden_break_count=(
+                        self.renderer._bad_line_break_count(
+                            layout.lines, request.text
+                        )
+                    ),
                     rough_key=(bool(layout.is_overflow), -requested),
                 )
             ]
@@ -541,6 +571,8 @@ class CanonicalLayoutSelector:
                     if layout is None:
                         continue
                     pass_candidates.append(
+                        # Keep semantic penalties explicit; tuple positions
+                        # are only for rough pruning within this pass.
                         self._to_spec(
                             layout,
                             mask_pass="rect",
@@ -549,11 +581,21 @@ class CanonicalLayoutSelector:
                             italic=italic,
                             rough_key=(
                                 bool(layout.is_overflow),
+                                0.0,
                                 -font_pixel_size(layout.font),
                                 self.renderer._bad_line_break_count(
                                     layout.lines, request.text
                                 ),
+                                sum(
+                                    len(line.strip()) == 1
+                                    for line in layout.lines
+                                ),
                                 layout.score,
+                            ),
+                            forbidden_break_count=(
+                                self.renderer._bad_line_break_count(
+                                    layout.lines, request.text
+                                )
                             ),
                         )
                     )
@@ -593,6 +635,11 @@ class CanonicalLayoutSelector:
                     allow_char_break=True,
                     bold=bold,
                     italic=italic,
+                    forbidden_break_count=(
+                        self.renderer._bad_line_break_count(
+                            fallback.lines, request.text
+                        )
+                    ),
                     rough_key=(True, -font_pixel_size(fallback.font)),
                 )
             ]
@@ -655,6 +702,11 @@ class CanonicalLayoutSelector:
                                 allow_char_break=allow_break,
                                 bold=bold,
                                 italic=italic,
+                                forbidden_break_count=bad,
+                                orphan_count=sum(
+                                    len(line.strip()) == 1
+                                    for line in layout.lines
+                                ),
                                 rough_key=rough_key,
                             )
                         )
@@ -722,6 +774,11 @@ class CanonicalLayoutSelector:
             allow_char_break=True,
             bold=request.bubble.bold,
             italic=request.bubble.italic,
+            forbidden_break_count=(
+                self.renderer._bad_line_break_count(
+                    layout.lines, request.text
+                )
+            ),
             rough_key=(True, -font_pixel_size(layout.font)),
         )
 
@@ -1044,12 +1101,12 @@ class CanonicalLayoutSelector:
 
     def _final_key(self, candidate: RasterizedCandidate) -> tuple[Any, ...]:
         spec = candidate.candidate
-        orphan = sum(len(line.strip()) == 1 for line in spec.lines)
         return (
-            spec.rough_key[3] if len(spec.rough_key) > 3 else 0,
-            orphan,
+            spec.forbidden_break_count,
+            spec.orphan_count,
             0 if spec.mask_pass == "mask_strict" else 1,
             0 if not spec.allow_char_break else 1,
+            spec.rough_axis_error,
             spec.score,
             abs(spec.area_usage - 0.62),
             abs(spec.line_height_ratio - 1.12),

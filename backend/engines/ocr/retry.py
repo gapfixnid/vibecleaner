@@ -43,7 +43,8 @@ def _language_mismatch(text: str, language: str) -> bool:
     ratio = script_ratio(text, script)
     if count < 12:
         return ratio < 0.10
-    return ratio < 0.25
+    required_ratio = 0.50 if script == "english" else 0.25
+    return ratio < required_ratio
 
 
 def _warning_needed(original: OcrSnapshot) -> bool:

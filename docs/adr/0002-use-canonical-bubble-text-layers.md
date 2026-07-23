@@ -28,6 +28,9 @@ returns a serializable overflow layout instead of failing the page job. Tile
 generation then enters per-bubble fallback while the translated domain state
 and canonical public geometry remain available. Public fallback lines use the
 same shaped origins, baselines, ink bounds, and runs as a successful tile.
+Likewise, when every rasterized candidate violates the safe mask, the best
+overflow geometry is retained for DOM editing but is relabeled
+`overflow_fallback`; it is never exposed as a ready PNG or export tile.
 
 The public canonical-layout cache is keyed by layout inputs and uses
 singleflight before entering the Qt executor. Tile singleflight owns the whole
@@ -73,3 +76,6 @@ changing the selectable bubble box. Layout fingerprints include the adopted
 mask bounds and source. Detector-component recovery clears `MASK_UNCERTAIN`;
 ellipse fallback adds it. Persisted association, mask, and OCR warnings are
 restored as runtime signals so a layout-only refresh cannot erase them.
+Expansion uses the detector box's short side and is clamped to 6–32 pixels.
+Expanded components must stay within 0.5–1.8 times the detector area and touch
+no more than 10% of the expanded search boundary.

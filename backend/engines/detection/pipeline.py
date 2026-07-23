@@ -156,7 +156,10 @@ class DetectionPipeline:
             key = tuple(int(value) for value in box)
             normalized.append((key, index, box))
         normalized.sort(key=lambda item: (*item[0], item[1]))
-        return [item[2] for item in normalized]
+        unique: dict[tuple[int, ...], np.ndarray] = {}
+        for key, _original_index, box in normalized:
+            unique.setdefault(key, box)
+        return list(unique.values())
 
     def _resolve_option(self, name: str, explicit_value, default):
         if explicit_value is not None:

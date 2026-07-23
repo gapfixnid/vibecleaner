@@ -45,6 +45,19 @@ def test_tiny_overlap_without_center_inside_is_not_associated():
     assert blocks[0].text_class == "text_free"
 
 
+def test_duplicate_bubble_boxes_do_not_create_false_ambiguity():
+    image = np.full((100, 100, 3), 255, dtype=np.uint8)
+    duplicate = [10, 10, 80, 80]
+    blocks = DetectionPipeline().build_text_blocks(
+        image,
+        np.array([[30, 30, 60, 60]]),
+        np.array([duplicate, duplicate]),
+    )
+
+    assert blocks[0].bubble_match_id == 0
+    assert not blocks[0].ambiguous_match
+
+
 def test_bubble_analysis_keeps_raw_model_confidence_separate_from_heuristic_score():
     block = TextBlock(
         text_bbox=np.array([5, 5, 25, 25]),

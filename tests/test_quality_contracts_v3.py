@@ -124,6 +124,16 @@ def test_rejected_retry_does_not_warn_for_high_confidence_original():
     assert not decision.uncertain
 
 
+def test_long_english_candidate_requires_half_latin_script():
+    decision = choose_ocr_retry(
+        OcrSnapshot("", None),
+        OcrSnapshot("abcd가나다라마바사아자차", 0.90),
+        "English",
+    )
+    assert not decision.accepted
+    assert decision.reason == "invalid_candidate"
+
+
 def test_different_detector_bubble_ids_never_merge_in_analysis_or_postpass():
     image = np.full((120, 160, 3), 255, np.uint8)
     first = TextBlock(
