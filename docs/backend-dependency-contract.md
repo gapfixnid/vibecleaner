@@ -1,14 +1,13 @@
 # Backend Dependency Contract
 
 This document is the dependency contract established by the composition-root
-refactor. Keep it aligned with `README.md` and the architecture decision record
-under `docs/adr/`.
+refactor. Keep it aligned with `README.md` and the current architecture
+document under `docs/architecture.md`.
 
-Pipeline v2 evolves this architecture incrementally; it does not authorize a
-second full-product rewrite. The preserve/replace boundary, extension rules,
-shadow rollout, and v1 retirement gates are defined in
-`docs/adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md`. Persisted
-contracts follow `docs/schema-versioning-policy.md`.
+Pipeline v2 is the current page-translation runtime and does not require a
+second full-product rewrite. Current stage, provider, checkpoint, and rendering
+contracts are summarized in `docs/architecture.md`. Persisted contracts follow
+`docs/schema-versioning-policy.md`.
 
 ## Runtime Entry Points
 

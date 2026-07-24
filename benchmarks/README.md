@@ -12,14 +12,14 @@ Generate a local scheduler baseline from the repository root:
 
 ```powershell
 python scripts/benchmark_pipeline_scheduler.py `
-  --output benchmarks/results/pipeline-v1-scheduler.json
+  --output benchmarks/results/pipeline-scheduler-baseline.json
 ```
 
 Results under `benchmarks/results/` are intentionally ignored because timings
-are machine-specific. CI may retain them as artifacts and compare v1/v2 on the
-same runner. Product quality/performance baselines require a licensed dataset,
+are machine-specific. This is a synthetic scheduler baseline, not a v1 runtime
+comparison. Product quality/performance baselines require a licensed dataset,
 pinned model catalog, and hardware profile; those arrive with the benchmark
-workstream rather than being fabricated in Phase A.
+workstream rather than being fabricated without the required data and hardware.
 
 Verify that v2 still overlaps independent Network and GPU stages:
 

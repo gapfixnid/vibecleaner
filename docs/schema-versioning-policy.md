@@ -1,8 +1,8 @@
 # Schema Versioning and Compatibility Policy
 
 This policy governs persisted project files, application settings, pipeline
-artifacts/checkpoints, and caches. It implements ADR 0001's promise that the
-pipeline core can change without breaking user data.
+artifacts/checkpoints, and caches. It implements the architecture policy that
+the pipeline core can change without breaking user data.
 
 ## Version identity
 
@@ -154,7 +154,7 @@ removed until it has been marked deprecated in release notes and runtime
 diagnostics for at least two minor releases. The deprecation notice names the
 replacement, migration behavior, last supported reader, and planned removal
 version. Security or data-corruption fixes may shorten this window, but require
-a dedicated ADR and recovery instructions.
+a dedicated architecture decision and recovery instructions.
 
 Deprecated cache schemas may be invalidated sooner because caches are
 rebuildable, but the release notes must state the performance/storage impact.

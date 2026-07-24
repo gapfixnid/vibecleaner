@@ -6,7 +6,7 @@ This document is for contributors who want to run or package vibecleaner from so
 
 ## Canonical text rendering
 
-Bubble text is rendered once by the backend Qt runtime and reused by both the canvas and export. The runtime/thread, immutable URL, cache, revision, and fallback contracts are recorded in [ADR 0002](adr/0002-use-canonical-bubble-text-layers.md). Keep all render-time Qt objects inside the dedicated worker; only `QGuiApplication` and bundled-font registration belong to the main thread.
+Bubble text is rendered once by the backend Qt runtime and reused by both the canvas and export. The runtime/thread, immutable URL, cache, revision, and fallback contracts are described in the [current architecture](architecture.md). Keep all render-time Qt objects inside the dedicated worker; only `QGuiApplication` and bundled-font registration belong to the main thread.
 
 Automatic layout produces rough candidates and lets the Qt worker choose the
 final result from actual alpha. At most eight candidates are rasterized per
@@ -179,8 +179,7 @@ See these documents for the full contracts:
 - [Backend dependency contract](backend-dependency-contract.md)
 - [Provider extension contract](provider-extension-contract.md)
 - [Schema versioning policy](schema-versioning-policy.md)
-- [Pipeline architecture decision](adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md)
-- [Shadow benchmark](shadow-benchmark.md)
+- [Current architecture](architecture.md)
 - [Model selection and custom ONNX guide](model-guide.md)
 
 ## License

@@ -6,7 +6,7 @@
 
 ## 기준 텍스트 렌더링
 
-말풍선 텍스트는 backend Qt runtime에서 한 번 렌더링하며 canvas와 export가 같은 결과를 재사용합니다. runtime/thread, immutable URL, cache, revision, fallback 계약은 [ADR 0002](adr/0002-use-canonical-bubble-text-layers.md)에 기록했습니다. 렌더링용 Qt 객체는 전용 worker 안에서만 사용하고, `QGuiApplication`과 bundled font 등록만 main thread에서 관리합니다.
+말풍선 텍스트는 backend Qt runtime에서 한 번 렌더링하며 canvas와 export가 같은 결과를 재사용합니다. runtime/thread, immutable URL, cache, revision, fallback 계약은 [현재 아키텍처 문서](architecture.md)에 기록했습니다. 렌더링용 Qt 객체는 전용 worker 안에서만 사용하고, `QGuiApplication`과 bundled font 등록만 main thread에서 관리합니다.
 
 자동 배치는 rough 후보를 만든 뒤 Qt worker에서 실제 alpha를 비교해
 최종 후보를 고릅니다. 말풍선당 raster 후보는 최대 8개이며 선택된
@@ -178,8 +178,7 @@ sidecar 빌드 스크립트는 별도 `.venv-runtime`을 만들고 `requirements
 - [백엔드 의존성 규칙](backend-dependency-contract.md)
 - [프로바이더 확장 규칙](provider-extension-contract.md)
 - [스키마 버전 정책](schema-versioning-policy.md)
-- [파이프라인 ADR](adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md)
-- [Shadow benchmark](shadow-benchmark.md)
+- [현재 아키텍처](architecture.md)
 - [모델 선택 및 ONNX 추가 가이드](model-guide.ko.md)
 
 ## 라이선스

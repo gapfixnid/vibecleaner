@@ -121,7 +121,7 @@ Detection, OCR, and inpainting run locally. Online translation providers receive
 - [Model selection and custom ONNX guide](docs/model-guide.md)
 - [모델 선택 및 ONNX 추가 가이드](docs/model-guide.ko.md)
 - [Backend dependency contract](docs/backend-dependency-contract.md)
-- [Pipeline architecture decision](docs/adr/0001-evolve-the-pipeline-core-without-a-full-rewrite.md)
+- [Current architecture](docs/architecture.md)
 - [Provider extension contract](docs/provider-extension-contract.md)
 - [Schema versioning policy](docs/schema-versioning-policy.md)
 
