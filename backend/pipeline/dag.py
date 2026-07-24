@@ -320,7 +320,11 @@ class DagPipelineExecutor:
 
     @staticmethod
     def _checkpoint_artifacts(context: PipelineContext) -> dict[str, Any]:
-        ephemeral = {"state", "job", "job_manager", "config", "show_progress"}
+        ephemeral = {
+            "state", "job", "job_manager", "config", "show_progress",
+            # This is a live identity guard, not a serializable stage artifact.
+            "snapshot_page",
+        }
         return {
             key: value for key, value in context.artifacts.items()
             if key not in ephemeral

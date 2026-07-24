@@ -50,6 +50,7 @@ export interface JobStatusDto {
   error_code?: string;
   error_stage?: string;
   error_details?: Record<string, unknown>;
+  error_retryable?: boolean;
 }
 
 export interface BubbleUpdateDto {

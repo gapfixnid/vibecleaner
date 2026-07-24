@@ -9,6 +9,40 @@ from pathlib import Path
 from typing import Any
 
 
+def _checkpoint_encode(value: Any) -> Any:
+    """Convert runtime-only proxy wrappers to pickle-safe values."""
+    from .context import StageOutput
+    if isinstance(value, StageOutput):
+        return {
+            "__checkpoint_type__": "StageOutput",
+            "stage": value.stage,
+            "values": _checkpoint_encode(dict(value.values)),
+        }
+    if isinstance(value, dict):
+        return {key: _checkpoint_encode(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_checkpoint_encode(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_checkpoint_encode(item) for item in value)
+    return value
+
+
+def _checkpoint_decode(value: Any) -> Any:
+    from .context import StageOutput
+    if isinstance(value, dict) and value.get("__checkpoint_type__") == "StageOutput":
+        return StageOutput(
+            stage=str(value["stage"]),
+            values=_checkpoint_decode(value.get("values", {})),
+        )
+    if isinstance(value, dict):
+        return {key: _checkpoint_decode(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_checkpoint_decode(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_checkpoint_decode(item) for item in value)
+    return value
+
+
 @dataclass
 class CheckpointManifest:
     run_id: str
@@ -63,7 +97,7 @@ class JsonCheckpointStore:
         fd, temporary = tempfile.mkstemp(prefix=f".{run_id}.", suffix=".tmp", dir=self.root)
         try:
             with os.fdopen(fd, "wb") as handle:
-                pickle.dump(artifacts, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(_checkpoint_encode(artifacts), handle, protocol=pickle.HIGHEST_PROTOCOL)
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary, target)
@@ -79,7 +113,7 @@ class JsonCheckpointStore:
             payload = pickle.load(handle)
         if not isinstance(payload, dict):
             raise ValueError(f"Invalid checkpoint artifact payload for run {run_id}")
-        return payload
+        return _checkpoint_decode(payload)
 
     def delete(self, run_id: str) -> None:
         self.path_for(run_id).unlink(missing_ok=True)

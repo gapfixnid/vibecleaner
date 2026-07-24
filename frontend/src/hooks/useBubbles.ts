@@ -276,11 +276,12 @@ export function useBubbles({ currentIndexRef, pagesRef, runTask, waitForJob, sho
           const job = await api.translateBubble(pageId, bubbleId);
           await waitForJob(job, t("bubbles.translatingSpeechBubble"));
           await fetchBubblesForPage(idx);
+          onPageTranslationChanged?.();
         },
         { errorTitle: t("bubbles.translationFailed") }
       );
     },
-    [currentIndexRef, getPageId, runTask, waitForJob, syncBubblesToBackend, fetchBubblesForPage, t]
+    [currentIndexRef, getPageId, runTask, waitForJob, syncBubblesToBackend, fetchBubblesForPage, onPageTranslationChanged, t]
   );
 
   const handleDeleteBubble = useCallback(

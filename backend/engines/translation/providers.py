@@ -5,6 +5,8 @@ import hashlib
 import logging
 import re
 import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 import cv2
 import numpy as np
@@ -26,6 +28,7 @@ logger = logging.getLogger(__name__)
 OLLAMA_REQUEST_TIMEOUT_SECONDS = 90
 OLLAMA_CONNECTION_TIMEOUT_SECONDS = 5.0
 RETRYABLE_HTTP_STATUS_CODES = {408, 425, 429, 500, 502, 503, 504}
+MAX_RETRY_AFTER_SECONDS = 30.0
 
 
 class FatalProviderHttpError(RuntimeError):
@@ -192,10 +195,16 @@ class OpenAICompatibleTranslator(BaseTranslator):
                         try:
                             delay = float(retry_after) if retry_after else 0.0
                         except (TypeError, ValueError):
-                            delay = 0.0
+                            try:
+                                retry_at = parsedate_to_datetime(str(retry_after))
+                                if retry_at.tzinfo is None:
+                                    retry_at = retry_at.replace(tzinfo=timezone.utc)
+                                delay = (retry_at - datetime.now(timezone.utc)).total_seconds()
+                            except (TypeError, ValueError, OverflowError):
+                                delay = 0.0
                         if delay <= 0:
                             delay = max(0.0, float(self.retry_backoff_seconds)) * (2 ** attempt)
-                        time.sleep(delay)
+                        time.sleep(min(delay, MAX_RETRY_AFTER_SECONDS))
                     continue
 
                 translated_text = self._extract_message_content(response)

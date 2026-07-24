@@ -323,7 +323,19 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
             if "cancelled" in str(exc).lower():
                 raise
             error = str(exc.detail) if isinstance(exc, HTTPException) else str(exc)
-            failed_pages.append({"page_id": page_id, "page_idx": page_idx, "error": error})
+            failed_page = {
+                "page_id": page_id,
+                "page_idx": page_idx,
+                "error": error,
+            }
+            if hasattr(exc, "code"):
+                failed_page.update({
+                    "error_code": getattr(exc, "code"),
+                    "error_stage": getattr(exc, "stage", None),
+                    "retryable": bool(getattr(exc, "retryable", False)),
+                    "error_details": dict(getattr(exc, "details", {}) or {}),
+                })
+            failed_pages.append(failed_page)
         else:
             if page_idx is not None:
                 successful_page_indices.append(page_idx)
@@ -353,6 +365,13 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
         "successful_page_indices": successful_page_indices,
         "failed_pages": failed_pages,
     }
+    if failed_pages and "error_code" in failed_pages[0]:
+        result.update({
+            "error_code": failed_pages[0]["error_code"],
+            "error_stage": failed_pages[0].get("error_stage"),
+            "error_retryable": bool(failed_pages[0].get("retryable")),
+            "error_details": failed_pages[0].get("error_details", {}),
+        })
     container.job_manager.update(job, progress=100, message=msg("batch_translation.complete", ui_lang))
     return result
 
