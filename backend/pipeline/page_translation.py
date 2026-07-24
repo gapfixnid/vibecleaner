@@ -11,6 +11,8 @@ from .dag import DagPipelineExecutor
 from .telemetry import DEFAULT_TELEMETRY_FILENAME
 from .telemetry import JsonlTelemetrySink
 from .telemetry import PipelineTelemetryRecord
+from .validation.results import PipelineJobError
+from .dag import _stable_digest
 
 
 def _telemetry_stages(context: PipelineContext) -> dict[str, dict[str, Any]]:
@@ -100,6 +102,20 @@ def run_page_translation(
     checkpoint_store: Any | None = None,
     resume_manifest: Any | None = None,
 ) -> dict[str, int]:
+    # Capture the input identity under the project lock before any stage can
+    # mutate the page. Detection later validates this identity; it must not
+    # create a new one after checkpoint hydration.
+    with state.lock:
+        page = next((item for item in state.pages if item.page_id == page_id), None)
+        if page is None:
+            raise ValueError(f"Page not found: {page_id}")
+        project_generation = state.project_generation
+        visual_revision = page.visual_revision
+        image_visual_revision = page.image_visual_revision
+        model_values = {
+            name: getattr(config, name, None)
+            for name in ("detect_model", "ocr_model", "translation_model", "inpainting_model", "inpainting_engine")
+        }
     context = PipelineContext(
         page_id=page_id,
         page=None,
@@ -112,6 +128,11 @@ def run_page_translation(
             "config": config,
             "job_manager": job_manager,
             "runtime_provider_diagnostics": _runtime_provider_diagnostics(runner),
+            "project_generation": project_generation,
+            "visual_revision": visual_revision,
+            "image_visual_revision": image_visual_revision,
+            "model_digest": model_values,
+            "settings_digest": _stable_digest(config),
         },
     )
     telemetry_path = getattr(config, "pipeline_telemetry_path", None)
@@ -146,8 +167,10 @@ def run_page_translation(
     ))
     runner.last_result = result
     if not result.succeeded:
-        message = result.issues[0].message if result.issues else "Page translation pipeline failed"
-        raise RuntimeError(message)
+        issue = result.issues[0] if result.issues else None
+        if issue is None:
+            raise RuntimeError("Page translation pipeline failed")
+        raise PipelineJobError(issue)
     if checkpoint_store is not None:
         delete = getattr(checkpoint_store, "delete", None)
         if callable(delete):

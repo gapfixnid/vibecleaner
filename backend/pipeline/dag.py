@@ -133,7 +133,10 @@ class DagPipelineExecutor:
                     return PipelineResult(context=context, succeeded=False, issues=exc.issues)
                 except Exception as exc:
                     issue = ValidationIssue(
-                        code="stage_failed", severity="error", message=str(exc), stage=spec.name
+                        code=str(getattr(exc, "code", "stage_failed")),
+                        severity="error", message=str(exc), stage=getattr(exc, "stage", None) or spec.name,
+                        retryable=bool(getattr(exc, "retryable", False)),
+                        details=dict(getattr(exc, "details", {}) or {}),
                     )
                     context.provenance.finish_stage(
                         entry, started_at,
@@ -180,7 +183,10 @@ class DagPipelineExecutor:
                     issues.extend(stage_issues)
                 except Exception as exc:
                     stage_issues = [ValidationIssue(
-                        code="stage_failed", severity="error", message=str(exc), stage=spec.name
+                        code=str(getattr(exc, "code", "stage_failed")), severity="error", message=str(exc),
+                        stage=getattr(exc, "stage", None) or spec.name,
+                        retryable=bool(getattr(exc, "retryable", False)),
+                        details=dict(getattr(exc, "details", {}) or {}),
                     )]
                     issues.extend(stage_issues)
                 else:

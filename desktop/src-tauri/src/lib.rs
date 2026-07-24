@@ -1063,41 +1063,7 @@ async fn retranslate_bubble(
         "expected_visual_revision": page_before.get("visual_revision").and_then(|v| v.as_u64()).unwrap_or(0),
     })).await?;
 
-    let job_id = job_status
-        .get("job_id")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| "Job ID missing".to_string())?
-        .to_string();
-
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(600);
-    loop {
-        if std::time::Instant::now() >= deadline {
-            return Err(BridgeError::new(
-                "BACKEND_JOB_TIMEOUT",
-                "The translation job did not finish within 10 minutes.",
-                true,
-            ));
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let job_path = job_api_path(&job_id, "")?;
-        let status: serde_json::Value =
-            forward_get_class(&session, &job_path, RequestClass::JobPoll).await?;
-        let state = status
-            .get("status")
-            .and_then(|v| v.as_str())
-            .unwrap_or("queued");
-        if state == "succeeded" {
-            break;
-        } else if state == "failed" || state == "cancelled" {
-            return Err(BridgeError::new(
-                "BACKEND_HTTP_ERROR",
-                "Translation failed.",
-                false,
-            ));
-        }
-    }
-
-    layout_bubble_for_session(&session, page_id, bubble_id).await
+    Ok(job_status)
 }
 
 #[tauri::command]
@@ -1111,41 +1077,7 @@ async fn autofit_bubble(
     let url = page_api_path(&page_id, &format!("/bubbles/{id_num}/inpaint"))?;
     let job_status: serde_json::Value = forward_empty_post(&session, &url).await?;
 
-    let job_id = job_status
-        .get("job_id")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| "Job ID missing".to_string())?
-        .to_string();
-
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(600);
-    loop {
-        if std::time::Instant::now() >= deadline {
-            return Err(BridgeError::new(
-                "BACKEND_JOB_TIMEOUT",
-                "The inpainting job did not finish within 10 minutes.",
-                true,
-            ));
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let job_path = job_api_path(&job_id, "")?;
-        let status: serde_json::Value =
-            forward_get_class(&session, &job_path, RequestClass::JobPoll).await?;
-        let state = status
-            .get("status")
-            .and_then(|v| v.as_str())
-            .unwrap_or("queued");
-        if state == "succeeded" {
-            break;
-        } else if state == "failed" || state == "cancelled" {
-            return Err(BridgeError::new(
-                "BACKEND_HTTP_ERROR",
-                "Inpainting failed.",
-                false,
-            ));
-        }
-    }
-
-    layout_bubble_for_session(&session, page_id, bubble_id).await
+    Ok(job_status)
 }
 
 #[tauri::command]

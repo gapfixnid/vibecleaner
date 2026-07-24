@@ -184,13 +184,11 @@ export const reOcrBubble = async (pageId: string, bubbleId: number): Promise<Act
 };
 
 export const translateBubble = async (pageId: string, bubbleId: number): Promise<JobStatus> => {
-  await api.retranslateBubble(pageId, `bubble_${bubbleId}`);
-  return { job_id: `translate_bubble_${bubbleId}`, status: "succeeded" };
+  return api.retranslateBubble(pageId, `bubble_${bubbleId}`) as Promise<JobStatus>;
 };
 
 export const inpaintBubble = async (pageId: string, bubbleId: number): Promise<JobStatus> => {
-  await api.autofitBubble(pageId, `bubble_${bubbleId}`);
-  return { job_id: `inpaint_bubble_${bubbleId}`, status: "succeeded" };
+  return api.autofitBubble(pageId, `bubble_${bubbleId}`) as Promise<JobStatus>;
 };
 
 export const getTranslationModels = async (

@@ -320,7 +320,7 @@ class ImageSlicer:
         
         # First, let's determine the return type by calling the function on the first slice
         slice_img, start_y, _ = self.get_slice(
-            image, 0, effective_slice_height, slice_height
+            image, 0, effective_slice_height, slice_height, num_slices
         )
         first_result = detect_func(slice_img)
         if on_tile_result is not None:

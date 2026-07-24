@@ -68,6 +68,16 @@ def _quality_rank(
     )
 
 
+def _inpaint_quality_rank(score: Any) -> tuple[int, float, float, float]:
+    signals = dict(getattr(score, "signals", {}) or {})
+    return (
+        1 if bool(getattr(score, "passed", False)) else 0,
+        float(signals.get("outside_preserved_ratio", 0.0)),
+        float(signals.get("target_change_ratio", 0.0)),
+        float(getattr(score, "score", 0.0)),
+    )
+
+
 def _resolve_page_index(state: Any, page_id: str) -> int:
     if page_id.isdigit():
         idx = int(page_id)
@@ -126,6 +136,19 @@ class PageDetectionStage:
         with state.lock:
             page_idx = _resolve_page_index(state, context.page_id)
             page = state.pages[page_idx]
+            expected = (
+                context.artifacts.get("project_generation"),
+                context.artifacts.get("visual_revision"),
+                context.artifacts.get("image_visual_revision"),
+            )
+            actual = (state.project_generation, page.visual_revision, page.image_visual_revision)
+            if all(value is not None for value in expected) and actual != expected:
+                raise PipelineValidationError([ValidationIssue(
+                    code="PAGE_REVISION_CONFLICT", severity="error",
+                    message="Page changed before the pipeline could start. Please retry.",
+                    stage="detection", retryable=True,
+                    details={"expected": expected, "actual": actual, "page_id": context.page_id},
+                )])
             self.ensure_page_image(page)
             image = page.cv_image.copy()
             inpainted_image = page.inpainted_image.copy() if page.inpainted_image is not None else None
@@ -142,10 +165,10 @@ class PageDetectionStage:
         context.artifacts.update(
             {
                 "page_idx": page_idx,
-                "project_generation": state.project_generation,
-                "visual_revision": page.visual_revision,
+                "project_generation": expected[0] if expected[0] is not None else state.project_generation,
+                "visual_revision": expected[1] if expected[1] is not None else page.visual_revision,
                 "snapshot_page": page,
-                "image_visual_revision": page.image_visual_revision,
+                "image_visual_revision": expected[2] if expected[2] is not None else page.image_visual_revision,
                 "image": image,
                 "inpainted_image": inpainted_image,
                 "local_bubbles": local_bubbles,
@@ -155,9 +178,9 @@ class PageDetectionStage:
         )
         context.artifacts["ocr_snapshot"] = PipelineSnapshot(
             page_id=context.page_id,
-            project_generation=state.project_generation,
-            visual_revision=page.visual_revision,
-            image_visual_revision=page.image_visual_revision,
+            project_generation=context.artifacts["project_generation"],
+            visual_revision=context.artifacts["visual_revision"],
+            image_visual_revision=context.artifacts["image_visual_revision"],
             bubbles=tuple(bubble.clone() for bubble in local_bubbles),
         )
 
@@ -629,7 +652,7 @@ class PageInpaintingStage:
                             mask_dilation=max(1, int(getattr(config, "inpaint_mask_dilation", 2)) + 2),
                         )
                         retry_score = self.quality_router.evaluate_inpainting(image, retry_image, boxes)
-                        if retry_score.score > initial_score.score:
+                        if _inpaint_quality_rank(retry_score) > _inpaint_quality_rank(initial_score):
                             inpainted_image, quality_score = retry_image, retry_score
                             selected_engine = retry_engine
                         else:

@@ -28,6 +28,10 @@ OLLAMA_CONNECTION_TIMEOUT_SECONDS = 5.0
 RETRYABLE_HTTP_STATUS_CODES = {408, 425, 429, 500, 502, 503, 504}
 
 
+class FatalProviderHttpError(RuntimeError):
+    """An HTTP response that must not be retried."""
+
+
 class OpenAICompatibleTranslator(BaseTranslator):
     def __init__(
         self,
@@ -180,7 +184,7 @@ class OpenAICompatibleTranslator(BaseTranslator):
                         self.supports_vision = False
                         raise VisionUnsupportedError(active_model)
                     if response.status_code not in RETRYABLE_HTTP_STATUS_CODES:
-                        raise RuntimeError(
+                        raise FatalProviderHttpError(
                             f"Translation provider rejected the request (HTTP {response.status_code})."
                         )
                     if attempt < max_retries:
@@ -240,6 +244,8 @@ class OpenAICompatibleTranslator(BaseTranslator):
                 )
                 break
             except VisionUnsupportedError:
+                raise
+            except FatalProviderHttpError:
                 raise
             except Exception as exc:
                 self.last_error = str(exc)

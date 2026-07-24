@@ -155,12 +155,12 @@ export const tauriClient: vibeCleanerApi = {
     return callTauri<BubbleDto>("reocr_bubble", { pageId, bubbleId });
   },
 
-  async retranslateBubble(pageId: string, bubbleId: string): Promise<BubbleDto> {
-    return callTauri<BubbleDto>("retranslate_bubble", { pageId, bubbleId });
+  async retranslateBubble(pageId: string, bubbleId: string): Promise<JobStatusDto> {
+    return callTauri<JobStatusDto>("retranslate_bubble", { pageId, bubbleId });
   },
 
-  async autofitBubble(pageId: string, bubbleId: string): Promise<BubbleDto> {
-    return callTauri<BubbleDto>("autofit_bubble", { pageId, bubbleId });
+  async autofitBubble(pageId: string, bubbleId: string): Promise<JobStatusDto> {
+    return callTauri<JobStatusDto>("autofit_bubble", { pageId, bubbleId });
   },
 
   async deleteBubble(pageId: string, bubbleId: string): Promise<PageDto> {

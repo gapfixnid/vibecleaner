@@ -151,8 +151,8 @@ export interface vibeCleanerApi {
   updateBubble(pageId: string, bubbleId: string, patch: BubblePatchDto): Promise<BubbleDto>;
   layoutBubble(pageId: string, bubbleId: string): Promise<BubbleDto>;
   reocrBubble(pageId: string, bubbleId: string): Promise<BubbleDto>;
-  retranslateBubble(pageId: string, bubbleId: string): Promise<BubbleDto>;
-  autofitBubble(pageId: string, bubbleId: string): Promise<BubbleDto>;
+  retranslateBubble(pageId: string, bubbleId: string): Promise<JobStatusDto>;
+  autofitBubble(pageId: string, bubbleId: string): Promise<JobStatusDto>;
   deleteBubble(pageId: string, bubbleId: string): Promise<PageDto>;
   exportPageToPath(pageId: string, savePath: string): Promise<ExportPageResultDto>;
   exportPages(options: ExportOptionsDto): Promise<ExportResultDto>;

@@ -18,3 +18,14 @@ class PipelineValidationError(Exception):
     def __init__(self, issues: list[ValidationIssue]) -> None:
         self.issues = issues
         super().__init__("; ".join(issue.message for issue in issues))
+
+
+class PipelineJobError(RuntimeError):
+    """Preserve the first structured pipeline issue at the Job boundary."""
+
+    def __init__(self, issue: ValidationIssue) -> None:
+        super().__init__(issue.message)
+        self.code = issue.code
+        self.stage = issue.stage
+        self.retryable = issue.retryable
+        self.details = dict(issue.details or {})
