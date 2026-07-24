@@ -18,6 +18,14 @@ from ...infrastructure.model_catalog import DEFAULT_OCR_MODEL
 logger = logging.getLogger(__name__)
 
 
+def rgb_luminance(pixels: np.ndarray) -> np.ndarray:
+    """Calculate Rec.601 luminance for the pipeline's RGB image contract."""
+    values = np.asarray(pixels, dtype=np.float64)
+    if values.shape[-1] != 3:
+        raise ValueError("rgb_luminance expects an RGB array with three channels")
+    return 0.299 * values[..., 0] + 0.587 * values[..., 1] + 0.114 * values[..., 2]
+
+
 @dataclass(frozen=True)
 class NormalizedTextRegion:
     box: np.ndarray
@@ -26,7 +34,7 @@ class NormalizedTextRegion:
 
 
 class DetectionPipeline:
-    """Common post-processing pipeline for all detection backends."""
+    """Common post-processing pipeline; image arrays are RGB."""
 
     def __init__(self, settings=None, backend: str | None = None) -> None:
         self.settings = settings
@@ -47,6 +55,11 @@ class DetectionPipeline:
         raw_bubble_count = (
             len(bubble_boxes) if bubble_boxes is not None else 0
         )
+        raw_text_keys = {
+            tuple(int(value) for value in box)
+            for box in (text_boxes if text_boxes is not None else [])
+        }
+        duplicate_text_box_count = max(0, raw_text_count - len(raw_text_keys))
         normalized_text = self._normalize_text_regions(
             text_boxes,
             image.shape,
@@ -97,6 +110,7 @@ class DetectionPipeline:
                 )
             )
             / max(1, raw_text_count + raw_bubble_count),
+            "duplicate_text_box_count": duplicate_text_box_count,
             "ambiguous_match_ratio": ambiguous / max(1, matched),
             "unmatched_ratio": unmatched / max(1, len(text_blocks)),
             "matched": matched,
@@ -121,7 +135,7 @@ class DetectionPipeline:
         image_shape: tuple[int, ...],
         confidences: dict[tuple[int, int, int, int], float],
     ) -> list[NormalizedTextRegion]:
-        regions: list[NormalizedTextRegion] = []
+        by_box: dict[tuple[int, int, int, int], NormalizedTextRegion] = {}
         source_boxes = raw_boxes if raw_boxes is not None else []
         for index, raw_box in enumerate(source_boxes):
             raw_key = tuple(int(value) for value in raw_box)
@@ -130,14 +144,20 @@ class DetectionPipeline:
             )
             if len(cleaned) != 1:
                 continue
-            regions.append(
-                NormalizedTextRegion(
-                    box=np.asarray(cleaned[0], dtype=int),
-                    original_index=index,
-                    confidence=confidences.get(raw_key),
-                )
+            box = np.asarray(cleaned[0], dtype=int)
+            key = tuple(int(value) for value in box)
+            candidate = NormalizedTextRegion(
+                box=box,
+                original_index=index,
+                confidence=confidences.get(raw_key),
             )
-        return regions
+            previous = by_box.get(key)
+            if previous is None or (
+                candidate.confidence is not None
+                and (previous.confidence is None or candidate.confidence > previous.confidence)
+            ):
+                by_box[key] = candidate
+        return sorted(by_box.values(), key=lambda region: region.original_index)
 
     @staticmethod
     def _normalize_bubble_boxes(
@@ -218,10 +238,10 @@ class DetectionPipeline:
             bg = np.median(border_pixels, axis=0)
 
             # Calculate luma (brightness)
-            bg_luma = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]
+            bg_luma = float(rgb_luminance(bg))
 
             # Calculate standard deviation of luma to check uniformity
-            border_luma = 0.299 * border_pixels[:, 0] + 0.587 * border_pixels[:, 1] + 0.114 * border_pixels[:, 2]
+            border_luma = rgb_luminance(border_pixels)
             bg_std = np.std(border_luma)
 
             # 1. White / Light speech bubbles: very bright background and relatively uniform

@@ -90,8 +90,20 @@ def test_empty_ocr_result_is_valid_empty_page_signal():
 
 def test_detection_without_confidence_does_not_trigger_speculative_replan():
     score = AdaptiveQualityRouter().evaluate_detection([SimpleNamespace()])
-    assert score.passed is True
+    assert score.passed is False
     assert score.signals["confidence_available"] == 0.0
+    assert score.status == "DETECTION_UNKNOWN"
+
+
+def test_empty_detection_is_unknown_unless_explicitly_confirmed():
+    router = AdaptiveQualityRouter()
+    unknown = router.evaluate_detection([])
+    confirmed = router.evaluate_detection([], no_text_confirmed=True)
+
+    assert unknown.status == "DETECTION_UNKNOWN"
+    assert not unknown.passed
+    assert confirmed.status == "NO_TEXT_CONFIRMED"
+    assert confirmed.passed
 
 
 def test_inpainting_quality_rejects_noop_result():

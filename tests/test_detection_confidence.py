@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from backend.engines.common.textblock import TextBlock
-from backend.engines.detection.pipeline import DetectionPipeline
+from backend.engines.detection.pipeline import DetectionPipeline, rgb_luminance
 from backend.pipeline.analysis.bubbles import BubbleAnalysisService
 from backend.pipeline.page_analysis import bubbles_from_analysis
 
@@ -31,6 +31,25 @@ def test_clamped_text_box_keeps_raw_detector_confidence():
     )
 
     assert blocks[0].confidence == 0.73
+
+
+def test_duplicate_detector_text_boxes_create_one_text_block():
+    image = np.full((40, 40, 3), 255, dtype=np.uint8)
+    blocks = DetectionPipeline().build_text_blocks(
+        image,
+        np.array([[5, 5, 25, 25], [5, 5, 25, 25]]),
+        np.empty((0, 4), dtype=np.int32),
+        text_confidences={(5, 5, 25, 25): 0.91},
+    )
+
+    assert len(blocks) == 1
+    assert blocks[0].confidence == 0.91
+    assert blocks[0].association_diagnostics["duplicate_text_box_count"] == 1
+
+
+def test_detection_luminance_uses_rgb_channel_order():
+    pixels = np.array([[255, 0, 0], [0, 0, 255]], dtype=np.uint8)
+    np.testing.assert_allclose(rgb_luminance(pixels), [76.245, 29.07])
 
 
 def test_tiny_overlap_without_center_inside_is_not_associated():

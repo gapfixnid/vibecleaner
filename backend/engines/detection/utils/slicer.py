@@ -296,7 +296,9 @@ class ImageSlicer:
     
     def process_slices_for_detection(self, 
                                     image: np.ndarray, 
-                                    detect_func: Callable) -> Any:
+                                    detect_func: Callable,
+                                    on_tile_result: Callable | None = None,
+                                    ) -> Any:
         """
         Process an image by slicing it and running detection on each slice.
         Flexible implementation that adapts to the return type of the detect_func.
@@ -321,19 +323,21 @@ class ImageSlicer:
             image, 0, effective_slice_height, slice_height
         )
         first_result = detect_func(slice_img)
+        if on_tile_result is not None:
+            on_tile_result(0, start_y, first_result)
         
         # Check return type to determine how to process the results
         if isinstance(first_result, tuple) and len(first_result) == 2:
             # Case 1: Function returns a tuple of two arrays (bubble_boxes, text_boxes)
             return self._process_box_tuple_results(
                 image, detect_func, effective_slice_height, num_slices,
-                first_result=first_result,
+                first_result=first_result, on_tile_result=on_tile_result,
             )
         elif isinstance(first_result, np.ndarray):
             # Case 2: Function returns a single array of boxes
             return self._process_single_box_array_results(
                 image, detect_func, effective_slice_height, num_slices,
-                first_result=first_result,
+                first_result=first_result, on_tile_result=on_tile_result,
             )
         else:
             # For any other return type, we'll need to handle it specifically
@@ -348,6 +352,7 @@ class ImageSlicer:
                                   effective_slice_height: int,
                                   num_slices: int,
                                   first_result: tuple[np.ndarray, np.ndarray] | None = None,
+                                  on_tile_result: Callable | None = None,
                                   ) -> tuple[np.ndarray, np.ndarray]:
         """
         Process slices for detectors that return a tuple of (bubble_boxes, text_boxes).
@@ -376,6 +381,8 @@ class ImageSlicer:
                 bubble_boxes, text_boxes = first_result
             else:
                 bubble_boxes, text_boxes = detect_func(slice_img)
+                if on_tile_result is not None:
+                    on_tile_result(slice_number, start_y, (bubble_boxes, text_boxes))
             
             # Adjust coordinates to match original image
             if isinstance(bubble_boxes, np.ndarray) and bubble_boxes.size > 0:
@@ -411,6 +418,7 @@ class ImageSlicer:
                                           effective_slice_height: int,
                                           num_slices: int,
                                           first_result: np.ndarray | None = None,
+                                          on_tile_result: Callable | None = None,
                                           ) -> np.ndarray:
         """
         Process slices for detectors that return a single array of boxes.
@@ -435,6 +443,8 @@ class ImageSlicer:
             
             # Run detection on this slice
             boxes = first_result if slice_number == 0 and first_result is not None else detect_func(slice_img)
+            if slice_number > 0 and on_tile_result is not None:
+                on_tile_result(slice_number, start_y, boxes)
             
             # Adjust coordinates to match original image
             if isinstance(boxes, np.ndarray) and boxes.size > 0:

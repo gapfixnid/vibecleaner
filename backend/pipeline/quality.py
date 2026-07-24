@@ -12,6 +12,7 @@ class QualityScore:
     passed: bool
     signals: dict[str, float] = field(default_factory=dict)
     recommended_action: str = "accept"
+    status: str = "PASS"
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,8 @@ class AdaptiveQualityRouter:
         self,
         regions: list[Any],
         signals: dict[str, float] | None = None,
+        *,
+        no_text_confirmed: bool = False,
     ) -> QualityScore:
         association = dict(signals or {})
         if not association and regions:
@@ -77,21 +80,28 @@ class AdaptiveQualityRouter:
                 > 0.20
             )
         )
+        if not regions:
+            status = "NO_TEXT_CONFIRMED" if no_text_confirmed else "DETECTION_UNKNOWN"
+            return QualityScore(
+                "detection",
+                0.0,
+                no_text_confirmed,
+                {"confidence_available": 0.0, "region_count": 0.0, **association},
+                "accept" if no_text_confirmed else "upgrade_model",
+                status,
+            )
         if not confidences:
             return QualityScore(
                 stage="detection",
-                score=0.0 if association_failed else 1.0,
-                passed=not association_failed,
+                score=0.0,
+                passed=False,
                 signals={
                     "confidence_available": 0.0,
                     "region_count": float(len(regions)),
                     **association,
                 },
-                recommended_action=(
-                    "upgrade_model"
-                    if association_failed
-                    else "accept"
-                ),
+                recommended_action="upgrade_model",
+                status="DETECTION_UNKNOWN",
             )
         mean_confidence = sum(confidences) / len(confidences)
         score = max(0.0, min(1.0, mean_confidence))
@@ -109,6 +119,7 @@ class AdaptiveQualityRouter:
                 **association,
             },
             recommended_action="accept" if passed else "upgrade_model",
+            status="PASS" if passed else "FAIL",
         )
 
     def evaluate_ocr(self, blocks: list[Any], language: str | None = None) -> QualityScore:

@@ -7,6 +7,7 @@ from ...infrastructure.runtime.device import get_providers
 from ...infrastructure.downloads import ModelDownloader, ModelID, models_base_dir
 from ...infrastructure.runtime.onnx import make_session
 from ..common.textblock import TextBlock
+from ..common.geometry import calculate_iou
 from .utils.slicer import ImageSlicer
 from .base import DetectionEngine
 from ...infrastructure.model_catalog import resolve_model
@@ -106,9 +107,33 @@ class RTDetrV2ONNXDetection(DetectionEngine):
             bubble_boxes, text_boxes = self._detect_single_image(image)
         else:
             self._text_confidences_by_box = {}
+            tile_text_candidates: list[tuple[tuple[int, int, int, int], float]] = []
+
+            def capture_tile(_tile_id: int, start_y: int, result: tuple[np.ndarray, np.ndarray]) -> None:
+                _bubble_boxes, tile_text_boxes = result
+                for raw_box in tile_text_boxes if isinstance(tile_text_boxes, np.ndarray) else ():
+                    local_key = tuple(int(value) for value in raw_box)
+                    confidence = self._text_confidences_by_box.get(local_key)
+                    if confidence is None:
+                        continue
+                    global_box = list(local_key)
+                    global_box[1] += start_y
+                    global_box[3] += start_y
+                    tile_text_candidates.append((tuple(global_box), float(confidence)))
+
             bubble_boxes, text_boxes = self.image_slicer.process_slices_for_detection(
-                image, self._detect_single_image
+                image, self._detect_single_image, on_tile_result=capture_tile
             )
+            merged_confidences: dict[tuple[int, int, int, int], float] = {}
+            for final_box in np.asarray(text_boxes).reshape(-1, 4):
+                final_key = tuple(int(value) for value in final_box)
+                matches = [
+                    confidence for candidate_box, confidence in tile_text_candidates
+                    if calculate_iou(list(final_key), list(candidate_box)) >= 0.20
+                ]
+                if matches:
+                    merged_confidences[final_key] = max(matches)
+            self._text_confidences_by_box = merged_confidences
         return self.create_text_blocks(
             image,
             text_boxes,
