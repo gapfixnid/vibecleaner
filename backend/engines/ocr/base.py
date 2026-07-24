@@ -6,6 +6,10 @@ from ...infrastructure import image as imk
 from ..common.textblock import TextBlock
 
 
+class OCREngineNotReadyError(RuntimeError):
+    code = "OCR_MODEL_NOT_READY"
+
+
 class OCREngine(ABC):
     """
     Abstract base class for all OCR engines.

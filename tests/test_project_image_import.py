@@ -74,3 +74,21 @@ def test_open_files_exposes_the_first_import_without_waiting_for_a_second(tmp_pa
     assert [page["filename"] for page in after_first.json()["pages"]] == ["first.png"]
     assert second.json()["current_index"] == 1
     assert [page["filename"] for page in second.json()["pages"]] == ["first.png", "second.png"]
+
+
+def test_open_files_reports_corrupt_images_instead_of_silently_skipping(tmp_path):
+    broken_path = tmp_path / "broken.png"
+    broken_path.write_bytes(b"not an image")
+    headers = {"X-VibeCleaner-Token": TEST_TOKEN}
+
+    with TestClient(create_app(TEST_TOKEN)) as client:
+        response = client.post(
+            "/api/project/open-files",
+            data={"files_json": json.dumps([str(broken_path)])},
+            headers=headers,
+        )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["code"] == "NO_IMPORTABLE_IMAGES"
+    assert detail["import_report"]["rejected"][0]["code"] == "IMAGE_DECODE_FAILED"

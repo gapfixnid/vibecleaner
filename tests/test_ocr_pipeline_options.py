@@ -6,6 +6,7 @@ import numpy as np
 from backend.core.config import AppConfig
 from backend.engines.ocr.ppocr import engine as ppocr_module
 from backend.engines.ocr.ppocr.engine import PPOCRv6Engine
+from backend.engines.ocr.base import OCREngineNotReadyError
 from backend.engines.ocr.ppocr.preprocessing import apply_adaptive_binarization, crop_text_line
 from backend.engines.ocr.local import LocalOCR
 from backend.engines.common.textblock import TextBlock
@@ -25,6 +26,15 @@ class FakePPOCREngine:
         return blocks
 
 class OcrPipelineOptionsTests(unittest.TestCase):
+    def test_ppocr_reports_model_not_ready_instead_of_returning_input(self):
+        engine = PPOCRv6Engine()
+        block = TextBlock([0, 0, 20, 20])
+
+        with self.assertRaises(OCREngineNotReadyError) as raised:
+            engine.process_image(np.zeros((30, 30, 3), dtype=np.uint8), [block])
+
+        self.assertEqual(raised.exception.code, "OCR_MODEL_NOT_READY")
+
     def test_local_ocr_uses_explicit_engine_without_global_config(self):
         block = TextBlock([1, 1, 10, 10])
         image = np.zeros((16, 16, 3), dtype=np.uint8)

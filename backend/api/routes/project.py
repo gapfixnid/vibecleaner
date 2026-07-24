@@ -14,6 +14,7 @@ from ...core.version import APP_NAME
 from ...core.container import AppContainer
 from ...infrastructure.image.encoding import encode_preview_jpeg_bytes
 from ...infrastructure.image.loading import load_cv_image
+from ...infrastructure.image.import_validation import ImportReport, validate_image_for_import
 from ...infrastructure.storage.project_schema import (
     ProjectSchemaError,
     create_project_metadata,
@@ -107,7 +108,7 @@ def _append_imported_pages(state, loaded_pages: list[MangaPage]) -> dict:
         }
 
 
-def _import_result(state, loaded_pages: list[MangaPage]) -> dict:
+def _import_result(state, loaded_pages: list[MangaPage], report: ImportReport | None = None) -> dict:
     """Return the committed page snapshot with the import mutation.
 
     Keeping the mutation and its UI snapshot in one HTTP response avoids a
@@ -117,7 +118,31 @@ def _import_result(state, loaded_pages: list[MangaPage]) -> dict:
     with state.lock:
         result = _append_imported_pages(state, loaded_pages)
         result.update(get_pages_response(state))
+        if report is not None:
+            result["import_report"] = report.to_dict()
         return result
+
+
+def _prepare_import(paths: list[str]) -> tuple[list[MangaPage], ImportReport]:
+    report = ImportReport()
+    loaded_pages: list[MangaPage] = []
+    for path in paths:
+        metadata, issues = validate_image_for_import(path)
+        warnings = [issue for issue in issues if issue.code == "HIGH_MEMORY_IMAGE"]
+        errors = [issue for issue in issues if issue.code != "HIGH_MEMORY_IMAGE"]
+        report.warnings.extend(warnings)
+        if errors or metadata is None:
+            report.rejected.extend(errors or [
+                *issues,
+            ])
+            continue
+        page = MangaPage(file_path=path, cv_image=None)
+        page._width = int(metadata["width"])
+        page._height = int(metadata["height"])
+        page._loaded = False
+        loaded_pages.append(page)
+        report.accepted.append(metadata)
+    return loaded_pages, report
 
 @router.post("/api/project/open-directory")
 def open_directory(directory: str = Form(...), container: AppContainer = Depends(get_container)):
@@ -136,20 +161,10 @@ def open_directory(directory: str = Form(...), container: AppContainer = Depends
     if not files:
         raise HTTPException(status_code=400, detail="No valid images found in the specified directory")
     
-    loaded_pages = []
-    for f in files:
-        try:
-            with Image.open(f) as img:
-                w, h = img.size
-            page = MangaPage(file_path=f, cv_image=None)
-            page._width = w
-            page._height = h
-            page._loaded = False
-            loaded_pages.append(page)
-        except Exception:
-            continue
-
-    return _import_result(container.project_state, loaded_pages)
+    loaded_pages, report = _prepare_import(files)
+    if not loaded_pages:
+        raise HTTPException(status_code=400, detail={"code": "NO_IMPORTABLE_IMAGES", "import_report": report.to_dict()})
+    return _import_result(container.project_state, loaded_pages, report)
 
 @router.post("/api/project/open-files")
 def open_files(files_json: str = Form(...), container: AppContainer = Depends(get_container)):
@@ -162,29 +177,19 @@ def open_files(files_json: str = Form(...), container: AppContainer = Depends(ge
         raise HTTPException(status_code=400, detail="No files selected")
         
     valid_exts = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
-    valid_files = []
+    candidate_files = []
     for f in files:
         ext = os.path.splitext(f)[1].lower()
         if ext in valid_exts and os.path.isfile(f):
-            valid_files.append(f)
+            candidate_files.append(f)
             
-    if not valid_files:
+    if not candidate_files:
         raise HTTPException(status_code=400, detail="No valid images selected")
-        
-    loaded_pages = []
-    for f in valid_files:
-        try:
-            with Image.open(f) as img:
-                w, h = img.size
-            page = MangaPage(file_path=f, cv_image=None)
-            page._width = w
-            page._height = h
-            page._loaded = False
-            loaded_pages.append(page)
-        except Exception:
-            continue
 
-    return _import_result(container.project_state, loaded_pages)
+    loaded_pages, report = _prepare_import(candidate_files)
+    if not loaded_pages:
+        raise HTTPException(status_code=400, detail={"code": "NO_IMPORTABLE_IMAGES", "import_report": report.to_dict()})
+    return _import_result(container.project_state, loaded_pages, report)
 
 @router.post("/api/project/save")
 def save_project(
