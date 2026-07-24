@@ -1,8 +1,8 @@
 # Backend Dependency Contract
 
 This document is the dependency contract established by the composition-root
-refactor. Keep it aligned with `README.md` and the design plan under
-`docs/superpowers/`.
+refactor. Keep it aligned with `README.md` and the architecture decision record
+under `docs/adr/`.
 
 Pipeline v2 evolves this architecture incrementally; it does not authorize a
 second full-product rewrite. The preserve/replace boundary, extension rules,

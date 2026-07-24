@@ -58,6 +58,20 @@ python scripts/benchmark_detection_recall.py `
 The capture output includes the model, threshold, tiling setting, predicted
 boxes, and raw model confidence values used for the run.
 
+Evaluate a quality corpus containing licensed or synthetic annotations and
+captured pipeline outputs:
+
+```powershell
+python scripts/evaluate_quality_corpus.py `
+  path/to/quality-corpus.json `
+  --output benchmarks/results/quality.json
+```
+
+The report includes only metrics supplied by the corpus: detection precision
+and recall, OCR CER/WER, translation exact-match rate, inpainting outside-change
+ratio, and layout overflow rate. The repository contract fixture is intentionally
+empty and does not represent a product-quality score.
+
 ## Golden image and resource regression
 
 `tests/fixtures/golden_image_corpus.json` is a deterministic, repository-safe
