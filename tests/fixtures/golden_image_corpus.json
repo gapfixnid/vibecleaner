@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "corpus_id": "vibecleaner-golden-images-v1",
+  "purpose": "Deterministic input, memory, and pipeline-boundary regression fixtures.",
+  "cases": [
+    {"case_id": "bw_bubbles", "category": "black_white_manga", "width": 640, "height": 900, "pattern": "bubbles"},
+    {"case_id": "color_webtoon", "category": "color_webtoon", "width": 720, "height": 1280, "pattern": "panels"},
+    {"case_id": "long_vertical", "category": "very_long_vertical", "width": 480, "height": 2400, "pattern": "panels"},
+    {"case_id": "low_contrast", "category": "low_contrast_text", "width": 640, "height": 900, "pattern": "low_contrast"},
+    {"case_id": "sfx_page", "category": "sfx_and_dialogue", "width": 640, "height": 900, "pattern": "sfx"},
+    {"case_id": "blank_page", "category": "no_text", "width": 640, "height": 900, "pattern": "blank"},
+    {"case_id": "unicode_page", "category": "unicode_and_combining_text", "width": 640, "height": 900, "pattern": "unicode"}
+  ]
+}

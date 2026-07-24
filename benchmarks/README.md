@@ -58,6 +58,24 @@ python scripts/benchmark_detection_recall.py `
 The capture output includes the model, threshold, tiling setting, predicted
 boxes, and raw model confidence values used for the run.
 
+## Golden image and resource regression
+
+`tests/fixtures/golden_image_corpus.json` is a deterministic, repository-safe
+fixture catalog covering manga, webtoon, long-page, low-contrast, SFX, blank,
+and Unicode cases. It does not claim model accuracy. Run the boundary and
+resource benchmark with:
+
+```powershell
+python scripts/benchmark_golden_regression.py `
+  --output benchmarks/results/golden-regression.json `
+  --repeat 3
+```
+
+Pass a previous result with `--baseline` to fail when a case's p50/p95 input
+validation time or peak Python allocation grows by more than 25 percent. The
+output is machine-readable and should be retained as a CI artifact, not
+committed as a hardware-independent golden timing value.
+
 If ground-truth coordinates are not known, create them with the temporary
 local annotator. It is not included in the product UI or release package:
 
