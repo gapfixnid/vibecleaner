@@ -68,8 +68,9 @@ class ImageSlicer:
             
         return slice_width, slice_height, effective_slice_height, num_slices
     
-    def get_slice(self, image: np.ndarray, slice_number: int, 
-                 effective_slice_height: int, slice_height: int) -> tuple[np.ndarray, int, int]:
+    def get_slice(self, image: np.ndarray, slice_number: int,
+                 effective_slice_height: int, slice_height: int,
+                 num_slices: int | None = None) -> tuple[np.ndarray, int, int]:
         """
         Extract a slice from the image.
         
@@ -88,7 +89,7 @@ class ImageSlicer:
         start_y = slice_number * effective_slice_height
         
         # For the last slice, make sure we go to the end of the image
-        if slice_number == math.ceil(height / effective_slice_height) - 1:
+        if slice_number == (num_slices or math.ceil(height / effective_slice_height)) - 1:
             end_y = height
         else:
             end_y = min(start_y + slice_height, height)
@@ -324,10 +325,16 @@ class ImageSlicer:
         # Check return type to determine how to process the results
         if isinstance(first_result, tuple) and len(first_result) == 2:
             # Case 1: Function returns a tuple of two arrays (bubble_boxes, text_boxes)
-            return self._process_box_tuple_results(image, detect_func, effective_slice_height)
+            return self._process_box_tuple_results(
+                image, detect_func, effective_slice_height, num_slices,
+                first_result=first_result,
+            )
         elif isinstance(first_result, np.ndarray):
             # Case 2: Function returns a single array of boxes
-            return self._process_single_box_array_results(image, detect_func, effective_slice_height)
+            return self._process_single_box_array_results(
+                image, detect_func, effective_slice_height, num_slices,
+                first_result=first_result,
+            )
         else:
             # For any other return type, we'll need to handle it specifically
             # This is just a placeholder for custom implementations
@@ -338,7 +345,10 @@ class ImageSlicer:
     def _process_box_tuple_results(self, 
                                   image: np.ndarray,
                                   detect_func: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]],
-                                  effective_slice_height: int) -> tuple[np.ndarray, np.ndarray]:
+                                  effective_slice_height: int,
+                                  num_slices: int,
+                                  first_result: tuple[np.ndarray, np.ndarray] | None = None,
+                                  ) -> tuple[np.ndarray, np.ndarray]:
         """
         Process slices for detectors that return a tuple of (bubble_boxes, text_boxes).
         
@@ -351,7 +361,6 @@ class ImageSlicer:
             Tuple of (combined_bubble_boxes, combined_text_boxes)
         """
         height, width = image.shape[:2]
-        num_slices = math.ceil(height / effective_slice_height)
         slice_height = int(width * self.target_slice_ratio)
         
         all_bubble_boxes = []
@@ -359,11 +368,14 @@ class ImageSlicer:
         
         for slice_number in range(num_slices):
             slice_img, start_y, _ = self.get_slice(
-                image, slice_number, effective_slice_height, slice_height
+                image, slice_number, effective_slice_height, slice_height, num_slices
             )
             
             # Run detection on this slice
-            bubble_boxes, text_boxes = detect_func(slice_img)
+            if slice_number == 0 and first_result is not None:
+                bubble_boxes, text_boxes = first_result
+            else:
+                bubble_boxes, text_boxes = detect_func(slice_img)
             
             # Adjust coordinates to match original image
             if isinstance(bubble_boxes, np.ndarray) and bubble_boxes.size > 0:
@@ -396,7 +408,10 @@ class ImageSlicer:
     def _process_single_box_array_results(self, 
                                           image: np.ndarray, 
                                           detect_func: Callable[[np.ndarray], np.ndarray],
-                                          effective_slice_height: int) -> np.ndarray:
+                                          effective_slice_height: int,
+                                          num_slices: int,
+                                          first_result: np.ndarray | None = None,
+                                          ) -> np.ndarray:
         """
         Process slices for detectors that return a single array of boxes.
         
@@ -409,18 +424,17 @@ class ImageSlicer:
             Combined array of boxes
         """
         height, width = image.shape[:2]
-        num_slices = math.ceil(height / effective_slice_height)
         slice_height = int(width * self.target_slice_ratio)
         
         all_boxes = []
         
         for slice_number in range(num_slices):
             slice_img, start_y, _ = self.get_slice(
-                image, slice_number, effective_slice_height, slice_height
+                image, slice_number, effective_slice_height, slice_height, num_slices
             )
             
             # Run detection on this slice
-            boxes = detect_func(slice_img)
+            boxes = first_result if slice_number == 0 and first_result is not None else detect_func(slice_img)
             
             # Adjust coordinates to match original image
             if isinstance(boxes, np.ndarray) and boxes.size > 0:

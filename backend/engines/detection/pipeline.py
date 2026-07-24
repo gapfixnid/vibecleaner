@@ -386,15 +386,18 @@ class DetectionPipeline:
                 backend="onnx",
                 det_model=getattr(self.settings, "ocr_model", DEFAULT_OCR_MODEL),
             )
-            missing_lines = [block for block in text_blocks if not getattr(block, "lines", None)]
-            if not missing_lines:
-                return
-            annotate_blocks_with_heuristic_lines(
-                image,
-                missing_lines,
-                line_merge_sensitivity=line_merge_sensitivity,
-                smart_direction=smart_direction,
-                text_direction_override=text_direction_override,
-            )
         except Exception:
-            logger.exception("Failed to build heuristic text lines. block_count=%s", len(text_blocks))
+            logger.exception("PP-OCR line detection failed; using heuristic lines. block_count=%s", len(text_blocks))
+
+        missing_lines = [block for block in text_blocks if not getattr(block, "lines", None)]
+        if missing_lines:
+            try:
+                annotate_blocks_with_heuristic_lines(
+                    image,
+                    missing_lines,
+                    line_merge_sensitivity=line_merge_sensitivity,
+                    smart_direction=smart_direction,
+                    text_direction_override=text_direction_override,
+                )
+            except Exception:
+                logger.exception("Heuristic line fallback failed. block_count=%s", len(missing_lines))

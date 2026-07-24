@@ -49,7 +49,7 @@ class JobManager:
             active_job_id = self._active_keys.get(key)
             if active_job_id:
                 active_job = self._jobs.get(active_job_id)
-                if active_job and active_job["status"] in {"queued", "running"}:
+                if active_job and active_job["status"] in {"queued", "running", "cancelling"}:
                     return self._public(active_job)
 
             job_id = uuid.uuid4().hex
@@ -129,7 +129,9 @@ class JobManager:
     def update(self, job: dict[str, Any], *, progress: int | None = None, message: str | None = None) -> None:
         with self._lock:
             if progress is not None:
-                job["progress"] = max(0, min(100, progress))
+                job["progress"] = max(
+                    job.get("progress", 0), max(0, min(100, progress))
+                )
             if message is not None:
                 job["message"] = message
             job["updated_at"] = time.time()
@@ -157,6 +159,8 @@ class JobManager:
                 return self._public(job)
             if job["status"] in {"queued", "running"}:
                 job["cancel_requested"] = True
+                if job["status"] == "running":
+                    job["status"] = "cancelling"
                 job["message"] = None  # frontend shows localized fallback
                 job["updated_at"] = time.time()
             return self._public(job)

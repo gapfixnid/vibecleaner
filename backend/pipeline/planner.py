@@ -19,13 +19,18 @@ class PipelinePlanner:
         )
 
     def translate_page_dag_plan(self) -> DagPipelinePlan:
-        """Return the v2 dependency graph with independent work marked parallel-safe."""
+        """Return the page graph.
+
+        Translation and inpainting currently share a mutable page context, so
+        they remain sequential until immutable stage outputs and a join stage
+        are introduced.
+        """
         return DagPipelinePlan(
             stages=(
                 DagStage("detection", resource=ResourceClass.GPU),
                 DagStage("ocr", ("detection",), ResourceClass.CPU),
-                DagStage("translation", ("ocr",), ResourceClass.NETWORK, parallel_safe=True),
-                DagStage("inpainting", ("ocr",), ResourceClass.GPU, parallel_safe=True),
+                DagStage("translation", ("ocr",), ResourceClass.NETWORK),
+                DagStage("inpainting", ("ocr",), ResourceClass.GPU),
                 DagStage("layout", ("translation", "inpainting"), ResourceClass.CPU),
                 DagStage("rendering", ("layout",), ResourceClass.IO),
             )

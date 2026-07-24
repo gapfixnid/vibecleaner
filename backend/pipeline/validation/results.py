@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 
 @dataclass(frozen=True)
@@ -10,6 +10,8 @@ class ValidationIssue:
     severity: Literal["warning", "error"]
     message: str
     stage: str | None = None
+    retryable: bool = False
+    details: dict[str, Any] | None = None
 
 
 class PipelineValidationError(Exception):

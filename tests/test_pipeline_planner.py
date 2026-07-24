@@ -10,7 +10,7 @@ def test_v2_page_plan_declares_stage_resources_and_dependencies():
     ]
     assert plan.stages[0].resource is ResourceClass.GPU
     assert plan.stages[2].resource is ResourceClass.NETWORK
-    assert plan.stages[2].parallel_safe is True
+    assert plan.stages[2].parallel_safe is False
     assert plan.stages[3].depends_on == ("ocr",)
     assert plan.stages[4].depends_on == ("translation", "inpainting")
     assert plan.stages[-1].depends_on == ("layout",)

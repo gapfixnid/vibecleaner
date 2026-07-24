@@ -23,10 +23,11 @@ from .page_analysis import (
     inpaint_boxes,
     recover_missing_source_polygons,
 )
-from .context import PipelineContext
+from .context import PipelineContext, PipelineSnapshot, StageOutput
 from .registry import StageRegistry
 from .runner import PipelineRunner
 from .quality import AdaptiveQualityRouter
+from .validation.results import PipelineValidationError, ValidationIssue
 
 logger = logging.getLogger(__name__)
 
@@ -78,13 +79,28 @@ def _resolve_page_index(state: Any, page_id: str) -> int:
 
 def _ensure_page_guard(state: Any, context: PipelineContext) -> Any:
     if state.project_generation != context.artifacts["project_generation"]:
-        raise RuntimeError("Project was replaced while the operation was running. Please retry.")
+        raise PipelineValidationError([ValidationIssue(
+            code="PROJECT_REVISION_CONFLICT", severity="error",
+            message="Project was replaced while the operation was running. Please retry.",
+            stage="commit", retryable=True, details={"page_id": context.page_id},
+        )])
     page_idx = _resolve_page_index(state, context.page_id)
     page = state.pages[page_idx]
     if page is not context.artifacts["snapshot_page"]:
-        raise RuntimeError("Page was replaced while the operation was running. Please retry.")
+        raise PipelineValidationError([ValidationIssue(
+            code="PAGE_REVISION_CONFLICT", severity="error",
+            message="Page was replaced while the operation was running. Please retry.",
+            stage="commit", retryable=True, details={"page_id": context.page_id},
+        )])
     if page.visual_revision != context.artifacts["visual_revision"]:
-        raise RuntimeError("Page changed while the operation was running. Please retry.")
+        raise PipelineValidationError([ValidationIssue(
+            code="PAGE_REVISION_CONFLICT", severity="error",
+            message="Page changed while the operation was running. Please retry.",
+            stage="commit", retryable=True,
+            details={"page_id": context.page_id,
+                     "expected_visual_revision": context.artifacts["visual_revision"],
+                     "actual_visual_revision": page.visual_revision},
+        )])
     return page
 
 
@@ -133,6 +149,13 @@ class PageDetectionStage:
                 "bubble_counter": bubble_counter,
                 "blocks": [],
             }
+        )
+        context.artifacts["ocr_snapshot"] = PipelineSnapshot(
+            page_id=context.page_id,
+            project_generation=state.project_generation,
+            visual_revision=page.visual_revision,
+            image_visual_revision=page.image_visual_revision,
+            bubbles=tuple(bubble.clone() for bubble in local_bubbles),
         )
 
         job_manager.ensure_not_cancelled(job)
@@ -419,6 +442,13 @@ class PageOcrStage:
 
         context.artifacts["local_bubbles"] = local_bubbles
         context.artifacts["ocr_result"] = local_bubbles
+        context.artifacts["ocr_snapshot"] = PipelineSnapshot(
+            page_id=context.page_id,
+            project_generation=context.artifacts["project_generation"],
+            visual_revision=context.artifacts["visual_revision"],
+            image_visual_revision=context.artifacts["image_visual_revision"],
+            bubbles=tuple(bubble.clone() for bubble in local_bubbles),
+        )
         diagnostics_after = self._diagnostics()
         ocr_provenance["cache"].update({
             "hits_after": diagnostics_after.get("ocr_cache_hits"),
@@ -492,7 +522,8 @@ class PageTranslationStage:
         show_progress = context.artifacts["show_progress"]
         config = context.artifacts["config"]
         image = context.artifacts["image"]
-        local_bubbles = context.artifacts["local_bubbles"]
+        snapshot = context.artifacts["ocr_snapshot"]
+        local_bubbles = [bubble.clone() for bubble in snapshot.bubbles]
         untranslated = [bubble for bubble in local_bubbles if not bubble.translated]
         temp_blocks = []
 
@@ -509,7 +540,11 @@ class PageTranslationStage:
             job_manager.ensure_not_cancelled(job)
 
         context.artifacts["temp_blocks"] = temp_blocks
-        context.artifacts["translation_result"] = local_bubbles
+        context.artifacts["translation_result"] = tuple(local_bubbles)
+        context.artifacts["translation_output"] = StageOutput(
+            stage=self.name,
+            values={"bubbles": tuple(local_bubbles), "temp_blocks": tuple(temp_blocks)},
+        )
         return context
 
 
@@ -528,7 +563,8 @@ class PageInpaintingStage:
         config = context.artifacts["config"]
         image = context.artifacts["image"]
         inpainted_image = context.artifacts["inpainted_image"]
-        local_bubbles = context.artifacts["local_bubbles"]
+        snapshot = context.artifacts["ocr_snapshot"]
+        local_bubbles = [bubble.clone() for bubble in snapshot.bubbles]
 
         if inpainted_image is None:
             if show_progress:
@@ -574,6 +610,9 @@ class PageInpaintingStage:
 
         context.artifacts["inpainted_image"] = inpainted_image
         context.artifacts["inpaint_result"] = inpainted_image
+        context.artifacts["inpainting_output"] = StageOutput(
+            stage=self.name, values={"image": inpainted_image}
+        )
         return context
 
 
@@ -588,7 +627,13 @@ class PageLayoutStage:
         job = context.artifacts["job"]
         job_manager = context.artifacts["job_manager"]
         image = context.artifacts["image"]
-        local_bubbles = context.artifacts["local_bubbles"]
+        translation_output = context.artifacts.get("translation_output")
+        source_bubbles = (
+            translation_output.values["bubbles"]
+            if isinstance(translation_output, StageOutput)
+            else context.artifacts.get("translation_result", context.artifacts["local_bubbles"])
+        )
+        local_bubbles = [bubble.clone() for bubble in source_bubbles]
         layout_cache = {}
         text_layer_refs = {}
         render_statuses = {}
@@ -715,7 +760,16 @@ class PageLayoutStage:
         context.artifacts["bubble_layout_cache"] = layout_cache
         context.artifacts["text_layer_refs"] = text_layer_refs
         context.artifacts["bubble_render_status"] = render_statuses
-        context.artifacts["layout_result"] = local_bubbles
+        context.artifacts["layout_result"] = tuple(local_bubbles)
+        context.artifacts["layout_output"] = StageOutput(
+            stage=self.name,
+            values={
+                "bubbles": tuple(local_bubbles),
+                "bubble_layout_cache": layout_cache,
+                "text_layer_refs": text_layer_refs,
+                "bubble_render_status": render_statuses,
+            },
+        )
         return context
 
 
@@ -742,7 +796,7 @@ class PageRenderingStage:
         show_progress = context.artifacts["show_progress"]
         page_id = context.page_id
         inpainted_image = context.artifacts["inpainted_image"]
-        local_bubbles = context.artifacts["local_bubbles"]
+        local_bubbles = list(context.artifacts["layout_result"])
         bubble_counter = context.artifacts["bubble_counter"]
         bubble_layout_cache = context.artifacts.get("bubble_layout_cache", {})
 
@@ -750,9 +804,11 @@ class PageRenderingStage:
             job_manager.update(job, progress=80, message=msg_from_context("page_translation.rendering", context))
         job_manager.ensure_not_cancelled(job)
         inpainted_preview_bytes = self.encode_preview_jpeg_bytes(inpainted_image) if inpainted_image is not None else None
+        thumbnail_original_bytes = self.encode_thumbnail_bytes(context.artifacts["image"])
         job_manager.ensure_not_cancelled(job)
 
         with state.lock:
+            job_manager.ensure_not_cancelled(job)
             page = _ensure_page_guard(state, context)
             page.bubbles = local_bubbles
             page.bubble_counter = bubble_counter
@@ -762,14 +818,18 @@ class PageRenderingStage:
             page._bubble_layout_cache = dict(bubble_layout_cache)
             page.text_layer_refs = dict(context.artifacts.get("text_layer_refs", {}))
             page.bubble_render_status = dict(context.artifacts.get("bubble_render_status", {}))
-            page._thumbnail_original_bytes = self.encode_thumbnail_bytes(page.cv_image)
+            page._thumbnail_original_bytes = thumbnail_original_bytes
             if inpainted_preview_bytes is not None:
                 page._preview_inpainted_bytes = inpainted_preview_bytes
             page.visual_revision += 1
             state.touch()
 
         context.artifacts["render_result"] = page
-        context.artifacts["result"] = {"translated_count": len(page.bubbles)}
+        translated_count = sum(
+            bool((bubble.translated or "").strip())
+            for bubble in page.bubbles
+        )
+        context.artifacts["result"] = {"translated_count": translated_count}
         return context
 
 

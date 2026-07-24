@@ -155,9 +155,6 @@ export function useProcessingTask(
           if (pollingGeneration !== pollingGenerationRef.current) {
             throw new Error(CANCELLED);
           }
-          if (cancelRequestedRef.current) {
-            throw new Error(CANCELLED);
-          }
           if (job.status === "succeeded" || job.status === "succeeded_with_errors") {
             return job.result;
           }
