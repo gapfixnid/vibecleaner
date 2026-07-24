@@ -14,7 +14,9 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ activeJob, onCancel, pageCount, currentIndex, selectedPageCount, isDirty, t }: StatusBarProps) {
-  const jobText = activeJob ? activeJob.message || activeJob.label : t("statusbar.ready");
+  const jobText = activeJob?.status === "cancelling"
+    ? t("task.cancelling")
+    : activeJob ? activeJob.message || activeJob.label : t("statusbar.ready");
   const progress = activeJob?.progress ?? null;
   const pageIndicator = pageCount > 0 && selectedPageCount > 1
     ? t("statusbar.selectedPageIndicator")
@@ -69,6 +71,7 @@ export function StatusBar({ activeJob, onCancel, pageCount, currentIndex, select
               data-tooltip={t("dialog.cancel")}
               data-tooltip-pos="top"
               aria-label={t("dialog.cancel")}
+              disabled={activeJob.status === "cancelling"}
             >
               <X size={11} />
             </button>

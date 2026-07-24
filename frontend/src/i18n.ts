@@ -144,6 +144,7 @@ export type TranslationKey =
   | "task.translatingPages"
   | "task.failed"
   | "task.cancelled"
+  | "task.cancelling"
   | "statusbar.ready"
   | "statusbar.pageIndicator"
   | "statusbar.selectedPageIndicator"
@@ -476,6 +477,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "task.translatingPages": "Translating {count} pages...",
     "task.failed": "Task Failed",
     "task.cancelled": "Task cancelled",
+    "task.cancelling": "Cancelling...",
     "statusbar.ready": "Ready",
     "statusbar.pageIndicator": "Page {n} of {total}",
     "statusbar.selectedPageIndicator": "{count} of {total} pages selected",
@@ -806,6 +808,7 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "task.translatingPages": "{count}개 페이지 번역 중...",
     "task.failed": "작업 실패",
     "task.cancelled": "작업이 취소되었습니다",
+    "task.cancelling": "작업 취소 중...",
     "statusbar.ready": "준비됨",
     "statusbar.pageIndicator": "{total}페이지 중 {n}페이지",
     "statusbar.selectedPageIndicator": "{total}페이지 중 {count}페이지 선택",

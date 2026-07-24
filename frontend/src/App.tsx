@@ -26,7 +26,7 @@ import { useWindowCloseGuard } from "./hooks/useWindowCloseGuard";
 import { useAppChrome } from "./hooks/useAppChrome";
 import { useFileDropImport } from "./hooks/useFileDropImport";
 import { useProjectActions } from "./hooks/useProjectActions";
-import { useAppSettings } from "./hooks/useAppSettings";
+import { SETUP_KNOWN_COMPLETE_KEY, useAppSettings } from "./hooks/useAppSettings";
 import { useWorkspacePages } from "./hooks/useWorkspacePages";
 import { createTranslator } from "./i18n";
 import { usePanelWidths } from "./hooks/usePanelWidths";
@@ -63,6 +63,13 @@ function App() {
   const t = useMemo(() => createTranslator(settings.ui_language), [settings.ui_language]);
   const handleInitialSetupComplete = useCallback((updatedSettings: typeof settings) => {
     setSettings(updatedSettings);
+    if (updatedSettings.setup_completed) {
+      try {
+        window.localStorage.setItem(SETUP_KNOWN_COMPLETE_KEY, "true");
+      } catch {
+        // Ignore unavailable storage.
+      }
+    }
   }, [setSettings]);
 
   const { toasts, showToast, dismissToast } = useToasts();

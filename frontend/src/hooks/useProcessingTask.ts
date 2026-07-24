@@ -55,6 +55,7 @@ export interface ActiveJobInfo {
   message: string | null;
   /** 0-100, or null for indeterminate. */
   progress: number | null;
+  status: JobStatus["status"];
 }
 
 /** Safety cap so a stuck/dead backend job can't poll forever. */
@@ -119,8 +120,8 @@ export function useProcessingTask(
   const cancelCurrentJob = useCallback(() => {
     cancelRequestedRef.current = true;
     const jobId = currentJobIdRef.current;
-    if (jobId) {
-      // Best effort: the poll loop exits via cancelRequestedRef regardless.
+  if (jobId) {
+      setActiveJob((current) => current ? { ...current, status: "cancelling", message: null } : current);
       runtime.cancelJob(jobId).catch(() => {});
     }
   }, [runtime]);
@@ -142,6 +143,7 @@ export function useProcessingTask(
           label: fallbackStatus,
           message: options?.ignoreBackendMessage ? null : job.message || null,
           progress: typeof job.progress === "number" ? job.progress : null,
+          status: cancelRequestedRef.current ? "cancelling" : job.status,
         });
       };
       publish(startedJob);
@@ -159,7 +161,8 @@ export function useProcessingTask(
             return job.result;
           }
           if (job.status === "failed") {
-            const errorMsg = job.error || `${job.kind || "Job"} failed`;
+            const errorCode = job.error_code ? `[${job.error_code}] ` : "";
+            const errorMsg = `${errorCode}${job.error || `${job.kind || "Job"} failed`}`;
             // Backend cancellation exceptions surface as failed+"cancelled" error.
             // Treat them as user cancellation so the i18n message is shown.
             if (errorMsg.toLowerCase().includes("cancelled")) {
