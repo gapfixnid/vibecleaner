@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -66,7 +68,17 @@ class JsonlTelemetrySink:
                 retained.append(json.dumps(row, ensure_ascii=False))
         while retained and len(("\n".join(retained) + "\n").encode("utf-8")) > self.max_bytes:
             retained.pop(0)
-        self.path.write_text(("\n".join(retained) + "\n") if retained else "", encoding="utf-8")
+        content = (("\n".join(retained) + "\n") if retained else "").encode("utf-8")
+        fd, temporary = tempfile.mkstemp(prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent)
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, self.path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
 
 
 def load_telemetry(path: str | Path) -> list[dict[str, Any]]:

@@ -47,6 +47,9 @@ export interface JobStatusDto {
   message?: string;
   result?: unknown;
   error?: string;
+  error_code?: string;
+  error_stage?: string;
+  error_details?: Record<string, unknown>;
 }
 
 export interface BubbleUpdateDto {

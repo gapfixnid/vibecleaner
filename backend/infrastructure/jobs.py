@@ -63,6 +63,9 @@ class JobManager:
                 "message": None,  # let frontend show its localized fallback label
                 "result": None,
                 "error": None,
+                "error_code": None,
+                "error_stage": None,
+                "error_details": {},
                 "cancel_requested": False,
                 "created_at": time.time(),
                 "updated_at": time.time(),
@@ -110,6 +113,9 @@ class JobManager:
                             job["error"] = result.get("error") or details
                         else:
                             job["error"] = result.get("error") or "Job completed without successful results"
+                        job["error_code"] = result.get("error_code") or "JOB_FAILED"
+                        job["error_stage"] = result.get("stage")
+                        job["error_details"] = result.get("error_details") or {}
                 job["updated_at"] = time.time()
         except Exception as exc:
             logger.exception("Background job failed: %s", job_id)
@@ -120,6 +126,9 @@ class JobManager:
                 else:
                     job["status"] = "failed"
                     job["error"] = str(exc)
+                    job["error_code"] = str(getattr(exc, "code", "JOB_FAILED"))
+                    job["error_stage"] = getattr(exc, "stage", None)
+                    job["error_details"] = dict(getattr(exc, "details", {}) or {})
                     job["message"] = None  # frontend shows localized fallback
                 job["updated_at"] = time.time()
         finally:
@@ -175,4 +184,7 @@ class JobManager:
             "message": job["message"],
             "result": job["result"],
             "error": job["error"],
+            "error_code": job.get("error_code"),
+            "error_stage": job.get("error_stage"),
+            "error_details": dict(job.get("error_details") or {}),
         }

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from time import perf_counter, sleep
@@ -11,6 +13,14 @@ from .registry import StageRegistry
 from .runner import PipelineResult
 from .resources import ResourceClass, ResourceManager
 from .validation.results import PipelineValidationError, ValidationIssue
+
+
+def _stable_digest(value: Any) -> str:
+    try:
+        payload = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
+    except TypeError:
+        payload = repr(value)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -222,7 +232,13 @@ class DagPipelineExecutor:
                 completed_stages=sorted(completed),
                 artifact_keys=sorted(artifacts),
                 metadata={
-                    "schema_version": 1,
+                    "schema_version": 2,
+                    "pipeline_contract_version": "v2",
+                    "project_generation": context.artifacts.get("project_generation"),
+                    "visual_revision": context.artifacts.get("visual_revision"),
+                    "image_visual_revision": context.artifacts.get("image_visual_revision"),
+                    "settings_digest": _stable_digest(context.artifacts.get("config")),
+                    "artifact_digest": _stable_digest(sorted(artifacts)),
                     "quality_replans": context.artifacts.get("quality_replans", []),
                     "quality_scores": context.artifacts.get("quality_scores", {}),
                 },

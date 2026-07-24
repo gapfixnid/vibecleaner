@@ -17,6 +17,10 @@ class CheckpointManifest:
     artifact_keys: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def contract_version(self) -> str:
+        return str(self.metadata.get("pipeline_contract_version", "unknown"))
+
 
 class JsonCheckpointStore:
     """Atomic JSON manifest store; artifact payloads remain stage-owned."""
