@@ -109,31 +109,40 @@ def test_dag_does_not_resume_when_visual_revision_changes():
 
 def test_checkpoint_round_trips_stage_output_and_resume_keeps_live_page_identity(tmp_path):
     registry = StageRegistry()
+    calls = 0
 
     class OutputStage(Stage):
         def run(self, context):
+            nonlocal calls
+            calls += 1
             context.artifacts["translation_output"] = StageOutput("translation", {"text": "ok"})
             return context
 
     registry.register(OutputStage("translate", "translate"))
+    registry.register(Stage("layout", "layout"))
     store = JsonCheckpointStore(tmp_path)
     live_page = object()
     first = SimpleNamespace(
         artifacts={"snapshot_page": live_page, "project_generation": 1, "visual_revision": 2, "image_visual_revision": 3, "config": None},
         provenance=ProvenanceTrace(), page_id="page-1",
     )
+    plan = DagPipelinePlan((DagStage("translate"), DagStage("layout", ("translate",))))
     assert DagPipelineExecutor(registry, checkpoint_store=store).run(
-        first, DagPipelinePlan((DagStage("translate"),))
+        first, plan
     ).succeeded
     manifest = store.load(first.provenance.run_id)
+    assert manifest is not None
+    assert manifest.completed_stages == ["translate"]
+    assert calls == 1
     resumed = SimpleNamespace(
         artifacts={"snapshot_page": live_page, "project_generation": 1, "visual_revision": 2, "image_visual_revision": 3, "config": None},
         provenance=ProvenanceTrace(), page_id="page-1",
     )
     result = DagPipelineExecutor(registry, checkpoint_store=store).run(
-        resumed, DagPipelinePlan((DagStage("translate"),)), resume_manifest=manifest
+        resumed, plan, resume_manifest=manifest
     )
     assert result.succeeded
+    assert calls == 1
     assert isinstance(resumed.artifacts["translation_output"], StageOutput)
     assert resumed.artifacts["snapshot_page"] is live_page
 

@@ -118,7 +118,7 @@ def run_page_translation(
         }
     context = PipelineContext(
         page_id=page_id,
-        page=None,
+        page=page,
         image=ImageData(array=None),
         settings=config,
         artifacts={
