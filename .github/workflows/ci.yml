@@ -49,6 +49,22 @@ jobs:
       - name: Python tests
         run: python -m pytest -q
 
+      - name: Golden image resource regression
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force benchmarks/results | Out-Null
+          python scripts/benchmark_golden_regression.py `
+            --output benchmarks/results/golden-regression.json `
+            --repeat 3
+
+      - name: Upload golden regression report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-image-regression
+          path: benchmarks/results/golden-regression.json
+          if-no-files-found: error
+
       - name: Frontend checks
         shell: pwsh
         run: |
