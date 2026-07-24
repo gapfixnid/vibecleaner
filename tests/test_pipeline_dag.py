@@ -86,6 +86,24 @@ def test_dag_resume_hydrates_page_artifacts_from_checkpoint_payload(tmp_path):
     assert store.payload_path_for(first.provenance.run_id).exists()
 
 
+def test_dag_does_not_resume_when_visual_revision_changes():
+    registry = StageRegistry()
+    registry.register(Stage("detect", "detect"))
+    context = SimpleNamespace(
+        artifacts={"order": ["hydrated"], "visual_revision": 2},
+        provenance=ProvenanceTrace(), page_id="page-1",
+    )
+    manifest = CheckpointManifest(
+        run_id="old-run", page_id="page-1", completed_stages=["detect"],
+        artifact_keys=["order"], metadata={"visual_revision": 1},
+    )
+    result = DagPipelineExecutor(registry).run(
+        context, DagPipelinePlan((DagStage("detect"),)), resume_manifest=manifest
+    )
+    assert result.succeeded
+    assert context.artifacts["order"] == ["hydrated", "detect"]
+
+
 def test_dag_retries_transient_stage_failure():
     class Flaky(Stage):
         def __init__(self):

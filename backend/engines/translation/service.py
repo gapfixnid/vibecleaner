@@ -4,6 +4,7 @@ import logging
 import threading
 import hashlib
 import shutil
+import tempfile
 import numpy as np
 from dataclasses import replace
 from typing import List, Optional, Any, Dict, cast
@@ -513,20 +514,43 @@ class TranslationService:
 
     def _load_tm(self) -> None:
         """Load persistent Translation Memory from local JSON file."""
-        if os.path.exists(self.tm_path):
+        candidates = [self.tm_path, self.tm_path + ".bak"]
+        for candidate in candidates:
+            if not os.path.exists(candidate):
+                continue
             try:
                 with self._cache_lock:
-                    with open(self.tm_path, "r", encoding="utf-8") as f:
-                        self._cache = json.load(f)
-                logger.info("Loaded %d translation memory records from %s", len(self._cache), self.tm_path)
+                    with open(candidate, "r", encoding="utf-8") as f:
+                        loaded = json.load(f)
+                    if not isinstance(loaded, dict):
+                        raise ValueError("Translation memory file must contain a JSON object")
+                    self._cache = {str(k): str(v) for k, v in loaded.items()}
+                if candidate != self.tm_path:
+                    logger.warning("Recovered translation memory from backup %s", candidate)
+                logger.info("Loaded %d translation memory records from %s", len(self._cache), candidate)
+                return
             except Exception:
-                logger.exception("Failed to load translation memory from %s", self.tm_path)
+                logger.exception("Failed to load translation memory from %s", candidate)
 
     def _save_tm(self) -> None:
         """Save persistent Translation Memory to local JSON file."""
         try:
             with self._cache_lock:
-                with open(self.tm_path, "w", encoding="utf-8") as f:
-                    json.dump(self._cache, f, ensure_ascii=False, indent=4)
+                directory = os.path.dirname(self.tm_path) or "."
+                os.makedirs(directory, exist_ok=True)
+                fd, temporary_path = tempfile.mkstemp(
+                    prefix="translation_memory.", suffix=".tmp", dir=directory
+                )
+                try:
+                    with os.fdopen(fd, "w", encoding="utf-8") as f:
+                        json.dump(self._cache, f, ensure_ascii=False, indent=4)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    if os.path.exists(self.tm_path):
+                        shutil.copyfile(self.tm_path, self.tm_path + ".bak")
+                    os.replace(temporary_path, self.tm_path)
+                finally:
+                    if os.path.exists(temporary_path):
+                        os.unlink(temporary_path)
         except Exception:
             logger.exception("Failed to save translation memory to %s", self.tm_path)

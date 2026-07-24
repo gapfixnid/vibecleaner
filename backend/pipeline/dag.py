@@ -23,6 +23,22 @@ def _stable_digest(value: Any) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _model_fingerprint(context: PipelineContext) -> dict[str, Any]:
+    explicit = context.artifacts.get("model_digest")
+    if explicit is not None:
+        return {"explicit": explicit}
+    config = context.artifacts.get("config")
+    values: dict[str, Any] = {}
+    for name in ("detect_model", "ocr_model", "translation_model", "inpainting_model", "inpainting_engine"):
+        if isinstance(config, dict):
+            value = config.get(name)
+        else:
+            value = getattr(config, name, None)
+        if value is not None:
+            values[name] = value
+    return values
+
+
 @dataclass(frozen=True)
 class DagStage:
     name: str
@@ -218,13 +234,59 @@ class DagPipelineExecutor:
     ) -> bool:
         if manifest is None or spec.name not in manifest.completed_stages:
             return False
+        if not DagPipelineExecutor._checkpoint_compatible(manifest, context):
+            return False
         # A manifest alone is not enough: the caller must hydrate artifacts first.
         return bool(manifest.artifact_keys) and set(manifest.artifact_keys) <= set(context.artifacts)
+
+    @staticmethod
+    def _checkpoint_compatible(manifest: CheckpointManifest, context: PipelineContext) -> bool:
+        """Reject checkpoints produced for a different input/settings/model revision.
+
+        Manifests written before schema v2 remain resumable when they have no
+        compatibility metadata; new manifests are strict about every value
+        they record.
+        """
+        metadata = manifest.metadata or {}
+        if metadata.get("pipeline_contract_version") not in (None, "v2"):
+            return False
+        artifacts = context.artifacts
+        for key in ("project_generation", "visual_revision", "image_visual_revision"):
+            if key in metadata and metadata[key] is not None and metadata[key] != artifacts.get(key):
+                return False
+        if "settings_digest" in metadata:
+            config = artifacts.get("config")
+            if metadata["settings_digest"] != _stable_digest(config):
+                return False
+        if "model_digest" in metadata:
+            if metadata["model_digest"] != _stable_digest(_model_fingerprint(context)):
+                return False
+        if "input_digest" in metadata:
+            current = {
+                "page_id": context.page_id,
+                "project_generation": artifacts.get("project_generation"),
+                "visual_revision": artifacts.get("visual_revision"),
+                "image_visual_revision": artifacts.get("image_visual_revision"),
+                "settings_digest": _stable_digest(artifacts.get("config")),
+                "model_digest": _stable_digest(_model_fingerprint(context)),
+            }
+            if metadata["input_digest"] != _stable_digest(current):
+                return False
+        return True
 
     def _save_checkpoint(self, context: PipelineContext, completed: set[str]) -> None:
         if self.checkpoint_store is None:
             return
         artifacts = self._checkpoint_artifacts(context)
+        model_digest = _model_fingerprint(context)
+        input_fingerprint = {
+            "page_id": context.page_id,
+            "project_generation": context.artifacts.get("project_generation"),
+            "visual_revision": context.artifacts.get("visual_revision"),
+            "image_visual_revision": context.artifacts.get("image_visual_revision"),
+            "settings_digest": _stable_digest(context.artifacts.get("config")),
+            "model_digest": _stable_digest(model_digest),
+        }
         self.checkpoint_store.save(
             CheckpointManifest(
                 run_id=context.provenance.run_id,
@@ -238,6 +300,8 @@ class DagPipelineExecutor:
                     "visual_revision": context.artifacts.get("visual_revision"),
                     "image_visual_revision": context.artifacts.get("image_visual_revision"),
                     "settings_digest": _stable_digest(context.artifacts.get("config")),
+                    "model_digest": _stable_digest(model_digest),
+                    "input_digest": _stable_digest(input_fingerprint),
                     "artifact_digest": _stable_digest(sorted(artifacts)),
                     "quality_replans": context.artifacts.get("quality_replans", []),
                     "quality_scores": context.artifacts.get("quality_scores", {}),
@@ -265,6 +329,10 @@ class DagPipelineExecutor:
             raise ValueError(
                 f"Checkpoint page mismatch: expected {context.page_id!r}, got {manifest.page_id!r}"
             )
+        # An incompatible checkpoint is treated as a cold start. This keeps
+        # stale artifacts from being injected before the stage loop evaluates it.
+        if not self._checkpoint_compatible(manifest, context):
+            return
         load_artifacts = getattr(self.checkpoint_store, "load_artifacts", None)
         if callable(load_artifacts):
             context.artifacts.update(load_artifacts(manifest.run_id))

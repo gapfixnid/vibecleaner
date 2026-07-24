@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import platform
 import sys
 import tempfile
 import time
@@ -90,7 +92,19 @@ def run(*, repeat: int = 3, baseline: dict | None = None) -> dict:
                 "time_ms": {"p50": _percentile(timings, 0.50), "p95": _percentile(timings, 0.95)},
                 "peak_python_bytes": max(peaks),
             })
-    output = {"schema_version": 1, "corpus_id": corpus["corpus_id"], "repeat": repeat, "cases": results}
+    output = {
+        "schema_version": 1,
+        "corpus_id": corpus["corpus_id"],
+        "repeat": repeat,
+        "environment": {
+            "platform": platform.platform(),
+            "python": platform.python_version(),
+            "machine": platform.machine(),
+            "processor": platform.processor(),
+            "device_profile": os.environ.get("VIBECLEANER_BENCHMARK_DEVICE", "cpu"),
+        },
+        "cases": results,
+    }
     if baseline:
         regressions = []
         baseline_cases = {item["case_id"]: item for item in baseline.get("cases", [])}
