@@ -28,6 +28,7 @@ from .registry import StageRegistry
 from .runner import PipelineRunner
 from .quality import AdaptiveQualityRouter
 from .validation.results import PipelineValidationError, ValidationIssue
+from .translation_quality import validate_translation
 
 logger = logging.getLogger(__name__)
 
@@ -535,8 +536,30 @@ class PageTranslationStage:
                 for bubble in untranslated
             ]
             self.translation_service.translate_blocks(temp_blocks, config.source_language, config.target_language, image)
+            quality_results = []
             for bubble, text_block in zip(untranslated, temp_blocks):
                 bubble.translated = text_block.translation
+                quality = validate_translation(
+                    bubble.text,
+                    bubble.translated,
+                    source_language=config.source_language,
+                    target_language=config.target_language,
+                )
+                quality_results.append(quality)
+                if quality.passed:
+                    bubble._derived_problem_codes.discard("TRANSLATION_UNCERTAIN")
+                else:
+                    bubble._derived_problem_codes.add("TRANSLATION_UNCERTAIN")
+            context.artifacts["translation_quality"] = {
+                "checked": len(quality_results),
+                "passed": sum(item.passed for item in quality_results),
+                "failed": sum(not item.passed for item in quality_results),
+                "issues": [
+                    {"bubble_id": bubble.id, "code": quality.reason_code, "detail": quality.detail}
+                    for bubble, quality in zip(untranslated, quality_results)
+                    if not quality.passed
+                ],
+            }
             job_manager.ensure_not_cancelled(job)
 
         context.artifacts["temp_blocks"] = temp_blocks

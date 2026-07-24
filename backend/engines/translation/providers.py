@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_REQUEST_TIMEOUT_SECONDS = 90
 OLLAMA_CONNECTION_TIMEOUT_SECONDS = 5.0
+RETRYABLE_HTTP_STATUS_CODES = {408, 425, 429, 500, 502, 503, 504}
 
 
 class OpenAICompatibleTranslator(BaseTranslator):
@@ -178,6 +179,19 @@ class OpenAICompatibleTranslator(BaseTranslator):
                         )
                         self.supports_vision = False
                         raise VisionUnsupportedError(active_model)
+                    if response.status_code not in RETRYABLE_HTTP_STATUS_CODES:
+                        raise RuntimeError(
+                            f"Translation provider rejected the request (HTTP {response.status_code})."
+                        )
+                    if attempt < max_retries:
+                        retry_after = response.headers.get("Retry-After")
+                        try:
+                            delay = float(retry_after) if retry_after else 0.0
+                        except (TypeError, ValueError):
+                            delay = 0.0
+                        if delay <= 0:
+                            delay = max(0.0, float(self.retry_backoff_seconds)) * (2 ** attempt)
+                        time.sleep(delay)
                     continue
 
                 translated_text = self._extract_message_content(response)
@@ -236,7 +250,7 @@ class OpenAICompatibleTranslator(BaseTranslator):
                 )
 
             if attempt < max_retries:
-                time.sleep(max(0, int(self.retry_backoff_seconds)))
+                time.sleep(max(0.0, float(self.retry_backoff_seconds)) * (2 ** attempt))
 
         raise RuntimeError(self.last_error or "Translation failed after multiple attempts.")
 
