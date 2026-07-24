@@ -614,19 +614,38 @@ class PageInpaintingStage:
                     "inpainting", current_engine, quality_score, self.provider_manifest
                 )
                 if retry_engine != current_engine:
-                    inpainted_image = self.inpainting_service.clean_background(
-                        image,
-                        boxes,
-                        bubble_clip_boxes(local_bubbles),
-                        source_polygons=bubble_source_polygons(local_bubbles),
-                        protect_edges=True,
-                        engine=retry_engine,
-                        mask_dilation=max(1, int(getattr(config, "inpaint_mask_dilation", 2)) + 2),
-                    )
-                    quality_score = self.quality_router.evaluate_inpainting(image, inpainted_image, boxes)
+                    initial_image = inpainted_image
+                    initial_score = quality_score
+                    try:
+                        retry_image = self.inpainting_service.clean_background(
+                            image,
+                            boxes,
+                            bubble_clip_boxes(local_bubbles),
+                            source_polygons=bubble_source_polygons(local_bubbles),
+                            protect_edges=True,
+                            engine=retry_engine,
+                            mask_dilation=max(1, int(getattr(config, "inpaint_mask_dilation", 2)) + 2),
+                        )
+                        retry_score = self.quality_router.evaluate_inpainting(image, retry_image, boxes)
+                        if retry_score.score > initial_score.score:
+                            inpainted_image, quality_score = retry_image, retry_score
+                            selected_engine = retry_engine
+                        else:
+                            inpainted_image, quality_score = initial_image, initial_score
+                            selected_engine = current_engine
+                    except Exception as exc:
+                        logger.warning("Inpainting retry failed; preserving initial result: %s", exc)
+                        inpainted_image, quality_score = initial_image, initial_score
+                        selected_engine = current_engine
                     context.artifacts.setdefault("quality_replans", []).append({
-                        "stage": "inpainting", "engine": retry_engine, "passed": quality_score.passed
+                        "stage": "inpainting", "engine": retry_engine,
+                        "selected_engine": selected_engine,
+                        "initial_score": initial_score.score,
+                        "retry_score": retry_score.score if "retry_score" in locals() else None,
+                        "passed": quality_score.passed,
                     })
+                    if "retry_score" in locals():
+                        del retry_score
             context.artifacts.setdefault("quality_scores", {})["inpainting"] = quality_score
             if inpainted_image is None or getattr(inpainted_image, "shape", None) != getattr(image, "shape", None):
                 raise RuntimeError("Inpainting did not produce a valid page image")

@@ -132,3 +132,13 @@ def test_inpainting_quality_accepts_sparse_stroke_removal():
 
     assert score.passed is True
     assert score.signals["outside_preserved_ratio"] == 1.0
+
+
+def test_inpainting_retry_score_can_be_compared_without_replacing_better_result():
+    image = np.zeros((12, 12, 3), dtype=np.uint8)
+    first = image.copy()
+    first[2:4, 2:4] = 32
+    second = image.copy()
+    second[2:8, 2:8] = 255
+    router = AdaptiveQualityRouter()
+    assert router.evaluate_inpainting(image, second, [[2, 2, 8, 8]]).score > router.evaluate_inpainting(image, first, [[2, 2, 8, 8]]).score
