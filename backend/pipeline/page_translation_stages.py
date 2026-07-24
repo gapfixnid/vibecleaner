@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import hashlib
 import math
+import numpy as np
 from types import SimpleNamespace
 from typing import Any
 
@@ -680,6 +682,9 @@ class PageLayoutStage:
         text_layer_refs = {}
         render_statuses = {}
         layout_diagnostics: list[dict[str, Any]] = []
+        page_image_digest = hashlib.sha256(
+            np.ascontiguousarray(image).data
+        ).hexdigest()
         translation_ratios: list[float] = []
         expanded_count = 0
         for bubble in local_bubbles:
@@ -692,6 +697,7 @@ class PageLayoutStage:
                         bubble,
                         image,
                         image_revision=context.artifacts.get("image_visual_revision", 0),
+                        image_digest=page_image_digest,
                     )
                     layout = tile.layout
                     diagnostics = dict(

@@ -200,6 +200,7 @@ class CanonicalLayoutSelector:
         mask: np.ndarray | None = None,
         mask_bounds: tuple[int, int, int, int] | None = None,
         mask_source: str | None = None,
+        image_digest: str | None = None,
     ) -> str:
         if mask is None:
             body = self.render_service._build_bubble_body_mask(
@@ -208,11 +209,12 @@ class CanonicalLayoutSelector:
             mask = body.mask if body is not None else None
             mask_bounds = body.bounds if body is not None else None
             mask_source = body.source if body is not None else None
-        image_digest = (
-            hashlib.sha256(np.ascontiguousarray(image).data).hexdigest()
-            if image is not None
-            else None
-        )
+        if image_digest is None:
+            image_digest = (
+                hashlib.sha256(np.ascontiguousarray(image).data).hexdigest()
+                if image is not None
+                else None
+            )
         mask_array = np.ascontiguousarray(mask) if mask is not None else None
         mask_digest = (
             hashlib.sha256(mask_array.data).hexdigest()

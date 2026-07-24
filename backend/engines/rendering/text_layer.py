@@ -124,6 +124,7 @@ class TextLayerService:
         bubble: TextBubble,
         image: np.ndarray,
         image_revision: int,
+        image_digest: str | None = None,
     ) -> str:
         del page_id, image_revision
         text = bubble.translated or bubble.text or ""
@@ -132,6 +133,7 @@ class TextLayerService:
             bubble,
             image,
             bubble.font_family or None,
+            image_digest=image_digest,
         )
 
     def create_tile(
@@ -140,10 +142,11 @@ class TextLayerService:
         bubble: TextBubble,
         image: np.ndarray,
         image_revision: int = 0,
+        image_digest: str | None = None,
     ) -> TextLayerTile:
         text = bubble.translated or bubble.text or ""
         input_key = self.layout_input_key(
-            page_id, bubble, image, image_revision
+            page_id, bubble, image, image_revision, image_digest
         )
         request = self.canonical_selector.build_request(
             text,
