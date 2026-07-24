@@ -335,6 +335,14 @@ def _run_translate_batch_pages(job: dict, page_ids: List[str], container: AppCon
                     "retryable": bool(getattr(exc, "retryable", False)),
                     "error_details": dict(getattr(exc, "details", {}) or {}),
                 })
+            elif isinstance(getattr(exc, "detail", None), dict):
+                detail = exc.detail
+                failed_page.update({
+                    "error_code": detail.get("code", "JOB_FAILED"),
+                    "error_stage": detail.get("stage"),
+                    "retryable": bool(detail.get("retryable", False)),
+                    "error_details": dict(detail.get("details", {}) or {}),
+                })
             failed_pages.append(failed_page)
         else:
             if page_idx is not None:

@@ -43,10 +43,11 @@ def test_dag_rejects_cycles():
 def test_dag_writes_stage_checkpoint(tmp_path):
     registry = StageRegistry()
     registry.register(Stage("detect", "detect"))
+    registry.register(Stage("ocr", "ocr"))
     context = SimpleNamespace(artifacts={}, provenance=ProvenanceTrace(), page_id="page-1")
     store = JsonCheckpointStore(tmp_path)
     result = DagPipelineExecutor(registry, checkpoint_store=store).run(
-        context, DagPipelinePlan((DagStage("detect"),))
+        context, DagPipelinePlan((DagStage("detect"), DagStage("ocr", ("detect",))))
     )
     assert result.succeeded
     manifest = store.load(context.provenance.run_id)
@@ -71,19 +72,20 @@ def test_dag_resume_skips_stage_when_checkpoint_artifacts_are_hydrated():
 def test_dag_resume_hydrates_page_artifacts_from_checkpoint_payload(tmp_path):
     registry = StageRegistry()
     registry.register(Stage("detect", "detect"))
+    registry.register(Stage("ocr", "ocr"))
     store = JsonCheckpointStore(tmp_path)
     first = SimpleNamespace(artifacts={}, provenance=ProvenanceTrace(), page_id="page-1")
     assert DagPipelineExecutor(registry, checkpoint_store=store).run(
-        first, DagPipelinePlan((DagStage("detect"),))
+        first, DagPipelinePlan((DagStage("detect"), DagStage("ocr", ("detect",))))
     ).succeeded
     manifest = store.load(first.provenance.run_id)
 
     resumed = SimpleNamespace(artifacts={}, provenance=ProvenanceTrace(), page_id="page-1")
     result = DagPipelineExecutor(registry, checkpoint_store=store).run(
-        resumed, DagPipelinePlan((DagStage("detect"),)), resume_manifest=manifest
+        resumed, DagPipelinePlan((DagStage("detect"), DagStage("ocr", ("detect",)))), resume_manifest=manifest
     )
     assert result.succeeded
-    assert resumed.artifacts["order"] == ["detect"]
+    assert resumed.artifacts["order"] == ["detect", "ocr"]
     assert store.payload_path_for(first.provenance.run_id).exists()
 
 

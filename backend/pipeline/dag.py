@@ -114,7 +114,8 @@ class DagPipelineExecutor:
                 failure = self._run_parallel_batch(context, executable, completed, pending)
                 if failure is not None:
                     return failure
-                self._save_checkpoint(context, completed)
+                if pending:
+                    self._save_checkpoint(context, completed)
                 continue
             for spec in executable:
                 stage = self.registry.get(spec.name)
@@ -149,7 +150,8 @@ class DagPipelineExecutor:
                 )
                 completed.add(spec.name)
                 pending.remove(spec)
-                self._save_checkpoint(context, completed)
+                if pending:
+                    self._save_checkpoint(context, completed)
         return PipelineResult(context=context, succeeded=True)
 
     def _run_parallel_batch(
@@ -324,6 +326,7 @@ class DagPipelineExecutor:
             "state", "job", "job_manager", "config", "show_progress",
             # This is a live identity guard, not a serializable stage artifact.
             "snapshot_page",
+            "render_result",
         }
         return {
             key: value for key, value in context.artifacts.items()

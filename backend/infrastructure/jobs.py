@@ -115,7 +115,7 @@ class JobManager:
                         else:
                             job["error"] = result.get("error") or "Job completed without successful results"
                         job["error_code"] = result.get("error_code") or "JOB_FAILED"
-                        job["error_stage"] = result.get("stage")
+                        job["error_stage"] = result.get("error_stage") or result.get("stage")
                         job["error_details"] = result.get("error_details") or {}
                         job["error_retryable"] = bool(result.get("error_retryable", False))
                 job["updated_at"] = time.time()

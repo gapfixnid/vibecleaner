@@ -128,6 +128,9 @@ def run_page_translation(
             "config": config,
             "job_manager": job_manager,
             "runtime_provider_diagnostics": _runtime_provider_diagnostics(runner),
+            # Keep the live object as the commit identity. It is deliberately
+            # excluded from checkpoint payloads and therefore survives hydrate.
+            "snapshot_page": page,
             "project_generation": project_generation,
             "visual_revision": visual_revision,
             "image_visual_revision": image_visual_revision,
