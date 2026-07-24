@@ -210,8 +210,29 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    api.getModelStatus().then(setModelStatus).catch(() => setModelStatus(null));
-    api.getProviderCatalog().then(setProviderCatalog).catch(() => setProviderCatalog(null));
+    let active = true;
+    let retryTimer: number | undefined;
+    let attempts = 0;
+    const loadStartupData = async () => {
+      try {
+        const [status, catalog] = await Promise.all([
+          api.getModelStatus(),
+          api.getProviderCatalog(),
+        ]);
+        if (!active) return;
+        setModelStatus(status);
+        setProviderCatalog(catalog);
+      } catch {
+        if (!active || attempts >= 20) return;
+        attempts += 1;
+        retryTimer = window.setTimeout(() => void loadStartupData(), 500);
+      }
+    };
+    void loadStartupData();
+    return () => {
+      active = false;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
   }, [isOpen]);
 
   useEffect(() => {

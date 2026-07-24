@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import * as api from "../services/api";
 import * as desktop from "../services/desktop";
 import { mergeBackendStatus } from "../lib/backendStatus";
+import { detectSystemUiLanguage } from "../i18n";
+import { SETUP_KNOWN_COMPLETE_KEY } from "./useAppSettings";
 import type { BackendStatus } from "../types/backend";
 import type { PagesResponse, Settings } from "../types";
 
@@ -77,7 +79,17 @@ export function useBackendBootstrap({
           fetchPagesFromServer(),
         ]);
         if (statusRef.current?.generation !== generation || statusRef.current.phase !== "running") return;
-        setSettings(settings);
+        try {
+          if (settings.setup_completed) window.localStorage.setItem(SETUP_KNOWN_COMPLETE_KEY, "true");
+          else window.localStorage.removeItem(SETUP_KNOWN_COMPLETE_KEY);
+        } catch {
+          // Ignore unavailable storage.
+        }
+        setSettings(
+          settings.setup_completed === false
+            ? { ...settings, ui_language: detectSystemUiLanguage() }
+            : settings,
+        );
         commitPagesFromServer(pages);
         handledRunningGenerationRef.current = generation;
         setBackendError(null);

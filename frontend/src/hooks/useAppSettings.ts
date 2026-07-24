@@ -1,8 +1,18 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 import * as api from "../services/api";
-import { getStoredUiLanguage, rememberUiLanguage } from "../i18n";
+import { detectSystemUiLanguage, getStoredUiLanguage, rememberUiLanguage } from "../i18n";
 import { DEFAULT_TRANSLATION_OPTIONS } from "../translationSettings";
 import type { Settings } from "../types";
+
+export const SETUP_KNOWN_COMPLETE_KEY = "vibecleaner_setup_known_complete";
+
+function hasKnownCompletedSetup(): boolean {
+  try {
+    return window.localStorage.getItem(SETUP_KNOWN_COMPLETE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 const DEFAULT_SETTINGS: Settings = {
   translation_model: "",
@@ -19,7 +29,7 @@ const DEFAULT_SETTINGS: Settings = {
   translation_llm_temperature: DEFAULT_TRANSLATION_OPTIONS.temperature,
   translation_llm_top_p: DEFAULT_TRANSLATION_OPTIONS.topP,
   translation_llm_max_tokens: DEFAULT_TRANSLATION_OPTIONS.maxTokens,
-  ui_language: getStoredUiLanguage(),
+  ui_language: hasKnownCompletedSetup() ? getStoredUiLanguage() : detectSystemUiLanguage(),
   source_language: "Japanese",
   target_language: "Korean",
   system_prompt: "",
@@ -44,7 +54,7 @@ const DEFAULT_SETTINGS: Settings = {
   inpaint_mask_dilation: 2,
   inpaint_use_textbox_only: true,
   inpaint_clip_to_bubble: true,
-  setup_completed: true,
+  setup_completed: hasKnownCompletedSetup(),
 };
 
 export function useAppSettings() {

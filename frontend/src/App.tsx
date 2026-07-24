@@ -5,6 +5,7 @@ import { Canvas } from "./components/Canvas";
 import { Inspector } from "./components/Inspector";
 import { SettingsModal } from "./components/SettingsModal";
 import { InitialSetupModal } from "./components/InitialSetupModal";
+import { SetupWelcomeModal } from "./components/SetupWelcomeModal";
 
 import { CustomDialog } from "./components/CustomDialog";
 import { AboutModal } from "./components/AboutModal";
@@ -52,7 +53,17 @@ function App() {
     markDirty();
   }, [markClean, markDirty]);
   const { settings, setSettings, handleSaveSettings } = useAppSettings();
+  const [setupWelcomeOpen, setSetupWelcomeOpen] = useState(settings.setup_completed === false);
+  const setupStartedRef = useRef(false);
+  useEffect(() => {
+    if (settings.setup_completed === false && !setupStartedRef.current) {
+      setSetupWelcomeOpen(true);
+    }
+  }, [settings.setup_completed]);
   const t = useMemo(() => createTranslator(settings.ui_language), [settings.ui_language]);
+  const handleInitialSetupComplete = useCallback((updatedSettings: typeof settings) => {
+    setSettings(updatedSettings);
+  }, [setSettings]);
 
   const { toasts, showToast, dismissToast } = useToasts();
   const notifyCancelled = useCallback(
@@ -490,10 +501,21 @@ function App() {
       )}
 
       {!backendError && settings.setup_completed === false && (
+        <SetupWelcomeModal
+          isOpen={setupWelcomeOpen}
+          t={t}
+          onStart={() => {
+            setupStartedRef.current = true;
+            setSetupWelcomeOpen(false);
+          }}
+        />
+      )}
+
+      {!backendError && settings.setup_completed === false && !setupWelcomeOpen && (
         <InitialSetupModal
           isOpen
           settings={settings}
-          onComplete={setSettings}
+          onComplete={handleInitialSetupComplete}
           waitForJob={waitForJob}
         />
       )}
@@ -518,7 +540,9 @@ function App() {
         />
       )}
 
-      {isBootstrapping && !backendError && <StartupLoadingScreen t={t} />}
+      {isBootstrapping && !backendError && settings.setup_completed !== false && (
+        <StartupLoadingScreen t={t} />
+      )}
 
       <style>{`
         .main-workspace {

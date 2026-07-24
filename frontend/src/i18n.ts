@@ -309,6 +309,12 @@ export type TranslationKey =
   | "settings.clipInpaintingMask"
   | "settings.maskTolerances"
   | "settings.maskDilation"
+  | "setup.welcomeTitle"
+  | "setup.welcomeDescription"
+  | "setup.welcomeStepOne"
+  | "setup.welcomeStepTwo"
+  | "setup.welcomeStepThree"
+  | "setup.start"
   | "setup.title"
   | "setup.subtitle"
   | "setup.languages"
@@ -325,6 +331,7 @@ export type TranslationKey =
   | "setup.ready"
   | "setup.saveFailed"
   | "setup.downloadFailed";
+  
 
 const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
   en: {
@@ -473,6 +480,12 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "statusbar.pageIndicator": "Page {n} of {total}",
     "statusbar.selectedPageIndicator": "{count} of {total} pages selected",
     "statusbar.unsaved": "Unsaved changes",
+    "setup.welcomeTitle": "Welcome to VibeCleaner",
+    "setup.welcomeDescription": "A short setup will prepare your languages, processing profile, and required local models before you begin.",
+    "setup.welcomeStepOne": "Choose the source and target languages.",
+    "setup.welcomeStepTwo": "Select a balanced or fast processing profile.",
+    "setup.welcomeStepThree": "Review the models; already installed models will not be downloaded again.",
+    "setup.start": "Start initial setup",
     "setup.downloadingModels": "Downloading models...",
     "setup.languageHelp": "Choose the source and target languages, then select the translation provider you want to use.",
     "setup.googleProviderHelp": "Ready to use without an API key.",
@@ -958,6 +971,12 @@ const translations: Record<UiLanguage, Record<TranslationKey, string>> = {
     "settings.clipInpaintingMask": "인페인팅 마스크를 말풍선 테두리 안쪽으로 제한",
     "settings.maskTolerances": "마스크 허용값",
     "settings.maskDilation": "마스크 확장",
+    "setup.welcomeTitle": "VibeCleaner에 오신 것을 환영합니다",
+    "setup.welcomeDescription": "작업을 시작하기 전에 언어, 처리 프로필, 필요한 로컬 모델을 간단히 준비합니다.",
+    "setup.welcomeStepOne": "원문과 번역 언어를 선택합니다.",
+    "setup.welcomeStepTwo": "균형형 또는 고속 처리 프로필을 선택합니다.",
+    "setup.welcomeStepThree": "모델을 확인합니다. 이미 설치된 모델은 다시 다운로드하지 않습니다.",
+    "setup.start": "초기 설정 시작",
     "setup.title": "초기 설정",
     "setup.subtitle": "균형 또는 고속 파이프라인을 선택하고 이 설정에 필요한 모델만 준비합니다.",
     "setup.languages": "언어 및 번역",
@@ -983,11 +1002,19 @@ export function normalizeUiLanguage(value: unknown): UiLanguage {
   return value === "ko" ? "ko" : "en";
 }
 
+export function detectSystemUiLanguage(locale?: string | null): UiLanguage {
+  const resolved = locale ?? (typeof navigator !== "undefined" ? navigator.language : "");
+  return String(resolved).toLowerCase().startsWith("ko") ? "ko" : "en";
+}
+
 export function getStoredUiLanguage(storage: Storage | null = getUiLanguageStorage()): UiLanguage {
   try {
-    return normalizeUiLanguage(storage?.getItem(UI_LANGUAGE_STORAGE_KEY));
+    const stored = storage?.getItem(UI_LANGUAGE_STORAGE_KEY);
+    return stored === null || stored === undefined
+      ? detectSystemUiLanguage()
+      : normalizeUiLanguage(stored);
   } catch {
-    return "en";
+    return detectSystemUiLanguage();
   }
 }
 

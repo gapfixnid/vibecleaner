@@ -23,12 +23,14 @@ const sandbox = {
 sandbox.exports = sandbox.module.exports;
 vm.runInNewContext(compiled.outputText, sandbox, { filename: modulePath });
 
-const { createTranslator, normalizeUiLanguage } = sandbox.module.exports;
+const { createTranslator, normalizeUiLanguage, detectSystemUiLanguage } = sandbox.module.exports;
 
 assert.equal(normalizeUiLanguage("ko"), "ko");
 assert.equal(normalizeUiLanguage("en"), "en");
 assert.equal(normalizeUiLanguage("unsupported"), "en");
 assert.equal(normalizeUiLanguage(undefined), "en");
+assert.equal(detectSystemUiLanguage("ko-KR"), "ko");
+assert.equal(detectSystemUiLanguage("en-US"), "en");
 
 const memoryStorage = (initial = {}) => {
   const data = { ...initial };
@@ -51,6 +53,10 @@ assert.equal(
   sandbox.module.exports.getStoredUiLanguage(memoryStorage({ vibecleaner_ui_language: "bogus" })),
   "en",
 );
+assert.equal(
+  sandbox.module.exports.getStoredUiLanguage(memoryStorage()),
+  "en",
+);
 const writableStorage = memoryStorage();
 sandbox.module.exports.rememberUiLanguage("ko", writableStorage);
 assert.equal(writableStorage.getItem("vibecleaner_ui_language"), "ko");
@@ -58,6 +64,8 @@ sandbox.module.exports.rememberUiLanguage("bogus", writableStorage);
 assert.equal(writableStorage.getItem("vibecleaner_ui_language"), "en");
 
 const korean = createTranslator("ko");
+assert.equal(korean("backend.startingTitle"), "작업 환경을 준비하고 있습니다");
+assert.equal(korean("backend.startingDesc"), "AI 처리 엔진을 시작하고 프로젝트를 불러오는 중입니다...");
 assert.equal(korean("toolbar.translate"), "번역");
 assert.equal(korean("settings.uiLanguage"), "UI 언어");
 assert.equal(korean("sidebar.pages"), "페이지");
@@ -74,6 +82,8 @@ assert.equal(korean("export.successTitle"), "내보내기 완료");
 assert.equal(korean("task.translationFailed"), "번역 실패");
 
 const english = createTranslator("en");
+assert.equal(english("backend.startingTitle"), "Preparing your workspace");
+assert.equal(english("backend.startingDesc"), "Starting the AI processing engine and loading your project...");
 assert.equal(english("toolbar.translate"), "Translate");
 assert.equal(english("settings.uiLanguage"), "UI Language");
 assert.equal(english("sidebar.pages"), "Pages");
